@@ -1,0 +1,1557 @@
+'use strict';
+/* 管综数学刷书 · 纯前端单页应用(界面沿用 gzbuild-quiz 模板)
+   - 已转录的题集(questions.js):一题一卡,公式用 KaTeX 渲染,选完立即判分并显示解析
+   - 未转录的单元:左侧原书页面,右侧答题卡,对答案时点出正确选项(答案键会被记住)
+   数据来自 data.js(scripts/build.py)与 questions.js(scripts/build_questions.py) */
+
+const BANK = window.BANK;
+const QBANK = window.QBANK || {};
+const LETTERS = 'ABCDE';
+const COND_OPTS = [
+  '条件(1)充分,但条件(2)不充分',
+  '条件(2)充分,但条件(1)不充分',
+  '条件(1)和(2)单独都不充分,但条件(1)和(2)联合起来充分',
+  '条件(1)充分,条件(2)也充分',
+  '条件(1)和(2)单独都不充分,条件(1)和(2)联合起来也不充分',
+];
+const COND_RUBRIC = '条件充分性判断选项含义:A. 条件(1)充分,但条件(2)不充分　B. 条件(2)充分,但条件(1)不充分　C. 条件(1)(2)单独都不充分,但联合起来充分　D. 条件(1)充分,条件(2)也充分　E. 条件(1)(2)单独和联合起来都不充分';
+const DEFAULT_COUNT = 10;
+
+const $app = document.getElementById('app');
+const KEY_SHEETS = 'gzb.sheets.v1', KEY_WRONG = 'gzb.wrong.v1', KEY_HIST = 'gzb.hist.v1',
+      KEY_SESSION = 'gzb.session.v1';
+
+function load(k, d) {
+  try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }
+  catch (e) { return d; }
+}
+function store(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
+}
+// 答题卡:unitKey -> {count, ans:{题号:选项}, key:{题号:正确选项}, pg:{题号:作答时所看页}, ts}
+let sheets = load(KEY_SHEETS, {});
+// 错题本(纯收录):'unitKey#题号' -> {t:收录后重做错次数, pick:错选, last:收录时间}
+let wrongBook = load(KEY_WRONG, {});
+let hist = load(KEY_HIST, []);           // 最近成绩
+const saveSheets = () => store(KEY_SHEETS, sheets);
+const saveWrong = () => store(KEY_WRONG, wrongBook);
+const saveHist = () => store(KEY_HIST, hist);
+
+let quiz = null;            // 当前做题会话
+
+/* 外观:跟随系统 / 浅色 / 深色 */
+const THEME_LABEL = { auto: '◐ 跟随系统', light: '☀ 浅色', dark: '☾ 深色' };
+const THEME_NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
+let themePref = load('gzb.theme.v1', 'auto');
+function setTheme(t) {
+  themePref = t;
+  store('gzb.theme.v1', t);
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', t);
+}
+setTheme(themePref);
+const THEME_ICON = { auto: '◐', light: '☀', dark: '☾' };
+function themeToggle(cls) {
+  const b = el('button', cls, THEME_ICON[themePref]);
+  b.title = '外观:' + THEME_LABEL[themePref].slice(2) + '(点击切换 跟随系统 / 浅色 / 深色)';
+  b.onclick = function () { setTheme(THEME_NEXT[themePref]); render(); };
+  return b;
+}
+
+/* ───────────── 书与练习单元 ─────────────
+   页码统一用 PDF 页号(1 起);书本页码 = PDF 页号 - offset - 1 */
+// 每本书以目录的哪一级作为一个练习单元
+const UNIT_LEVEL = { wbq: 1, jz200: 0, dw1000: 2 };
+
+const BOOKS = {};
+const UNITS = {};
+BANK.books.forEach(function (b) {
+  BOOKS[b.id] = b;
+  b.lastBookPage = b.pages - b.offset - 1;
+  b.units = buildUnits(b);
+  b.units.forEach(function (u) { UNITS[u.key] = u; });
+});
+
+function pdfOf(book, bookPage) { return Math.min(book.pages, Math.max(1, bookPage + book.offset + 1)); }
+function pageLabel(book, pdf) {
+  const p = pdf - book.offset - 1;
+  return p >= 1 ? '第 ' + p + ' 页' : '扉页 ' + pdf;
+}
+function pageImg(book, pdf) { return 'books/' + book.id + '/pages/' + String(pdf).padStart(4, '0') + '.webp'; }
+
+function buildUnits(book) {
+  const toc = book.toc, lv = UNIT_LEVEL[book.id] != null ? UNIT_LEVEL[book.id] : 1;
+  const units = [];
+  const answerSecs = [];      // 「解析」下的条目,按顺序对应各单元的答案页
+  let inAnswers = false;
+  toc.forEach(function (e, i) {
+    if (e.level === 0) inAnswers = /^解析$/.test(e.title.trim());     // 「解析几何」不是答案部分
+    if (inAnswers) { if (e.level > 0) answerSecs.push(e); return; }
+    if (/大纲解读|逻辑|写作/.test(e.title)) return;     // 逻辑、写作暂不做练习
+    let isUnit = e.level === lv;
+    if (e.level < lv) {           // 没有更细分小节的上级条目,自身也算一个单元
+      isUnit = true;
+      for (let j = i + 1; j < toc.length && toc[j].level > e.level; j++) {
+        if (toc[j].level <= lv) { isUnit = false; break; }
+      }
+    }
+    if (!isUnit) return;
+    let end = book.lastBookPage;
+    for (let j = i + 1; j < toc.length; j++) {
+      if (toc[j].level <= e.level) {
+        // overlap:下一部分常在同一页中间开始,单元包含该页
+        end = Math.max(e.page, toc[j].page - (book.overlap ? 0 : 1));
+        break;
+      }
+    }
+    let group = '';
+    for (let j = i - 1; j >= 0; j--) {
+      if (toc[j].level < e.level) { group = toc[j].title; break; }
+    }
+    const u = { key: book.id + ':' + i, book: book, title: e.title, group: group || e.title,
+                start: pdfOf(book, e.page), end: pdfOf(book, end), ans: null,
+                first: e.first || 1, count: e.count || 0 };   // count>0:题号固定(真题)
+    // 已逐题转录的题集:真题按年份(zt-2010),参考书按「书 id|单元名」(jz200|单元一 应用题)
+    const name = group && group !== e.title ? group + ' · ' + e.title : e.title;
+    const qset = QBANK[book.id + '-' + (group.match(/\d{4}/) || [''])[0]] || QBANK[book.id + '|' + name];
+    if (qset) {
+      u.qs = {};
+      qset.qs.forEach(function (q) { u.qs[q.no] = q; });
+      u.qnos = qset.qs.map(q => q.no);
+      u.verified = !!qset.verified;
+    }
+    units.push(u);
+  });
+  if (answerSecs.length === units.length) {
+    units.forEach(function (u, k) { u.ans = pdfOf(book, answerSecs[k].page); });
+  }
+  return units;
+}
+function unitName(u) {
+  return u.group && u.group !== u.title ? u.group + ' · ' + u.title : u.title;
+}
+function unitOfPage(book, pdf) {
+  let best = null;
+  book.units.forEach(function (u) { if (u.start <= pdf && pdf <= u.end) best = u; });
+  return best;
+}
+
+/* ───────────── 答题卡与判分 ───────────── */
+function getSheet(key) {
+  const u = UNITS[key];
+  const s = sheets[key] || { count: (u && u.count) || DEFAULT_COUNT, ans: {}, key: {}, pg: {} };
+  if (u && u.qs) for (const n in u.qs) { if (u.qs[n].ans) s.key[n] = u.qs[n].ans; }    // 已转录且带答案的题
+  return s;
+}
+function unitList(u, s) { return u.qnos ? u.qnos.slice() : range(u.first, u.first + s.count - 1); }
+function putSheet(key, s) {
+  s.ts = Date.now();
+  sheets[key] = s;
+  saveSheets();
+}
+function status(s, n) {
+  const a = s.ans[n], k = s.key[n];
+  if (!a) return 'un';
+  if (!k) return 'ans';
+  return a === k ? 'ok' : 'bad';
+}
+function sheetStats(s, list) {
+  const r = { done: 0, ok: 0, bad: 0, pending: 0 };
+  (list || Object.keys(s.ans)).forEach(function (n) {
+    const st = status(s, n);
+    if (st === 'un') return;
+    r.done++;
+    if (st === 'ok') r.ok++;
+    else if (st === 'bad') r.bad++;
+    else r.pending++;
+  });
+  return r;
+}
+function bookStats(book) {
+  const r = { done: 0, ok: 0, bad: 0, pending: 0 };
+  book.units.forEach(function (u) {
+    if (!sheets[u.key]) return;
+    const st = sheetStats(getSheet(u.key));
+    for (const k in r) r[k] += st[k];
+  });
+  return r;
+}
+
+/* ───────────── 收录(错题本) ─────────────
+   错题本 = 纯收录模式:答错不自动进本,只有手动「☆ 收录」的题才收录;
+   收录的题重做时答错,只累计错误次数,不自动移出。 */
+const wid = (key, n) => key + '#' + n;
+function recordResult(key, n, pick, right) {
+  const r = wrongBook[wid(key, n)];
+  if (right || !r) return;
+  r.t = (r.t || 0) + 1;
+  r.pick = pick;
+  saveWrong();
+}
+function toggleStar(key, n) {
+  const id = wid(key, n);
+  if (wrongBook[id]) removeWrong(id);
+  else { wrongBook[id] = { t: 0, last: Date.now(), pick: null }; saveWrong(); }
+}
+function removeWrong(id) {
+  delete wrongBook[id];
+  saveWrong();
+}
+function isStar(key, n) { return !!wrongBook[wid(key, n)]; }
+function starLabel(key, n) { return isStar(key, n) ? '★ 已收录' : '☆ 收录'; }
+
+/* 选答案:有答案键时立即判分并锁定 */
+function pickAnswer(n, L) {
+  const s = getSheet(quiz.unit.key);
+  if (s.ans[n] && s.key[n]) return;
+  s.ans[n] = L;
+  s.pg[n] = quiz.page;
+  putSheet(quiz.unit.key, s);
+  if (s.key[n]) {
+    recordResult(quiz.unit.key, n, L, L === s.key[n]);
+    afterJudge();
+  }
+  render();
+}
+/* 对答案(未转录的单元):点出正确选项 */
+function setKey(n, L, silent) {
+  const s = getSheet(quiz.unit.key);
+  s.key[n] = L;
+  putSheet(quiz.unit.key, s);
+  if (s.ans[n]) recordResult(quiz.unit.key, n, s.ans[n], s.ans[n] === L);
+  if (!silent) afterJudge();
+  updateHist();
+  render();
+}
+function clearKey(n) {
+  const s = getSheet(quiz.unit.key);
+  delete s.key[n];
+  putSheet(quiz.unit.key, s);
+  render();
+}
+function afterJudge() {
+  const s = getSheet(quiz.unit.key);
+  if (quiz.list.every(n => status(s, n) === 'ok' || status(s, n) === 'bad')) finishQuiz();
+}
+
+/* ───────────── 会话 ───────────── */
+function saveSession() {
+  if (!quiz) return;
+  if (quiz.done) { localStorage.removeItem(KEY_SESSION); return; }
+  store(KEY_SESSION, { unit: quiz.unit.key, list: quiz.list, idx: quiz.idx,
+                       page: quiz.page, redo: quiz.redo, origin: quiz.origin });
+}
+function loadSession() {
+  const s = load(KEY_SESSION, null);
+  return s && UNITS[s.unit] ? s : null;
+}
+function restoreSession() {
+  const s = loadSession();
+  if (!s) return null;
+  quiz = makeQuiz(UNITS[s.unit], s.list, s.redo, s.origin);
+  quiz.idx = Math.min(s.idx || 0, quiz.list.length - 1);
+  quiz.page = s.page || quiz.page;
+  return quiz;
+}
+function makeQuiz(unit, list, redo, origin) {
+  const s = getSheet(unit.key);
+  if (!list) list = unitList(unit, s);
+  const firstPg = s.pg[list[0]];
+  const q = unit.qs && unit.qs[list[0]];
+  return { unit: unit, book: unit.book, list: list, idx: 0,
+           page: q && q.page ? pdfOf(unit.book, q.page) : redo && firstPg ? firstPg : unit.start,
+           redo: !!redo, showPage: false, done: false, showResult: false, histId: null,
+           origin: origin || '#/' };
+}
+function range(a, b) { const r = []; for (let i = a; i <= b; i++) r.push(i); return r; }
+
+function startUnit(unitKey, at) {
+  const u = UNITS[unitKey], s = getSheet(unitKey);
+  const done = Object.keys(s.ans).length;
+  if (done && !(at && at.keep)) {
+    if (confirm('这一节已有 ' + done + ' 题作答记录。\n确定 = 清空作答重新做\n取消 = 接着上次继续')) {
+      s.ans = {}; s.pg = {};
+      putSheet(unitKey, s);
+    }
+  }
+  quiz = makeQuiz(u, null, false, '#/');
+  if (at && at.page) quiz.page = at.page;
+  if (at && at.no != null) quiz.idx = Math.max(0, quiz.list.indexOf(at.no));
+  location.hash = '#/quiz';
+}
+function startRedo(unitKey, nums, origin) {
+  const s = getSheet(unitKey);
+  nums.forEach(function (n) { delete s.ans[n]; });
+  putSheet(unitKey, s);
+  quiz = makeQuiz(UNITS[unitKey], nums.slice().sort((a, b) => a - b), true, origin);
+  location.hash = '#/quiz';
+}
+function finishQuiz() {
+  stopQTimer();
+  localStorage.removeItem(KEY_SESSION);
+  quiz.done = true; quiz.showResult = true;
+  if (!quiz.redo) {
+    quiz.histId = Date.now();
+    hist.unshift({ id: quiz.histId, d: todayStr(), unit: quiz.unit.key, ok: 0, total: 0 });
+    hist = hist.slice(0, 30);
+    updateHist();
+  }
+}
+/* 结束后补对答案时,同步更新这次成绩 */
+function updateHist() {
+  if (!quiz || !quiz.histId) return;
+  const r = hist.find(h => h.id === quiz.histId);
+  if (!r) return;
+  const st = sheetStats(getSheet(quiz.unit.key), quiz.list);
+  r.ok = st.ok; r.total = quiz.list.length; r.pending = st.pending;
+  saveHist();
+}
+function confirmFinish() {
+  const s = getSheet(quiz.unit.key);
+  const un = quiz.list.filter(n => !s.ans[n]).length;
+  if (un && !confirm('还有 ' + un + ' 题未作答,确定结束?')) return;
+  finishQuiz();
+  render();
+}
+function setCount(c) {
+  const s = getSheet(quiz.unit.key);
+  s.count = Math.max(1, Math.min(200, c));
+  putSheet(quiz.unit.key, s);
+  quiz.list = unitList(quiz.unit, s);
+  quiz.idx = Math.min(quiz.idx, quiz.list.length - 1);
+  render();
+}
+function goQ(i) {
+  quiz.idx = Math.max(0, Math.min(quiz.list.length - 1, i));
+  quiz.showResult = false;
+  const q = quiz.unit.qs && quiz.unit.qs[quiz.list[quiz.idx]];
+  if (q && q.page) quiz.page = pdfOf(quiz.book, q.page);
+  render();
+}
+function goPage(p) {
+  quiz.page = Math.max(1, Math.min(quiz.book.pages, p));
+  render();
+}
+
+/* ───────────── 单题正计时(督促) ───────────── */
+let qTimerId = null, qTimerStart = 0, qTimerIdx = -1;
+function stopQTimer() {
+  if (qTimerId) { clearInterval(qTimerId); qTimerId = null; }
+  qTimerIdx = -1;
+}
+function tickQTimer() {
+  const t = document.getElementById('qtimer');
+  if (!t) { if (quiz && !quiz.done) return; stopQTimer(); return; }
+  const sec = Math.floor((Date.now() - qTimerStart) / 1000);
+  t.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+  t.classList.toggle('long', sec >= 180);     // 超过 3 分钟只轻微变色,不闪烁
+}
+function ensureQTimer(idx) {
+  if (qTimerIdx === idx && qTimerId) return;
+  qTimerIdx = idx;
+  qTimerStart = Date.now();
+  if (qTimerId) clearInterval(qTimerId);
+  qTimerId = setInterval(tickQTimer, 500);
+  tickQTimer();
+}
+
+/* ───────────── 小工具 ───────────── */
+function el(tag, cls, html) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html != null) n.innerHTML = html;
+  return n;
+}
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function todayStr() { const d = new Date(); return (d.getMonth() + 1) + '月' + d.getDate() + '日'; }
+function relDays(ts) {
+  const d = Math.floor((Date.now() - ts) / 86400000);
+  return d <= 0 ? '今天' : d === 1 ? '昨天' : d + ' 天前';
+}
+function pct(ok, total) { return total ? Math.round(ok / total * 100) + '%' : '—'; }
+/* 渲染节点内的 $...$ 公式(KaTeX 未加载时保留原文) */
+function typeset(node) {
+  if (window.renderMathInElement) {
+    // 分数统一用正常大小(\dfrac),与试卷排版一致、更易读
+    window.renderMathInElement(node, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false,
+                                       macros: { '\\frac': '\\dfrac' } });
+  }
+  return node;
+}
+
+/* ───────────── 复制:公式转成可读纯文本 ───────────── */
+const SUP = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+              '+': '⁺', '-': '⁻', 'n': 'ⁿ' };
+const SUB = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+              '+': '₊', '-': '₋', 'n': 'ₙ', 'k': 'ₖ' };
+const TEX_SYM = { le: '≤', leq: '≤', ge: '≥', geq: '≥', neq: '≠', ne: '≠', times: '×', div: '÷', cdot: '·',
+  pm: '±', approx: '≈', parallel: '∥', perp: '⊥', triangle: '△', angle: '∠', pi: 'π', infty: '∞',
+  in: '∈', cup: '∪', cap: '∩', alpha: 'α', beta: 'β', theta: 'θ', lambda: 'λ', circ: '°', Rightarrow: '⇒',
+  quad: ' ', qquad: '  ', ldots: '…', cdots: '⋯', left: '', right: '', lt: '<', gt: '>',
+  varnothing: '∅', emptyset: '∅', subset: '⊂', mathbb: '', begin: '', end: '',
+  sigma: 'σ', Delta: 'Δ', sim: '∼', cong: '≅', iff: '⇔', to: '→', mid: '|', sum: 'Σ', limits: '', ln: 'ln', min: 'min', max: 'max' };
+// 取出 s[i] 起的一个 {…} 组或单个字符,返回 [内容, 结束位置]
+function texGroup(s, i) {
+  while (s[i] === ' ') i++;
+  if (s[i] === '\\') {                       // 单个命令作参数,如 \frac\pi2
+    const m = /^\\([a-zA-Z]+|.)/.exec(s.slice(i));
+    return [m[0], i + m[0].length];
+  }
+  if (s[i] !== '{') return [s[i] || '', i + 1];
+  let d = 0;
+  for (let j = i; j < s.length; j++) {
+    if (s[j] === '{') d++;
+    else if (s[j] === '}' && --d === 0) return [s.slice(i + 1, j), j + 1];
+  }
+  return [s.slice(i + 1), s.length];
+}
+function wrap(t) { return /^[\w.]+$|^[^\s+\-−×÷/]+$/.test(t) ? t : '(' + t + ')'; }
+function scriptText(t, map, mark) {
+  return t.split('').every(c => map[c]) ? t.split('').map(c => map[c]).join('') : mark + wrap(t);
+}
+function texToText(s) {
+  let out = '', i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '\\') {
+      const m = /^\\([a-zA-Z]+|.)/.exec(s.slice(i));
+      const cmd = m[1];
+      i += m[0].length;
+      if (/^[a-zA-Z]/.test(cmd)) while (s[i] === ' ') i++;     // 命令后的空格不输出
+      if (cmd === 'frac' || cmd === 'dfrac') {
+        const a = texGroup(s, i), b = texGroup(s, a[1]);
+        out += wrap(texToText(a[0])) + '/' + wrap(texToText(b[0]));
+        i = b[1];
+      } else if (cmd === 'sqrt') {
+        const a = texGroup(s, i);
+        const t = texToText(a[0]);
+        out += '√' + (t.length > 1 ? '(' + t + ')' : t);
+        i = a[1];
+      } else if (cmd === 'begin' || cmd === 'end') {      // \begin{cases} 等环境名不输出
+        i = texGroup(s, i)[1];
+        if (cmd === 'begin') out += '{';
+        else out += '}';
+      } else if (cmd === '\\') {
+        out += ', ';
+      } else if (cmd === 'bar') {                         // \bar x → x̄
+        const a = texGroup(s, i);
+        out += texToText(a[0]) + '\u0304';
+        i = a[1];
+      } else if (cmd === 'text' || cmd === 'mathrm') {
+        const a = texGroup(s, i);
+        out += a[0];
+        i = a[1];
+      } else if (cmd === ',' || cmd === ' ' || cmd === ';') {
+        out += cmd === ' ' ? ' ' : '';
+      } else if (cmd === '{' || cmd === '}' || cmd === '%' || cmd === '$') {
+        out += cmd;
+      } else if (TEX_SYM[cmd] != null) {
+        out += TEX_SYM[cmd];
+      } else out += cmd;
+    } else if (c === '^' || c === '_') {
+      const a = texGroup(s, i + 1);
+      out += scriptText(texToText(a[0]), c === '^' ? SUP : SUB, c);
+      i = a[1];
+    } else if (c === '{' || c === '}' || c === '&') {
+      i++;
+    } else {
+      out += c === '-' ? '−' : c;
+      i++;
+    }
+  }
+  return out;
+}
+/* 题干/选项 → 纯文本:表格转成行,公式转可读文本 */
+function richToText(html) {
+  const t = html.replace(/<table[^>]*>/g, '\n').replace(/<\/tr>/g, '\n').replace(/<\/td>\s*<td>/g, ' | ').replace(/<[^>]+>/g, '');
+  return t.replace(/\$([^$]*)\$/g, (m, tex) => texToText(tex)).replace(/[ \t]+/g, ' ').trim();
+}
+function questionPlainText(u, n) {
+  const q = u.qs[n];
+  let t = '【' + unitName(u) + ' · 第 ' + n + ' 题】\n' + richToText(q.stem);
+  if (q.kind === 'cond') {
+    t += '\n(1) ' + richToText(q.c1) + '\n(2) ' + richToText(q.c2);
+    t += '\n(A 条件(1)充分但(2)不充分 / B 条件(2)充分但(1)不充分 / C 联合充分 / D 都充分 / E 都不充分)';
+  } else {
+    q.opts.forEach(function (o, i) { t += '\n' + LETTERS[i] + '. ' + richToText(o); });
+  }
+  if (q.fig) t += '\n(原题附有图形,见刷题页面)';
+  return t;
+}
+/* 复制图片:把题目(出处、题干、图形、条件、选项)排成干净的卷面再截图 */
+function captureNode(u, n) {
+  const q = u.qs[n];
+  const box = el('div', 'capture');
+  box.append(el('div', 'cap-src', esc(unitName(u)) + ' · 第 ' + n + ' 题'));
+  box.append(el('div', 'cap-stem', '<b>' + n + '.</b> ' + q.stem));
+  if (q.fig) {
+    const img = el('img', 'cap-fig');
+    img.src = q.fig;
+    box.append(img);
+  }
+  if (q.kind === 'cond') {
+    box.append(el('div', 'cap-cond', '(1) ' + q.c1));
+    box.append(el('div', 'cap-cond', '(2) ' + q.c2));
+  } else {
+    const opts = el('div', 'cap-opts');
+    q.opts.forEach(function (o, i) { opts.append(el('span', '', LETTERS[i] + '. ' + o)); });
+    box.append(opts);
+  }
+  return typeset(box);
+}
+function flash(btn, text, ok) {
+  const old = btn.dataset.label || btn.textContent;
+  btn.dataset.label = old;
+  btn.textContent = text;
+  btn.classList.toggle('copied', ok !== false);
+  setTimeout(function () { btn.textContent = old; btn.classList.remove('copied'); }, 1500);
+}
+function copyQuestionImage(u, n, btn) {
+  if (!window.html2canvas) { copyText(questionPlainText(u, n), btn); return; }
+  const node = captureNode(u, n);
+  document.body.append(node);
+  const blob = Promise.all([...node.querySelectorAll('img')].map(i => i.decode().catch(() => {})))
+    .then(() => window.html2canvas(node, { backgroundColor: '#ffffff', scale: 2, logging: false }))
+    .then(c => new Promise(r => c.toBlob(r, 'image/png')))
+    .finally(() => node.remove());
+  const download = () => blob.then(function (b) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = unitName(u) + '-第' + n + '题.png';
+    a.click();
+    flash(btn, '已存为图片');
+  });
+  // ClipboardItem 需在点击时同步创建,内容可以是 Promise(Safari 要求如此)
+  if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      .then(() => flash(btn, '已复制 ✓'), download);
+  } else download();
+}
+
+function copyText(text, btn) {
+  const done = function () { flash(btn, '已复制 ✓'); };
+  const fallback = function () {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.append(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败,请手动选择'); }
+    ta.remove();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else fallback();
+}
+
+/* ───────────── 渲染分发 ───────────── */
+function renderSidebar(hash) {
+  const side = document.getElementById('side');
+  side.innerHTML = '';
+  const wrongN = Object.keys(wrongBook).length;
+  const brand = el('div', 'brand');
+  brand.append(el('div', 'brand-title', '管综数学刷书'));
+  brand.append(el('div', 'brand-sub', BANK.updated + ' 更新'));
+  side.append(brand);
+  const nav = el('nav', 'snav');
+  [['#/', '主页', '⌂'], ['#/wrong', '错题本', '★']]
+    .forEach(function (item) {
+      const active = item[0] === '#/' ? hash.indexOf('#/wrong') !== 0 : hash.indexOf(item[0]) === 0;
+      const a = el('a', 'sitem' + (active ? ' active' : ''));
+      a.href = item[0];
+      a.append(el('span', 'sicon', item[2]));
+      a.append(el('span', 'slabel', item[1]));
+      if (item[0] === '#/wrong' && wrongN) a.append(el('span', 'sbadge', String(wrongN)));
+      nav.append(a);
+    });
+  side.append(nav);
+  const nq = Object.keys(QBANK).reduce((n, k) => n + QBANK[k].qs.length, 0);
+  const foot = el('div', 'side-foot', '已逐题转录 ' + nq + ' 题<br>记录存在本机浏览器,记得导出备份');
+  const tb = el('button', 'themebtn', THEME_LABEL[themePref]);
+  tb.title = '切换外观:跟随系统 / 浅色 / 深色';
+  tb.onclick = function () { setTheme(THEME_NEXT[themePref]); render(); };
+  foot.append(document.createElement('br'), tb);
+  side.append(foot);
+}
+
+let lastRoute = '';
+// 离开列表页(主页/错题本)时记住滚动位置和展开的分组,返回时恢复
+const savedView = {};
+function saveView(route) {
+  if (route === 'quiz') return;
+  savedView[route] = { y: window.scrollY,
+    open: [...$app.querySelectorAll('details')].map(d => d.open) };
+}
+function restoreView(route) {
+  const v = savedView[route];
+  if (!v) { window.scrollTo(0, 0); return; }
+  $app.querySelectorAll('details').forEach(function (d, i) { if (v.open[i] != null) d.open = v.open[i]; });
+  window.scrollTo(0, v.y);
+}
+function render() {
+  const hash = location.hash || '#/';
+  const route = hash.split('/')[1] || '';
+  const entered = route !== lastRoute;
+  if (entered) saveView(lastRoute);
+  lastRoute = route;
+  renderSidebar(hash);
+  document.body.classList.toggle('focus', hash.indexOf('#/quiz') === 0);   // 做题时隐藏侧栏,专注
+  if (hash.indexOf('#/quiz') === 0) {
+    if (!quiz && !restoreSession()) { location.hash = '#/'; return; }
+    saveSession();
+    renderQuiz();
+    if (entered) window.scrollTo(0, 0);
+    return;
+  }
+  if (quiz && !quiz.done) saveSession();     // 主动退出也保留断点
+  stopQTimer();
+  quiz = null;
+  if (hash.indexOf('#/wrong') === 0) renderWrong();
+  else renderHome();
+  if (entered) restoreView(route);
+}
+window.addEventListener('hashchange', render);
+
+/* ───────────── 首页 ───────────── */
+const HELP_HTML =
+  '<h3>怎么刷</h3>' +
+  '<p><b>已转录的题</b>:一题一卡,点选项立即判分,并显示答案与解析;答案与解析由 AI 解出,如发现有误请以官方答案为准。点 <b>复制图片</b> 可把整题(含图形)截成图片直接粘贴,<b>复制文字</b> 得到纯文本(公式转成 a/b、x²、√2 等写法)。</p>' +
+  '<p><b>未转录的部分</b>:左边看原书页面,右边答题卡选 A–E;选完翻到答案页,点出正确选项即判分。答案键会被记住,重做时自动判分。</p>' +
+  '<p><b>错题本是纯收录模式</b>:答错不会自动进本,做题时点 <b>☆ 收录</b> 把值得重做的题收进来;收录的题不会自动移出,可随时手动移出。</p>' +
+  '<p>快捷键:<code>A</code>–<code>E</code> 作答 · <code>Enter</code> 下一题 · <code>←</code><code>→</code> 换题 · <code>S</code> 收录 · <code>X</code> 复制图片 · <code>V</code> 原页 · <code>G</code> 题号 · <code>Esc</code> 退出</p>' +
+  '<h3>数据备份</h3>' +
+  '<p>所有记录只保存在本机浏览器,换浏览器或清缓存会丢失,建议定期<b>导出备份</b>。</p>' +
+  '<p>部署在 GitHub 时:把导出的备份文件改名为 <code>progress.json</code> 放进网站目录一起上传;浏览器记录被清空后,打开网站会自动从它恢复。</p>';
+
+function renderHome() {
+  $app.innerHTML = '';
+  const w = el('div', 'wrap');
+
+  const head = el('header', 'hero');
+  head.append(themeToggle('themefab'));
+  head.append(el('div', 'badge', '管理类联考(199)· 数学考前冲刺'));
+  head.append(el('h1', '', '管综数学刷书'));
+  let done = 0, ok = 0, bad = 0, units = 0;
+  BANK.books.forEach(function (b) {
+    const st = bookStats(b);
+    done += st.done; ok += st.ok; bad += st.bad; units += b.units.length;
+  });
+  head.append(el('p', 'hero-sub', BANK.books.length + ' 本书 · ' + units + ' 节练习 · 已做 ' + done +
+    ' 题 · 收录 ' + Object.keys(wrongBook).length));
+  w.append(head);
+  w.append(searchBar());
+
+  const sess = loadSession();
+  if (sess) {
+    const u = UNITS[sess.unit], s = getSheet(sess.unit);
+    const answered = sess.list.filter(n => s.ans[n]).length;
+    const rc = el('div', 'card sec resumecard');
+    const info = el('div', 'rinfo');
+    info.append(el('div', 'rtitle', '⏵ ' + esc(u.book.title + ' · ' + unitName(u))));
+    info.append(el('div', 'rmeta', '做到第 ' + sess.list[sess.idx || 0] + ' 题 / 共 ' + sess.list.length +
+      ' 题' + (answered ? ' · 已答 ' + answered : '')));
+    rc.append(info);
+    const cont = el('button', 'btn small', '继续');
+    cont.onclick = function () { location.hash = '#/quiz'; };
+    const drop = el('button', 'btn ghost small', '放弃');
+    drop.onclick = function () { localStorage.removeItem(KEY_SESSION); render(); };
+    const acts = el('div', 'setacts');
+    acts.append(cont, drop);
+    rc.append(acts);
+    w.append(rc);
+  }
+
+  const grid = el('div', 'homegrid books');
+  BANK.books.forEach(function (book) { grid.append(bookCard(book)); });
+  w.append(grid);
+
+  if (hist.length) {
+    const hc = el('section', 'card sec');
+    hc.append(el('h2', 'sec-title', '最近成绩'));
+    hist.slice(0, 8).forEach(function (r) {
+      const u = UNITS[r.unit];
+      if (!u) return;
+      const row = el('div', 'setrow');
+      row.append(el('div', 'setname small', esc(u.book.title + ' · ' + unitName(u))));
+      row.append(el('div', 'setmeta', r.d));
+      row.append(el('div', 'setbest', r.ok + '/' + r.total +
+        (r.pending ? '<span class="setmeta"> · 待对答案 ' + r.pending + '</span>' : '')));
+      hc.append(row);
+    });
+    w.append(hc);
+  }
+
+  const hd = el('details', 'helpcard');
+  hd.append(el('summary', '', '<b>使用说明 / 数据备份</b>'));
+  const body = el('div', 'helpbody', HELP_HTML);
+  const acts = el('div', 'setacts');
+  acts.style.marginLeft = '0';
+  const ex = el('button', 'btn small', '导出备份');
+  ex.onclick = exportBackup;
+  const im = el('button', 'btn ghost small', '导入备份');
+  im.onclick = importBackup;
+  const clr = el('button', 'btn ghost small', '清空全部记录');
+  clr.onclick = function () {
+    if (confirm('清空全部本地记录(答题卡、答案键、错题本、成绩)?此操作不可恢复,建议先导出备份。')) {
+      sheets = {}; wrongBook = {}; hist = [];
+      saveSheets(); saveWrong(); saveHist();
+      localStorage.removeItem(KEY_SESSION);
+      render();
+    }
+  };
+  acts.append(ex, im, clr);
+  body.append(acts);
+  hd.append(body);
+  w.append(hd);
+
+  $app.append(w);
+}
+
+function bookCard(book) {
+  const sec = el('section', 'card sec hsec');
+  const head = el('div', 'bookhead');
+  const cover = el('img', 'bookcover');
+  cover.src = 'books/' + book.id + '/thumbs/0001.webp';
+  cover.alt = '';
+  head.append(cover);
+  const info = el('div', 'bookinfo');
+  info.append(el('h2', 'sec-title', esc(book.title) + ' · ' + book.units.length + (book.id === 'zt' ? ' 套' : ' 节')));
+  const st = bookStats(book);
+  info.append(el('div', 'bookstat', esc(book.author) + ' · ' + book.pages + ' 页 · 已做 <b>' + st.done +
+    '</b> 题'));
+  head.append(info);
+  sec.append(head);
+
+  let groups = [];
+  book.units.forEach(function (u) {
+    let g = groups.find(x => x.name === u.group);
+    if (!g) groups.push(g = { name: u.group, units: [] });
+    g.units.push(u);
+  });
+  // 每组只有一个单元(如真题按年份)时,排成紧凑的年份格子
+  if (groups.every(g => g.units.length === 1)) {
+    const yg = el('div', 'yeargrid');
+    groups.forEach(function (g) { yg.append(yearCell(g.units[0])); });
+    sec.append(yg);
+    return sec;
+  }
+  // 每组只有两三个单元(如 1000 题的专项):专项排成两列小卡片,单元直接放卡片里
+  const small = groups.filter(g => g.units.length <= 3);
+  if (small.length >= 4) {
+    const gg = el('div', 'groupgrid');
+    small.forEach(function (g) {
+      const c = el('div', 'gcard');
+      c.append(el('div', 'g-name', esc(g.name)));
+      const row = el('div', 'g-units');
+      g.units.forEach(function (u) { row.append(unitCell(u, u.title)); });
+      c.append(row);
+      gg.append(c);
+    });
+    sec.append(gg);
+    groups = groups.filter(g => g.units.length > 3);     // 单元多的组仍用折叠列表
+  }
+  groups.forEach(function (g) {
+    const used = g.units.reduce((n, u) => n + (sheets[u.key] ? sheetStats(sheets[u.key]).done : 0), 0);
+    const box = el('details', 'foldgroup');
+    box.append(el('summary', '', '<b>' + esc(g.name) + '</b><span class="catcnt">' + g.units.length + ' 节' +
+      (used ? ' · 已做 ' + used + ' 题' : '') + ' ▾</span>'));
+    if (used) box.open = true;
+    // 组内单元排成紧凑格子,整块可点
+    const ug = el('div', 'unitgrid');
+    g.units.forEach(function (u) {
+      ug.append(unitCell(u, g.units.length === 1 && u.title === g.name ? '整部分练习' : u.title));
+    });
+    box.append(ug);
+    sec.append(box);
+  });
+  return sec;
+}
+
+function yearCell(u) {
+  const s = sheets[u.key] && getSheet(u.key);
+  const total = s ? unitList(u, s).length : (u.qnos ? u.qnos.length : u.count);
+  const st = s ? sheetStats(s) : { done: 0, ok: 0, bad: 0 };
+  const b = el('button', 'ycell' + (st.done ? ' started' : '') + (u.qs ? '' : ' raw'));
+  b.title = unitName(u) + (u.qs ? '' : '(原卷页面作答)');
+  b.append(el('span', 'y-year', (u.group.match(/\d{4}/) || [u.title])[0]));
+  b.append(el('span', 'y-meta', st.done ? st.ok + '/' + total : total + ' 题'));
+  b.append(el('span', 'y-bar', '<i style="width:' + Math.round(st.done / total * 100) + '%"></i>'));
+  b.onclick = () => startUnit(u.key);
+  return b;
+}
+
+function unitCell(u, label) {
+  const s = sheets[u.key] && getSheet(u.key);
+  const total = u.qnos ? u.qnos.length : (u.count || (s && s.count) || 0);
+  const st = s ? sheetStats(s) : { done: 0, ok: 0 };
+  const b = el('button', 'ucell' + (st.done ? ' started' : ''));
+  b.title = unitName(u);
+  b.append(el('span', 'u-name', esc(label.replace(/^第.节\s*/, ''))));
+  b.append(el('span', 'u-meta', (st.done ? '已做 ' + st.done + (total ? '/' + total : '') : (total ? total + ' 题' : '原页'))));
+  if (total) b.append(el('span', 'y-bar', '<i style="width:' + Math.min(100, Math.round(st.done / total * 100)) + '%"></i>'));
+  b.onclick = () => startUnit(u.key);
+  return b;
+}
+
+function unitRow(u, label) {
+  const row = el('div', 'setrow unit');
+  const s = sheets[u.key] && getSheet(u.key);
+  const left = el('div', '');
+  left.append(el('div', 'setname', esc(label)));
+  let meta = u.qs ? u.qnos.length + ' 题'
+    : (u.count ? '第 ' + u.first + '–' + (u.first + u.count - 1) + ' 题 · ' : '') + pageLabel(u.book, u.start) +
+      (u.end > u.start ? ' – ' + (u.end - u.book.offset - 1) : '');
+  if (s) {
+    const st = sheetStats(s);
+    if (st.done) meta += ' · 已做 ' + st.done + '/' + unitList(u, s).length +
+      (st.ok ? ' · <span class="okc">✓' + st.ok + '</span>' : '') +
+      (st.bad ? ' · <span class="badc">✗' + st.bad + '</span>' : '');
+  }
+  left.append(el('div', 'unitmeta', meta));
+  row.append(left);
+  const acts = el('div', 'setacts');
+  const p = el('button', 'btn small', '做题');
+  p.onclick = () => startUnit(u.key);
+  acts.append(p);
+  row.append(acts);
+  return row;
+}
+
+function exportBackup() {
+  const data = { app: 'gzb', exported: new Date().toISOString(), sheets: sheets, wrong: wrongBook, hist: hist };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '管综刷书备份-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function importBackup() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json,.json';
+  inp.onchange = function () {
+    const f = inp.files[0];
+    if (!f) return;
+    f.text().then(function (txt) {
+      const d = JSON.parse(txt);
+      if (d.app !== 'gzb' || !d.sheets) throw new Error('bad');
+      if (!confirm('导入会覆盖当前的全部记录,确定?')) return;
+      sheets = d.sheets; wrongBook = d.wrong || {}; hist = d.hist || [];
+      saveSheets(); saveWrong(); saveHist();
+      render();
+    }).catch(function () { alert('导入失败:文件不是本站导出的备份'); });
+  };
+  inp.click();
+}
+
+/* ───────────── 搜索(首页小搜索框) ───────────── */
+let searchQ = '';
+let searchHist = load('gzb.searchhist.v1', []);   // 最近搜索,最多 8 条
+function rememberSearch(q) {
+  q = (q || '').trim();
+  if (!q) return;
+  searchHist = [q].concat(searchHist.filter(x => x !== q)).slice(0, 8);
+  store('gzb.searchhist.v1', searchHist);
+}
+function historyChips(inp, res) {
+  const box = el('div', 'searchhist');
+  if (!searchHist.length) return box;
+  box.append(el('span', 'sh-label', '最近搜索'));
+  searchHist.forEach(function (q) {
+    const c = el('button', 'sh-chip', esc(q));
+    c.onclick = function () { inp.value = q; searchQ = q; rememberSearch(q); runSearch(q, res); };
+    box.append(c);
+  });
+  const clr = el('button', 'sh-clear', '清除');
+  clr.onclick = function () { searchHist = []; store('gzb.searchhist.v1', searchHist); box.innerHTML = ''; };
+  box.append(clr);
+  return box;
+}
+function searchBar() {
+  const box = el('div', 'minisearch');
+  const inp = el('input');
+  inp.type = 'search';
+  inp.placeholder = '🔍 搜题目关键词,如:圆心、等差、柯西';
+  inp.value = searchQ;
+  const res = el('div', 'minisearch-res');
+  let timer = null;
+  inp.oninput = function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () { searchQ = inp.value.trim(); runSearch(searchQ, res); }, 250);
+  };
+  inp.onkeydown = function (ev) {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') rememberSearch(inp.value);
+  };
+  box.append(inp, res);
+  if (searchQ) runSearch(searchQ, res);
+  else res.append(historyChips(inp, res));
+  return box;
+}
+function loadSearchText(cb) {
+  const need = BANK.books.filter(b => b.searchable && !(window.SEARCH_TEXT && window.SEARCH_TEXT[b.id]));
+  if (!need.length) { cb(); return; }
+  let left = need.length;
+  need.forEach(function (b) {
+    const sc = document.createElement('script');
+    sc.src = 'text-' + b.id + '.js';
+    sc.onload = sc.onerror = function () { if (--left === 0) cb(); };
+    document.body.append(sc);
+  });
+}
+function runSearch(q, res) {
+  res.innerHTML = '';
+  if (!q) {
+    const inp = res.parentNode && res.parentNode.querySelector('input');
+    if (inp) res.append(historyChips(inp, res));
+    return;
+  }
+  const terms = q.split(/\s+/).filter(Boolean);
+  const hits = [];
+  function snip(t) {
+    const at = Math.max(0, t.indexOf(terms[0]));
+    let s = esc(t.slice(Math.max(0, at - 24), at + 56).replace(/\n/g, ' '));
+    terms.forEach(function (x) { s = s.split(esc(x)).join('<mark>' + esc(x) + '</mark>'); });
+    return '…' + s + '…';
+  }
+  // 1) 已转录的题目
+  Object.values(UNITS).forEach(function (u) {
+    if (!u.qs) return;
+    u.qnos.forEach(function (n) {
+      const t = questionPlainText(u, n);
+      if (terms.every(x => t.indexOf(x) >= 0)) {
+        hits.push({ title: unitName(u) + ' · 第 ' + n + ' 题', snip: snip(t.split('\n').slice(1).join(' ')),
+                    go: () => startUnit(u.key, { no: n, keep: true }) });
+      }
+    });
+  });
+  // 2) 有文字层的书页(未转录部分)
+  loadSearchText(function () {
+    BANK.books.forEach(function (book) {
+      const texts = book.searchable && window.SEARCH_TEXT && window.SEARCH_TEXT[book.id];
+      if (!texts) return;
+      texts.forEach(function (t, i) {
+        const pdf = i + 1, u = unitOfPage(book, pdf);
+        if (!u || u.qs || !terms.every(x => t.indexOf(x) >= 0)) return;
+        hits.push({ title: book.title + ' · ' + pageLabel(book, pdf) + ' · ' + unitName(u), snip: snip(t),
+                    go: () => startUnit(u.key, { page: pdf, keep: true }) });
+      });
+    });
+    res.innerHTML = '';
+    if (!hits.length) { res.append(el('div', 'setmeta', '没有找到「' + esc(q) + '」')); return; }
+    res.append(el('div', 'setmeta', '找到 ' + hits.length + ' 处' + (hits.length > 30 ? ',显示前 30 处' : '')));
+    hits.slice(0, 30).forEach(function (h) {
+      const d = el('div', 'hit');
+      d.append(el('div', 'hit-title', esc(h.title)));
+      d.append(el('div', 'hit-snip', h.snip));
+      d.onclick = function () { rememberSearch(q); h.go(); };
+      res.append(d);
+    });
+  });
+}
+
+/* ───────────── 原书页面查看器 ───────────── */
+function viewer(book, pdf, onGo, extra) {
+  const card = el('div', 'card viewer');
+  const ctl = el('div', 'pagectl');
+  const prev = el('button', 'btn ghost small', '‹ 上页');
+  prev.disabled = pdf <= 1;
+  prev.onclick = () => onGo(pdf - 1);
+  const next = el('button', 'btn ghost small', '下页 ›');
+  next.disabled = pdf >= book.pages;
+  next.onclick = () => onGo(pdf + 1);
+  ctl.append(prev, el('span', 'pgno', '<b>' + pageLabel(book, pdf) + '</b>'), next);
+  ctl.append(el('span', 'grow'));
+  const zoom = el('button', 'btn ghost small', '放大');
+  ctl.append(zoom);
+  card.append(ctl);
+  if (extra) card.append(extra);
+  const wrap = el('div', 'pagewrap');
+  const img = el('img', 'pageimg');
+  img.src = pageImg(book, pdf);
+  img.alt = book.title + ' ' + pageLabel(book, pdf);
+  wrap.append(img);
+  zoom.onclick = function () {
+    wrap.classList.toggle('zoom');
+    zoom.textContent = wrap.classList.contains('zoom') ? '缩小' : '放大';
+  };
+  card.append(wrap);
+  if (pdf < book.pages) { const pre = new Image(); pre.src = pageImg(book, pdf + 1); }
+  return card;
+}
+
+/* ───────────── 做题页 ───────────── */
+function quizTopbar() {
+  const u = quiz.unit;
+  const bar = el('div', 'topbar focusbar');
+  const back = el('button', 'iconbtn', '←');
+  back.title = '退出(Esc),进度会保留';
+  back.onclick = exitQuiz;
+  bar.append(back);
+  const t = el('div', 'topbar-title');
+  t.append(el('span', 'fb-title', esc(unitName(u)) + (quiz.redo ? ' · 重做' : '')));
+  if (!(quiz.done && quiz.showResult)) {
+    // 进度条即拉条:拖动可快速跳题,底色显示已答比例
+    const s = getSheet(u.key), st = sheetStats(s, quiz.list);
+    const prog = el('div', 'fb-prog');
+    const range = el('input', 'fb-range');
+    range.type = 'range';
+    range.min = 0;
+    range.max = Math.max(0, quiz.list.length - 1);
+    range.value = quiz.idx;
+    range.title = '拖动快速跳题';
+    range.style.setProperty('--done', Math.round(st.done / quiz.list.length * 100) + '%');
+    const count = el('span', 'fb-count', (quiz.idx + 1) + ' / ' + quiz.list.length);
+    range.oninput = function () { count.textContent = '第 ' + quiz.list[+range.value] + ' 题'; };
+    range.onchange = function () { goQ(+range.value); };
+    range.onkeydown = function (ev) { ev.stopPropagation(); };
+    prog.append(range, count);
+    t.append(prog);
+  }
+  bar.append(t);
+  const right = el('div', 'topbar-right');
+  right.append(themeToggle('quietbtn themeq'));
+  if (!(quiz.done && quiz.showResult)) {
+    const nb = el('button', 'quietbtn' + (quiz.showNav ? ' on' : ''), '题号');
+    nb.title = '展开/收起题号(G)';
+    nb.onclick = function () { quiz.showNav = !quiz.showNav; render(); };
+    right.append(nb);
+  }
+  bar.append(right);
+  return bar;
+}
+function exitQuiz() { const org = quiz.origin || '#/'; quiz = null; location.hash = org; }
+
+function renderQuiz() {
+  $app.innerHTML = '';
+  const u = quiz.unit, s = getSheet(u.key);
+  const w = el('div', u.qs ? 'wrap' : 'wrap wide');
+  w.append(quizTopbar());
+
+  if (quiz.done && quiz.showResult) {
+    w.append(resultView());
+    $app.append(w);
+    return;
+  }
+  if (u.qs) {
+    if (quiz.showNav) w.append(navGrid(s));
+    w.append(questionCard(s));
+    $app.append(w);
+    return;
+  }
+
+  // 未转录:原书页面 + 答题卡
+  const chips = el('div', 'unitpages');
+  for (let p = u.start; p <= u.end; p++) {
+    const c = el('button', 'pchip' + (p === quiz.page ? ' cur' : ''), String(p - u.book.offset - 1));
+    c.onclick = (function (pp) { return function () { goPage(pp); }; })(p);
+    chips.append(c);
+  }
+  if (u.ans) {
+    const c = el('button', 'pchip ans' + (quiz.page === u.ans ? ' cur' : ''), '答案页');
+    c.onclick = () => goPage(u.ans);
+    chips.append(c);
+  }
+  const grid = el('div', 'quizgrid');
+  grid.append(viewer(u.book, quiz.page, goPage, chips));
+  const col = el('div', 'sheetcol');
+  col.append(sheetCard(s));
+  grid.append(col);
+  w.append(grid);
+  $app.append(w);
+}
+
+function navCls(s, n, i) {
+  let c = i === quiz.idx ? ' cur' : '';
+  const st = status(s, n);
+  if (st === 'ok' || st === 'bad' || st === 'ans') c += ' ' + st;
+  if (isStar(quiz.unit.key, n)) c += ' star';
+  return c;
+}
+function navGrid(s) {
+  const nav = el('div', 'navgrid');
+  quiz.list.forEach(function (n, i) {
+    const b = el('button', 'nv' + navCls(s, n, i), String(n));
+    b.onclick = () => goQ(i);
+    nav.append(b);
+  });
+  return nav;
+}
+
+/* 一题一卡(已转录的题) */
+function questionCard(s) {
+  const u = quiz.unit, n = quiz.list[quiz.idx], q = u.qs[n];
+  const cardEl = el('div', 'card qcard');
+  const meta = el('div', 'qmeta');
+  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '')));
+  const tools = el('span', 'qtools');
+  const imgBtn = el('button', 'tool', '复制图片');
+  imgBtn.title = '把整道题(含图形)截成图片复制,可直接粘贴(X)';
+  imgBtn.onclick = function () { copyQuestionImage(u, n, imgBtn); };
+  const txtBtn = el('button', 'tool', '复制文字');
+  txtBtn.title = '复制纯文本,公式转成 a/b、x²、√2 等写法';
+  txtBtn.onclick = function () { copyText(questionPlainText(u, n), txtBtn); };
+  const pgBtn = el('button', 'tool' + (quiz.showPage ? ' on' : ''), '原页');
+  pgBtn.title = '对照原卷页面(V)';
+  pgBtn.onclick = function () { quiz.showPage = !quiz.showPage; render(); };
+  const starBtn = el('button', 'tool star' + (isStar(u.key, n) ? ' on' : ''), isStar(u.key, n) ? '★ 已收录' : '☆ 收录');
+  starBtn.title = '收录到错题本 / 移出(S)';
+  starBtn.onclick = function () { toggleStar(u.key, n); render(); };
+  tools.append(imgBtn, txtBtn, pgBtn, starBtn);
+  meta.append(tools);
+  cardEl.append(meta);
+
+  const stem = el('div', 'qstem');
+  stem.innerHTML = '<span class="qno">' + n + '.</span> ' + q.stem;
+  cardEl.append(stem);
+  if (q.fig) {
+    const img = el('img', 'qfig');
+    img.src = q.fig;
+    img.alt = '原题图示';
+    cardEl.append(img);
+  }
+
+  const chosen = s.ans[n];
+  const key = q.ans || s.key[n];          // 题目自带答案,或用户对照原书点出的答案
+  const reveal = !!chosen && !!key;
+  const grid = el('div', 'optgrid');
+  function optButton(L, txt) {
+    const b = el('button', 'opt');
+    b.innerHTML = '<span class="ol">' + L + '</span><span class="ot">' + txt + '</span>';
+    const isChosen = chosen === L, isAns = key === L;
+    if (reveal) {
+      if (isAns) b.classList.add('ok');
+      if (isChosen && !isAns) b.classList.add('bad');
+      if (isChosen) b.classList.add('chosen');
+      b.disabled = true;
+    } else {
+      if (isChosen) b.classList.add('chosen');
+      b.onclick = () => pickAnswer(n, L);
+    }
+    return b;
+  }
+  if (q.kind === 'cond') {
+    cardEl.append(el('div', 'cond', '(1) ' + q.c1));
+    cardEl.append(el('div', 'cond', '(2) ' + q.c2));
+    COND_OPTS.forEach(function (txt, li) { grid.append(optButton(LETTERS[li], txt)); });
+  } else {
+    q.opts.forEach(function (o, li) { grid.append(optButton(LETTERS[li], o)); });
+  }
+  cardEl.append(grid);
+
+  if (chosen && !key) {
+    // 题目没有内置答案:对照原书答案页点出正确选项,之后自动判分
+    const kr = el('div', 'keyrow');
+    kr.append(el('div', 'klabel', '对答案:点「原页」翻到答案,点出<b>正确选项</b>'));
+    const kl = el('div', 'letters');
+    LETTERS.split('').forEach(function (L) {
+      const b = el('button', 'lbtn', L);
+      b.onclick = () => setKey(n, L);
+      kl.append(b);
+    });
+    kr.append(kl);
+    cardEl.append(kr);
+  }
+  if (reveal) {
+    const p = el('div', 'panel');
+    let html = '<div class="ansline">答案 <b class="ansletter">' + key + '</b>';
+    if (q.kind === 'cond') html += '<span class="ansmeaning">' + COND_OPTS[LETTERS.indexOf(key)] + '</span>';
+    html += chosen === key ? '<span class="yourok">✓ 答对</span>' : '<span class="yourbad">你的答案:' + chosen + '</span>';
+    html += '</div>';
+    if (q.sol) html += '<div class="solmain">' + q.sol + '</div>';
+    if (!q.ans) {
+      html += '<div class="ainote">答案由你对照原书填写 · <button class="fixkey" id="fixkey">填错了?</button></div>';
+    } else if (q.sol || !u.verified) {
+      html += '<div class="ainote">' + (u.verified ? '解析由 AI 撰写,答案已与题库核对' : '答案与解析由 AI 解出,待核对') + '</div>';
+    }
+    p.innerHTML = html;
+    cardEl.append(p);
+    const fk = p.querySelector('#fixkey');
+    if (fk) fk.onclick = () => clearKey(n);
+  }
+  typeset(cardEl);
+
+  const w = el('div', 'wrap');
+  w.append(cardEl);
+  if (quiz.showPage) w.append(viewer(quiz.book, quiz.page, goPage));
+
+  const f = el('div', 'qfooter');
+  const prev = el('button', 'btn ghost', '← 上一题');
+  prev.disabled = quiz.idx === 0;
+  prev.onclick = () => goQ(quiz.idx - 1);
+  f.append(prev);
+  f.append(el('span', 'fcount', reveal ? '<kbd>Enter</kbd> 下一题' : '<kbd>A</kbd>–<kbd>E</kbd> 作答'));
+  const last = quiz.idx === quiz.list.length - 1;
+  const nx = el('button', 'btn' + (reveal ? '' : ' ghost'), quiz.done ? '返回成绩' : last ? '完成' : '下一题 →');
+  nx.onclick = nextOrFinish;
+  f.append(nx);
+  w.append(f);
+  return w;
+}
+function nextOrFinish() {
+  if (quiz.done) { quiz.showResult = true; render(); }
+  else if (quiz.idx === quiz.list.length - 1) confirmFinish();
+  else goQ(quiz.idx + 1);
+}
+
+/* 答题卡(未转录:看原书页面作答) */
+function sheetCard(s) {
+  const card = el('div', 'card sheet');
+  const st = sheetStats(s, quiz.list);
+  card.append(el('h2', 'sec-title', '答题卡<span class="catcnt">已答 ' + st.done + '/' + quiz.list.length +
+    ' · ✓' + st.ok + ' ✗' + st.bad + '</span>'));
+
+  if (!quiz.redo && !quiz.done && !quiz.unit.count) {
+    const cc = el('div', 'cntctl');
+    cc.append(el('span', '', '本节题数'));
+    [['−5', -5], ['−1', -1], ['+1', 1], ['+5', 5]].forEach(function (x) {
+      const b = el('button', '', x[0]);
+      b.onclick = () => setCount(s.count + x[1]);
+      cc.append(b);
+    });
+    card.append(cc);
+  }
+  card.append(navGrid(s));
+
+  const n = quiz.list[quiz.idx];
+  const a = s.ans[n], k = s.key[n];
+  const cur = el('div', 'curq');
+  const ch = el('div', 'curq-head');
+  ch.append(el('span', 'curq-no', '第 ' + n + ' 题'));
+  if (s.pg[n] && s.pg[n] !== quiz.page) {
+    const back = el('button', 'meta-copy', '回到作答页');
+    back.onclick = () => goPage(s.pg[n]);
+    ch.append(back);
+  }
+  const star = el('button', 'meta-copy starbtn', starLabel(quiz.unit.key, n));
+  star.title = '收录到错题本 / 取消收录';
+  star.onclick = function () { toggleStar(quiz.unit.key, n); render(); };
+  ch.append(star);
+  cur.append(ch);
+
+  const locked = a && k;
+  const letters = el('div', 'letters');
+  LETTERS.split('').forEach(function (L) {
+    const b = el('button', 'lbtn', L);
+    if (a === L) b.classList.add('chosen');
+    if (locked) {
+      if (L === k) b.classList.add('ok');
+      if (a === L && L !== k) b.classList.add('bad');
+      b.disabled = true;
+    } else b.onclick = () => pickAnswer(n, L);
+    letters.append(b);
+  });
+  cur.append(letters);
+
+  if (a && !k) {
+    const kr = el('div', 'keyrow');
+    kr.append(el('div', 'klabel', '对答案:翻到答案页,点出<b>正确选项</b>' + (quiz.unit.ans ? '' : '(答案一般在本节末尾)')));
+    const kl = el('div', 'letters');
+    LETTERS.split('').forEach(function (L) {
+      const b = el('button', 'lbtn', L);
+      b.onclick = () => setKey(n, L);
+      kl.append(b);
+    });
+    kr.append(kl);
+    cur.append(kr);
+  } else if (locked) {
+    const v = el('div', 'verdict ' + (a === k ? 'ok' : 'bad'),
+      a === k ? '✓ 答对' : '✗ 答错 · 你选 ' + a + ',正确答案 ' + k);
+    const fix = el('button', 'fixkey', '答案键填错了?');
+    fix.onclick = () => clearKey(n);
+    v.append(fix);
+    cur.append(v);
+  }
+  card.append(cur);
+
+  const cond = el('details', 'condhint');
+  cond.append(el('summary', '', '条件充分性判断选项含义'));
+  cond.append(el('div', '', COND_RUBRIC));
+  card.append(cond);
+
+  const f = el('div', 'sheetfoot');
+  const prev = el('button', 'btn ghost small', '上一题');
+  prev.disabled = quiz.idx === 0;
+  prev.onclick = () => goQ(quiz.idx - 1);
+  f.append(prev);
+  if (quiz.done) {
+    const r = el('button', 'btn small', '返回成绩');
+    r.onclick = function () { quiz.showResult = true; render(); };
+    f.append(r);
+  } else {
+    const fin = el('button', 'btn ghost small', '结束');
+    fin.onclick = confirmFinish;
+    f.append(fin);
+  }
+  const next = el('button', 'btn small', '下一题');
+  next.disabled = quiz.idx === quiz.list.length - 1;
+  next.onclick = () => goQ(quiz.idx + 1);
+  f.append(next);
+  card.append(f);
+  card.append(el('div', 'hint', '<kbd>A</kbd>–<kbd>E</kbd> 选答案 · <kbd>←</kbd><kbd>→</kbd> 换题 · <kbd>[</kbd><kbd>]</kbd> 翻页'));
+  return card;
+}
+
+function resultView() {
+  const s = getSheet(quiz.unit.key);
+  const c = el('div', 'card result');
+  const st = sheetStats(s, quiz.list);
+  const total = quiz.list.length, blank = total - st.done;
+  c.append(el('div', 'score-big', st.ok + '<span class="score-total"> / ' + total + '</span>'));
+  c.append(el('div', 'score-sub', '已判 ' + (st.ok + st.bad) + ' 题' +
+    (st.pending ? ' · <b>' + st.pending + ' 题待对答案</b>' : '') + (blank ? ' · 未作答 ' + blank : '')));
+
+  const grid = el('div', 'chipgrid');
+  quiz.list.forEach(function (n, i) {
+    const x = status(s, n);
+    const chip = el('button', 'chip ' + (x === 'ok' ? 'ok' : x === 'bad' ? 'bad' : 'un'), String(n));
+    chip.onclick = function () { quiz.showResult = false; quiz.idx = i; render(); };
+    grid.append(chip);
+  });
+  c.append(grid);
+
+  // 未转录的单元:补对答案
+  if (!quiz.unit.qs && st.pending) {
+    c.append(el('div', 'rtitle', '对答案 · 点出每题的正确选项即可判分(答案键会被记住)'));
+    const tbl = el('div', 'keytable');
+    quiz.list.forEach(function (n) {
+      if (!s.ans[n]) return;
+      const x = status(s, n);
+      const line = el('div', 'keyline ' + (x === 'ok' || x === 'bad' ? x : ''));
+      line.append(el('span', '', '<b>' + n + '</b>'));
+      line.append(el('span', '', '你选 ' + s.ans[n]));
+      const ls = el('div', 'letters');
+      LETTERS.split('').forEach(function (L) {
+        const b = el('button', 'lbtn' + (s.key[n] === L ? ' ok' : ''), L);
+        b.onclick = () => setKey(n, L, true);
+        ls.append(b);
+      });
+      line.append(ls);
+      tbl.append(line);
+    });
+    c.append(tbl);
+  }
+
+  const acts = el('div', 'actions');
+  const home = el('button', 'btn ghost', quiz.origin === '#/wrong' ? '返回错题本' : '返回主页');
+  home.onclick = function () { const o = quiz.origin || '#/'; quiz = null; location.hash = o; };
+  acts.append(home);
+  const wrongNs = quiz.list.filter(n => status(s, n) === 'bad');
+  if (wrongNs.length) {
+    const b = el('button', 'btn', '重刷本次错题(' + wrongNs.length + ')');
+    b.onclick = function () { startRedo(quiz.unit.key, wrongNs, quiz.origin); render(); };
+    acts.append(b);
+  }
+  c.append(acts);
+  return c;
+}
+
+/* ───────────── 错题本(纯收录) ───────────── */
+function renderWrong() {
+  $app.innerHTML = '';
+  const w = el('div', 'wrap');
+  w.append(el('h2', 'pagetitle', '错题本'));
+
+  const items = Object.keys(wrongBook).map(function (id) {
+    const i = id.lastIndexOf('#');
+    return { id: id, unit: UNITS[id.slice(0, i)], n: Number(id.slice(i + 1)), r: wrongBook[id] };
+  }).filter(x => x.unit);
+
+  if (!items.length) {
+    w.append(el('div', 'card empty', '还没有收录题目。做题时点 ☆ 收录,把值得重做的题收进来。'));
+    $app.append(w);
+    return;
+  }
+  w.append(exportBar(items));
+  BANK.books.forEach(function (book) {
+    const mine = items.filter(x => x.unit.book === book);
+    if (!mine.length) return;
+    const sec = el('section', 'card sec');
+    sec.append(el('h2', 'sec-title', esc(book.title) + '<span class="catcnt"> · ' + mine.length + ' 题</span>'));
+    book.units.forEach(function (u) {
+      const us = mine.filter(x => x.unit === u).sort((a, b) => a.n - b.n);
+      if (!us.length) return;
+      const g = el('div', 'unitgroup');
+      const gt = el('div', 'setrow');
+      gt.append(el('div', 'unitgroup-title', esc(unitName(u))));
+      const all = el('button', 'btn small', '重刷这 ' + us.length + ' 题');
+      all.style.marginLeft = 'auto';
+      all.onclick = () => startRedo(u.key, us.map(x => x.n), '#/wrong');
+      gt.append(all);
+      g.append(gt);
+      const s = getSheet(u.key);
+      us.forEach(function (x) {
+        const row = el('div', 'wq');
+        row.append(el('span', 'wq-no', '第 ' + x.n + ' 题'));
+        const q = u.qs && u.qs[x.n];
+        const preview = q ? questionPlainText(u, x.n).split('\n')[1] : '';
+        row.append(el('span', 'wq-meta', [
+          preview ? esc(preview.slice(0, 42)) + (preview.length > 42 ? '…' : '') : '',
+          x.r.t ? '重做错 ' + x.r.t + ' 次' : '',
+          x.r.pick ? '错选 ' + x.r.pick : '',
+          !q && s.key[x.n] ? '正确 ' + s.key[x.n] : '',
+          !q && s.pg[x.n] ? pageLabel(book, s.pg[x.n]) : '',
+          '收录于' + relDays(x.r.last)
+        ].filter(Boolean).join(' · ')));
+        const acts = el('div', 'setacts');
+        const redo = el('button', 'btn ghost small', '重做');
+        redo.onclick = () => startRedo(u.key, [x.n], '#/wrong');
+        const rm = el('button', 'btn ghost small', '移出');
+        rm.onclick = function () { removeWrong(x.id); render(); };
+        acts.append(redo, rm);
+        row.append(acts);
+        g.append(row);
+      });
+      sec.append(g);
+    });
+    w.append(sec);
+  });
+  $app.append(w);
+}
+
+/* ───────────── 错题本导出(自动排版 → 打印/存为 PDF) ───────────── */
+let exportOpt = load('gzb.export.v1', { ans: true, space: true });
+function exportBar(items) {
+  const bar = el('div', 'card sec exportbar');
+  bar.append(el('div', 'eb-title', '导出错题 <span class="setmeta">自动排版,在打印窗口选「存储为 PDF」即可</span>'));
+  const opts = el('div', 'eb-opts');
+  [['ans', '最后附答案'], ['space', '每题留作答空白']].forEach(function (o) {
+    const lab = el('label', 'eb-opt');
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.checked = !!exportOpt[o[0]];
+    cb.onchange = function () { exportOpt[o[0]] = cb.checked; store('gzb.export.v1', exportOpt); };
+    lab.append(cb, document.createTextNode(' ' + o[1]));
+    opts.append(lab);
+  });
+  const go = el('button', 'btn small', '导出 PDF(' + items.length + ' 题)');
+  go.onclick = function () { printWrong(items); };
+  opts.append(go);
+  bar.append(opts);
+  return bar;
+}
+function printWrong(items) {
+  // 与页面一致的顺序:按书、单元、题号
+  const order = [];
+  BANK.books.forEach(function (b) {
+    b.units.forEach(function (u) {
+      items.filter(x => x.unit === u).sort((a, c) => a.n - c.n).forEach(x => order.push(x));
+    });
+  });
+  const doc = el('div', 'printdoc');
+  const d = new Date();
+  doc.append(el('div', 'pd-head', '<b>错题本</b><span>' + order.length + ' 题 · 导出于 ' +
+    d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate() + '</span>'));
+  const answers = [];
+  order.forEach(function (x, k) {
+    const u = x.unit, q = u.qs && u.qs[x.n], s = getSheet(u.key);
+    const box = el('div', 'pq');
+    box.append(el('div', 'pq-src', '<b>' + (k + 1) + '.</b> ' + esc(unitName(u)) + ' · 第 ' + x.n + ' 题' +
+      (x.r.t ? ' · 重做错 ' + x.r.t + ' 次' : '')));
+    if (q) {
+      box.append(el('div', 'pq-stem', q.stem));
+      if (q.fig) { const img = el('img', 'pq-fig'); img.src = q.fig; box.append(img); }
+      if (q.kind === 'cond') {
+        box.append(el('div', 'pq-cond', '(1) ' + q.c1));
+        box.append(el('div', 'pq-cond', '(2) ' + q.c2));
+      } else {
+        const op = el('div', 'pq-opts');
+        q.opts.forEach(function (o, i) { op.append(el('span', '', LETTERS[i] + '. ' + o)); });
+        box.append(op);
+      }
+      answers.push({ k: k + 1, ans: q.ans });
+    } else {
+      // 未转录的题:附原书页面
+      const pg = s.pg[x.n] || u.start;
+      box.append(el('div', 'pq-note', '原书' + pageLabel(u.book, pg) + '(未转录,附原页)'));
+      const img = el('img', 'pq-page'); img.src = pageImg(u.book, pg); box.append(img);
+      answers.push({ k: k + 1, ans: s.key[x.n] || '—' });
+    }
+    if (exportOpt.space) box.append(el('div', 'pq-space'));
+    doc.append(box);
+  });
+  if (exportOpt.ans) {
+    // 只附答案,紧凑排在最后
+    const sec = el('div', 'pd-ans');
+    sec.append(el('div', 'pd-anstitle', '答案'));
+    const grid = el('div', 'pa-grid');
+    answers.forEach(function (a) { grid.append(el('span', 'pa', a.k + '. <b>' + a.ans + '</b>')); });
+    sec.append(grid);
+    doc.append(sec);
+  }
+  typeset(doc);
+  document.body.append(doc);
+  document.body.classList.add('printing');
+  const done = function () { document.body.classList.remove('printing'); doc.remove(); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  Promise.all([...doc.querySelectorAll('img')].map(i => i.decode().catch(() => {})))
+    .then(function () { window.print(); });
+}
+
+/* ───────────── 备份恢复 ─────────────
+   本机没有任何记录时(如浏览器缓存被清),自动从网站目录下的 progress.json 恢复。
+   用法:主页「导出备份」得到的文件改名为 progress.json,放进 site/ 一起上传到 GitHub。 */
+function restoreFromRepo() {
+  if (Object.keys(sheets).length || Object.keys(wrongBook).length || hist.length) return;
+  fetch('progress.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || d.app !== 'gzb' || !d.sheets) return;
+      sheets = d.sheets; wrongBook = d.wrong || {}; hist = d.hist || [];
+      saveSheets(); saveWrong(); saveHist();
+      if (!quiz) render();
+    }).catch(function () {});
+}
+
+/* ───────────── 触屏左右滑动换题 ───────────── */
+let touchX = null, touchY = 0;
+document.addEventListener('touchstart', function (ev) {
+  const t = ev.target;
+  // 拉条、表格等可横向操作的元素上不触发
+  if (!quiz || ev.touches.length !== 1 || (t.closest && t.closest('input,.qtable,.pagewrap'))) { touchX = null; return; }
+  touchX = ev.touches[0].clientX;
+  touchY = ev.touches[0].clientY;
+}, { passive: true });
+document.addEventListener('touchend', function (ev) {
+  if (touchX == null || !quiz || quiz.showResult || (location.hash || '').indexOf('#/quiz') !== 0) return;
+  const dx = ev.changedTouches[0].clientX - touchX, dy = ev.changedTouches[0].clientY - touchY;
+  touchX = null;
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+  goQ(quiz.idx + (dx < 0 ? 1 : -1));
+}, { passive: true });
+
+/* ───────────── 键盘 ─────────────
+   A–E / 1–5 作答 · ←→ 换题 · Enter 下一题 · S 收录 · X 复制图片 · V 原页 · G 题号 · [ ] 翻页 · Esc 退出 */
+document.addEventListener('keydown', function (ev) {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+  if (!quiz || (location.hash || '').indexOf('#/quiz') !== 0) return;
+  if (ev.key === 'Escape') { exitQuiz(); return; }
+  if (quiz.showResult) return;
+  const s = getSheet(quiz.unit.key), n = quiz.list[quiz.idx];
+  const k = ev.key.toUpperCase();
+  const L = LETTERS.indexOf(k) >= 0 && k.length === 1 ? k : '12345'.indexOf(k) >= 0 && k.length === 1 ? LETTERS['12345'.indexOf(k)] : null;
+  if (L) {
+    // 已作答且待对答案时,按键用于填正确答案
+    if (s.ans[n] && !s.key[n]) setKey(n, L);
+    else pickAnswer(n, L);
+  } else if (k === 'X' && quiz.unit.qs) {
+    const b = document.querySelector('.qtools .tool');
+    if (b) copyQuestionImage(quiz.unit, n, b);
+  } else if (ev.key === 'Enter' || ev.key === 'ArrowRight') {
+    if (ev.key === 'Enter') nextOrFinish(); else goQ(quiz.idx + 1);
+  } else if (ev.key === 'ArrowLeft') goQ(quiz.idx - 1);
+  else if (k === 'S') { toggleStar(quiz.unit.key, n); render(); }
+  else if (k === 'V' && quiz.unit.qs) { quiz.showPage = !quiz.showPage; render(); }
+  else if (k === 'G') { quiz.showNav = !quiz.showNav; render(); }
+  else if (ev.key === ']') goPage(quiz.page + 1);
+  else if (ev.key === '[') goPage(quiz.page - 1);
+  else return;
+  ev.preventDefault();
+});
+
+render();
+restoreFromRepo();
