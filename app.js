@@ -136,6 +136,30 @@ function unitOfPage(book, pdf) {
   return best;
 }
 
+/* ───────────── 书页图是否跟仓库一起发布 ─────────────
+   books/ 体积大,线上可能还没上传。探测一次封面图:取不到就把需要原页的单元收起来,
+   只留已逐题转录的部分;以后把 books/ 放回仓库,刷新即自动恢复,不用动代码。 */
+const PAGES = { ok: {}, done: false };
+function pagesOk(book) { return PAGES.ok[book.id] === true; }
+function unitAvailable(u) { return !!u.qs || pagesOk(u.book); }
+function visibleBooks() { return BANK.books.filter(function (b) { return b.units.some(unitAvailable); }); }
+function probePages() {
+  const ids = Object.keys(BOOKS);
+  let left = ids.length;
+  if (!left) { PAGES.done = true; return; }
+  const settle = function (id, ok) {
+    if (id in PAGES.ok) return;
+    PAGES.ok[id] = ok;
+    if (--left === 0) { PAGES.done = true; render(); }    // 探测完重画当前页
+  };
+  ids.forEach(function (id) {
+    const im = new Image();
+    im.onload = function () { settle(id, true); };
+    im.onerror = function () { settle(id, false); };
+    im.src = 'books/' + id + '/thumbs/0001.webp';
+  });
+}
+
 /* ───────────── 答题卡与判分 ───────────── */
 function getSheet(key) {
   const u = UNITS[key];
@@ -601,6 +625,12 @@ function render() {
   document.body.classList.toggle('focus', hash.indexOf('#/quiz') === 0);   // 做题时隐藏侧栏,专注
   if (hash.indexOf('#/quiz') === 0) {
     if (!quiz && !restoreSession()) { location.hash = '#/'; return; }
+    if (quiz && !unitAvailable(quiz.unit)) {      // 书页没上传,断点/收藏的单元打不开,回首页
+      quiz = null;
+      localStorage.removeItem(KEY_SESSION);
+      location.hash = '#/';
+      return;
+    }
     saveSession();
     renderQuiz();
     if (entered) window.scrollTo(0, 0);
@@ -635,17 +665,18 @@ function renderHome() {
   head.append(el('div', 'badge', '管理类联考(199)· 数学考前冲刺'));
   head.append(el('h1', '', '管综数学刷书'));
   let done = 0, ok = 0, bad = 0, units = 0;
-  BANK.books.forEach(function (b) {
+  const books = visibleBooks();
+  books.forEach(function (b) {
     const st = bookStats(b);
-    done += st.done; ok += st.ok; bad += st.bad; units += b.units.length;
+    done += st.done; ok += st.ok; bad += st.bad; units += b.units.filter(unitAvailable).length;
   });
-  head.append(el('p', 'hero-sub', BANK.books.length + ' 本书 · ' + units + ' 节练习 · 已做 ' + done +
+  head.append(el('p', 'hero-sub', books.length + ' 本书 · ' + units + ' 节练习 · 已做 ' + done +
     ' 题 · 收录 ' + Object.keys(wrongBook).length));
   w.append(head);
   w.append(searchBar());
 
   const sess = loadSession();
-  if (sess) {
+  if (sess && UNITS[sess.unit] && unitAvailable(UNITS[sess.unit])) {
     const u = UNITS[sess.unit], s = getSheet(sess.unit);
     const answered = sess.list.filter(n => s.ans[n]).length;
     const rc = el('div', 'card sec resumecard');
@@ -665,7 +696,10 @@ function renderHome() {
   }
 
   const grid = el('div', 'homegrid books');
-  BANK.books.forEach(function (book) { grid.append(bookCard(book)); });
+  books.forEach(function (book) {
+    const c = bookCard(book);
+    if (c) grid.append(c);
+  });
   w.append(grid);
 
   if (hist.length) {
@@ -673,7 +707,7 @@ function renderHome() {
     hc.append(el('h2', 'sec-title', '最近成绩'));
     hist.slice(0, 8).forEach(function (r) {
       const u = UNITS[r.unit];
-      if (!u) return;
+      if (!u || !unitAvailable(u)) return;
       const row = el('div', 'setrow');
       row.append(el('div', 'setname small', esc(u.book.title + ' · ' + unitName(u))));
       row.append(el('div', 'setmeta', r.d));
@@ -711,14 +745,18 @@ function renderHome() {
 }
 
 function bookCard(book) {
+  const units = book.units.filter(unitAvailable);      // 书页没上传时跳过只能看原页的单元
+  if (!units.length) return null;
   const sec = el('section', 'card sec hsec');
   const head = el('div', 'bookhead');
-  const cover = el('img', 'bookcover');
-  cover.src = 'books/' + book.id + '/thumbs/0001.webp';
-  cover.alt = '';
-  head.append(cover);
+  if (pagesOk(book)) {
+    const cover = el('img', 'bookcover');
+    cover.src = 'books/' + book.id + '/thumbs/0001.webp';
+    cover.alt = '';
+    head.append(cover);
+  }
   const info = el('div', 'bookinfo');
-  info.append(el('h2', 'sec-title', esc(book.title) + ' · ' + book.units.length + (book.id === 'zt' ? ' 套' : ' 节')));
+  info.append(el('h2', 'sec-title', esc(book.title) + ' · ' + units.length + (book.id === 'zt' ? ' 套' : ' 节')));
   const st = bookStats(book);
   info.append(el('div', 'bookstat', esc(book.author) + ' · ' + book.pages + ' 页 · 已做 <b>' + st.done +
     '</b> 题'));
@@ -726,7 +764,7 @@ function bookCard(book) {
   sec.append(head);
 
   let groups = [];
-  book.units.forEach(function (u) {
+  units.forEach(function (u) {
     let g = groups.find(x => x.name === u.group);
     if (!g) groups.push(g = { name: u.group, units: [] });
     g.units.push(u);
@@ -936,7 +974,7 @@ function runSearch(q, res) {
       if (!texts) return;
       texts.forEach(function (t, i) {
         const pdf = i + 1, u = unitOfPage(book, pdf);
-        if (!u || u.qs || !terms.every(x => t.indexOf(x) >= 0)) return;
+        if (!u || u.qs || !unitAvailable(u) || !terms.every(x => t.indexOf(x) >= 0)) return;
         hits.push({ title: book.title + ' · ' + pageLabel(book, pdf) + ' · ' + unitName(u), snip: snip(t),
                     go: () => startUnit(u.key, { page: pdf, keep: true }) });
       });
@@ -1101,7 +1139,9 @@ function questionCard(s) {
   const starBtn = el('button', 'tool star' + (isStar(u.key, n) ? ' on' : ''), isStar(u.key, n) ? '★ 已收录' : '☆ 收录');
   starBtn.title = '收录到错题本 / 移出(S)';
   starBtn.onclick = function () { toggleStar(u.key, n); render(); };
-  tools.append(imgBtn, txtBtn, pgBtn, starBtn);
+  tools.append(imgBtn, txtBtn);
+  if (pagesOk(u.book)) tools.append(pgBtn);          // 书页没上传时不给「原页」
+  tools.append(starBtn);
   meta.append(tools);
   cardEl.append(meta);
 
@@ -1177,7 +1217,7 @@ function questionCard(s) {
 
   const w = el('div', 'wrap');
   w.append(cardEl);
-  if (quiz.showPage) w.append(viewer(quiz.book, quiz.page, goPage));
+  if (quiz.showPage && pagesOk(quiz.book)) w.append(viewer(quiz.book, quiz.page, goPage));
 
   const f = el('div', 'qfooter');
   const prev = el('button', 'btn ghost', '← 上一题');
@@ -1359,10 +1399,12 @@ function renderWrong() {
   const items = Object.keys(wrongBook).map(function (id) {
     const i = id.lastIndexOf('#');
     return { id: id, unit: UNITS[id.slice(0, i)], n: Number(id.slice(i + 1)), r: wrongBook[id] };
-  }).filter(x => x.unit);
+  }).filter(x => x.unit && unitAvailable(x.unit));
 
   if (!items.length) {
-    w.append(el('div', 'card empty', '还没有收录题目。做题时点 ☆ 收录,把值得重做的题收进来。'));
+    w.append(el('div', 'card empty', Object.keys(wrongBook).length
+      ? '收录的题都在还没上传书页的板块里 —— 用本地的「启动网站.command」可以看到它们。'
+      : '还没有收录题目。做题时点 ☆ 收录,把值得重做的题收进来。'));
     $app.append(w);
     return;
   }
@@ -1545,7 +1587,7 @@ document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') nextOrFinish(); else goQ(quiz.idx + 1);
   } else if (ev.key === 'ArrowLeft') goQ(quiz.idx - 1);
   else if (k === 'S') { toggleStar(quiz.unit.key, n); render(); }
-  else if (k === 'V' && quiz.unit.qs) { quiz.showPage = !quiz.showPage; render(); }
+  else if (k === 'V' && quiz.unit.qs && pagesOk(quiz.unit.book)) { quiz.showPage = !quiz.showPage; render(); }
   else if (k === 'G') { quiz.showNav = !quiz.showNav; render(); }
   else if (ev.key === ']') goPage(quiz.page + 1);
   else if (ev.key === '[') goPage(quiz.page - 1);
@@ -1553,5 +1595,6 @@ document.addEventListener('keydown', function (ev) {
   ev.preventDefault();
 });
 
+probePages();          // 先探测书页图,探完会自动重画(有书页 → 全站;没书页 → 只留真题)
 render();
 restoreFromRepo();
