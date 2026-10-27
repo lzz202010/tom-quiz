@@ -61,7 +61,7 @@ function themeToggle(cls) {
 /* ───────────── 书与练习单元 ─────────────
    页码统一用 PDF 页号(1 起);书本页码 = PDF 页号 - offset - 1 */
 // 每本书以目录的哪一级作为一个练习单元
-const UNIT_LEVEL = { jz200: 0, dw1000: 2 };
+const UNIT_LEVEL = { wbq: 1, jz200: 0, dw1000: 2, lj: 1 };
 
 const BOOKS = {};
 const UNITS = {};
@@ -87,7 +87,8 @@ function buildUnits(book) {
   toc.forEach(function (e, i) {
     if (e.level === 0) inAnswers = /^解析$/.test(e.title.trim());     // 「解析几何」不是答案部分
     if (inAnswers) { if (e.level > 0) answerSecs.push(e); return; }
-    if (/大纲解读|逻辑|写作/.test(e.title)) return;     // 逻辑、写作暂不做练习
+    if (/大纲解读/.test(e.title) || (book.id === 'zt' && /逻辑|写作/.test(e.title))) return;     // 真题里的逻辑、写作暂不做练习
+    if (book.id === 'dw1000' && /全真模拟检测题\((七|八)\)/.test(e.title)) return;     // 这两套不做
     let isUnit = e.level === lv;
     if (e.level < lv) {           // 没有更细分小节的上级条目,自身也算一个单元
       isUnit = true;
@@ -207,9 +208,9 @@ function bookStats(book) {
 const wid = (key, n) => key + '#' + n;
 function recordResult(key, n, pick, right) {
   const r = wrongBook[wid(key, n)];
-  if (right || !r) return;
-  r.t = (r.t || 0) + 1;
-  r.pick = pick;
+  if (!r) return;
+  if (right) r.ok = (r.ok || 0) + 1;      // 复习做对:抽中概率慢慢降低(不会移出)
+  else { r.t = (r.t || 0) + 1; r.pick = pick; }
   saveWrong();
 }
 function toggleStar(key, n) {
@@ -292,16 +293,38 @@ function range(a, b) { const r = []; for (let i = a; i <= b; i++) r.push(i); ret
 function startUnit(unitKey, at) {
   const u = UNITS[unitKey], s = getSheet(unitKey);
   const done = Object.keys(s.ans).length;
-  if (done && !(at && at.keep)) {
-    if (confirm('这一节已有 ' + done + ' 题作答记录。\n确定 = 清空作答重新做\n取消 = 接着上次继续')) {
-      s.ans = {}; s.pg = {};
-      putSheet(unitKey, s);
+  const go = function (reset) {
+    if (reset) { s.ans = {}; s.pg = {}; putSheet(unitKey, s); }
+    quiz = makeQuiz(u, null, false, '#/');
+    if (at && at.page) quiz.page = at.page;
+    if (at && at.no != null) quiz.idx = Math.max(0, quiz.list.indexOf(at.no));
+    else if (!reset) {                       // 继续:跳到第一道没做的题
+      const k = quiz.list.findIndex(n => !s.ans[n]);
+      if (k >= 0) quiz.idx = k;
     }
-  }
-  quiz = makeQuiz(u, null, false, '#/');
-  if (at && at.page) quiz.page = at.page;
-  if (at && at.no != null) quiz.idx = Math.max(0, quiz.list.indexOf(at.no));
-  location.hash = '#/quiz';
+    location.hash = '#/quiz';
+  };
+  if (!done || (at && at.keep)) { go(false); return; }
+  choose('这一节已做 ' + done + ' 题', [['继续', () => go(false), true], ['重置', () => go(true)]]);
+}
+/* 简单的选择弹窗:items = [[按钮文字, 回调, 是否主按钮]] */
+function choose(title, items) {
+  const bg = el('div', 'choose-bg');
+  const box = el('div', 'choose');
+  box.append(el('div', 'choose-title', esc(title)));
+  const row = el('div', 'choose-row');
+  items.forEach(function (it) {
+    const b = el('button', 'btn' + (it[2] ? '' : ' ghost'), it[0]);
+    b.onclick = function () { bg.remove(); it[1](); };
+    row.append(b);
+  });
+  const x = el('button', 'btn ghost', '取消');
+  x.onclick = () => bg.remove();
+  row.append(x);
+  box.append(row);
+  bg.append(box);
+  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  document.body.append(bg);
 }
 function startRedo(unitKey, nums, origin) {
   const s = getSheet(unitKey);
@@ -575,7 +598,7 @@ function copyText(text, btn) {
 function renderSidebar(hash) {
   const side = document.getElementById('side');
   side.innerHTML = '';
-  const wrongN = Object.keys(wrongBook).length;
+  const wrongN = wrongIds(curSubject()).length;
   const brand = el('div', 'brand');
   brand.append(el('div', 'brand-title', '管综数学刷书'));
   brand.append(el('div', 'brand-sub', BANK.updated + ' 更新'));
@@ -648,35 +671,49 @@ window.addEventListener('hashchange', render);
 /* ───────────── 首页 ───────────── */
 const HELP_HTML =
   '<h3>怎么刷</h3>' +
-  '<p><b>已转录的题</b>:一题一卡,点选项立即判分,并显示答案与解析;答案与解析由 AI 解出,如发现有误请以官方答案为准。点 <b>复制图片</b> 可把整题(含图形)截成图片直接粘贴,<b>复制文字</b> 得到纯文本(公式转成 a/b、x²、√2 等写法)。</p>' +
+  '<p><b>已转录的题</b>:一题一卡,点选项立即判分,并显示答案与解析;真题答案已与官方答案核对;1000 题的答案取自原书解析,个别拆分的小问由 AI 解出;如发现有误请以原书为准。点 <b>复制图片</b> 可把整题(含图形)截成图片直接粘贴。</p>' +
   '<p><b>未转录的部分</b>:左边看原书页面,右边答题卡选 A–E;选完翻到答案页,点出正确选项即判分。答案键会被记住,重做时自动判分。</p>' +
   '<p><b>错题本是纯收录模式</b>:答错不会自动进本,做题时点 <b>☆ 收录</b> 把值得重做的题收进来;收录的题不会自动移出,可随时手动移出。</p>' +
-  '<p>快捷键:<code>A</code>–<code>E</code> 作答 · <code>Enter</code> 下一题 · <code>←</code><code>→</code> 换题 · <code>S</code> 收录 · <code>X</code> 复制图片 · <code>V</code> 原页 · <code>G</code> 题号 · <code>Esc</code> 退出</p>' +
+  '<p>快捷键:<code>A</code>–<code>E</code> 作答 · <code>Enter</code> 下一题 · <code>←</code><code>→</code> 换题 · <code>S</code> 收录 · <code>X</code> 复制图片 · <code>G</code> 题号 · <code>Esc</code> 退出</p>' +
   '<h3>数据备份</h3>' +
   '<p>所有记录只保存在本机浏览器,换浏览器或清缓存会丢失,建议定期<b>导出备份</b>。</p>' +
   '<p>部署在 GitHub 时:把导出的备份文件改名为 <code>progress.json</code> 放进网站目录一起上传;浏览器记录被清空后,打开网站会自动从它恢复。</p>';
 
+/* 主页顶部的科目切换:逻辑题库单独一栏,数学是其余各书 */
+const KEY_SUBJECT = 'gzb.subject';
+const SUBJECTS = [['math', '数学'], ['logic', '逻辑']];
+function subjectOf(book) { return book.id === 'lj' ? 'logic' : 'math'; }
+function curSubject() { return localStorage.getItem(KEY_SUBJECT) === 'logic' ? 'logic' : 'math'; }
+function subjectTabs() {
+  const bar = el('div', 'subjtabs');
+  SUBJECTS.forEach(function (x) {
+    const b = el('button', 'subjtab' + (curSubject() === x[0] ? ' on' : ''), x[1]);
+    b.onclick = function () {
+      if (curSubject() === x[0]) return;
+      localStorage.setItem(KEY_SUBJECT, x[0]);
+      render();
+      window.scrollTo(0, 0);
+    };
+    bar.append(b);
+  });
+  return bar;
+}
+
 function renderHome() {
   $app.innerHTML = '';
   const w = el('div', 'wrap');
+  const subj = curSubject();
 
   const head = el('header', 'hero');
   head.append(themeToggle('themefab'));
-  head.append(el('div', 'badge', '管理类联考(199)· 数学考前冲刺'));
-  head.append(el('h1', '', '管综数学刷书'));
-  let done = 0, ok = 0, bad = 0, units = 0;
-  const books = visibleBooks();
-  books.forEach(function (b) {
-    const st = bookStats(b);
-    done += st.done; ok += st.ok; bad += st.bad; units += b.units.filter(unitAvailable).length;
-  });
-  head.append(el('p', 'hero-sub', books.length + ' 本书 · ' + units + ' 节练习 · 已做 ' + done +
-    ' 题 · 收录 ' + Object.keys(wrongBook).length));
+  head.append(subjectTabs());
+  head.append(el('div', 'badge', '管理类联考 199 · ' + (subj === 'logic' ? '逻辑真题按题型' : '数学考前冲刺')));
+  head.append(el('h1', '', subj === 'logic' ? '管综逻辑刷题' : '管综数学刷书'));
+  const books = visibleBooks().filter(b => subjectOf(b) === subj);
   w.append(head);
-  w.append(searchBar());
 
   const sess = loadSession();
-  if (sess && UNITS[sess.unit] && unitAvailable(UNITS[sess.unit])) {
+  if (sess && UNITS[sess.unit] && unitAvailable(UNITS[sess.unit]) && subjectOf(UNITS[sess.unit].book) === subj) {
     const u = UNITS[sess.unit], s = getSheet(sess.unit);
     const answered = sess.list.filter(n => s.ans[n]).length;
     const rc = el('div', 'card sec resumecard');
@@ -707,7 +744,7 @@ function renderHome() {
     hc.append(el('h2', 'sec-title', '最近成绩'));
     hist.slice(0, 8).forEach(function (r) {
       const u = UNITS[r.unit];
-      if (!u || !unitAvailable(u)) return;
+      if (!u || !unitAvailable(u) || subjectOf(u.book) !== subj) return;
       const row = el('div', 'setrow');
       row.append(el('div', 'setname small', esc(u.book.title + ' · ' + unitName(u))));
       row.append(el('div', 'setmeta', r.d));
@@ -756,11 +793,13 @@ function bookCard(book) {
     head.append(cover);
   }
   const info = el('div', 'bookinfo');
-  info.append(el('h2', 'sec-title', esc(book.title) + ' · ' + units.length + (book.id === 'zt' ? ' 套' : ' 节')));
+  info.append(el('h2', 'sec-title', esc(book.title)));
   const st = bookStats(book);
-  info.append(el('div', 'bookstat', esc(book.author) + ' · ' + book.pages + ' 页 · 已做 <b>' + st.done +
-    '</b> 题'));
+  info.append(el('div', 'bookstat', esc(book.author) + (book.pages ? ' · ' + book.pages + ' 页' : '') +
+    (st.done ? ' · 已做 <b>' + st.done + '</b> 题' : '')));
   head.append(info);
+  head.append(el('span', 'bookcount', units.length + (book.id === 'zt' ? ' 套' : ' 节')));
+  sec.style.setProperty('--book', book.color);
   sec.append(head);
 
   let groups = [];
@@ -1125,22 +1164,15 @@ function questionCard(s) {
   const u = quiz.unit, n = quiz.list[quiz.idx], q = u.qs[n];
   const cardEl = el('div', 'card qcard');
   const meta = el('div', 'qmeta');
-  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '')));
+  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id === 'lj' ? '逻辑推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '')));
   const tools = el('span', 'qtools');
   const imgBtn = el('button', 'tool', '复制图片');
   imgBtn.title = '把整道题(含图形)截成图片复制,可直接粘贴(X)';
   imgBtn.onclick = function () { copyQuestionImage(u, n, imgBtn); };
-  const txtBtn = el('button', 'tool', '复制文字');
-  txtBtn.title = '复制纯文本,公式转成 a/b、x²、√2 等写法';
-  txtBtn.onclick = function () { copyText(questionPlainText(u, n), txtBtn); };
-  const pgBtn = el('button', 'tool' + (quiz.showPage ? ' on' : ''), '原页');
-  pgBtn.title = '对照原卷页面(V)';
-  pgBtn.onclick = function () { quiz.showPage = !quiz.showPage; render(); };
   const starBtn = el('button', 'tool star' + (isStar(u.key, n) ? ' on' : ''), isStar(u.key, n) ? '★ 已收录' : '☆ 收录');
   starBtn.title = '收录到错题本 / 移出(S)';
   starBtn.onclick = function () { toggleStar(u.key, n); render(); };
-  tools.append(imgBtn, txtBtn);
-  if (pagesOk(u.book)) tools.append(pgBtn);          // 书页没上传时不给「原页」
+  tools.append(imgBtn);
   tools.append(starBtn);
   meta.append(tools);
   cardEl.append(meta);
@@ -1186,7 +1218,7 @@ function questionCard(s) {
   if (chosen && !key) {
     // 题目没有内置答案:对照原书答案页点出正确选项,之后自动判分
     const kr = el('div', 'keyrow');
-    kr.append(el('div', 'klabel', '对答案:点「原页」翻到答案,点出<b>正确选项</b>'));
+    kr.append(el('div', 'klabel', '这题还没有内置答案:对照原书点出<b>正确选项</b>'));
     const kl = el('div', 'letters');
     LETTERS.split('').forEach(function (L) {
       const b = el('button', 'lbtn', L);
@@ -1203,8 +1235,11 @@ function questionCard(s) {
     html += chosen === key ? '<span class="yourok">✓ 答对</span>' : '<span class="yourbad">你的答案:' + chosen + '</span>';
     html += '</div>';
     if (q.sol) html += '<div class="solmain">' + q.sol + '</div>';
+    else if (q.solimg) html += '<img class="solimg" loading="lazy" alt="原书解析" src="' + q.solimg + '">';   // 还没重写成文字的题,先显示原书解析截图
     if (!q.ans) {
       html += '<div class="ainote">答案由你对照原书填写 · <button class="fixkey" id="fixkey">填错了?</button></div>';
+    } else if (q.asrc) {
+      html += '<div class="ainote">' + (q.asrc === 'book' ? '答案取自原书解析' : '答案由 AI 解出(原书没有对应选项),待核对') + '</div>';
     } else if (q.sol || !u.verified) {
       html += '<div class="ainote">' + (u.verified ? '解析由 AI 撰写,答案已与题库核对' : '答案与解析由 AI 解出,待核对') + '</div>';
     }
@@ -1391,23 +1426,33 @@ function resultView() {
 }
 
 /* ───────────── 错题本(纯收录) ───────────── */
+// 某科目错题本里的题号(数学、逻辑各自独立)
+function wrongIds(subj) {
+  return Object.keys(wrongBook).filter(function (id) {
+    const u = UNITS[id.slice(0, id.lastIndexOf('#'))];
+    return u && subjectOf(u.book) === subj;
+  });
+}
 function renderWrong() {
   $app.innerHTML = '';
   const w = el('div', 'wrap');
-  w.append(el('h2', 'pagetitle', '错题本'));
+  const subj = curSubject();
+  w.append(subjectTabs());
+  w.append(el('h2', 'pagetitle', (subj === 'logic' ? '逻辑' : '数学') + '错题本'));
 
-  const items = Object.keys(wrongBook).map(function (id) {
+  const items = wrongIds(subj).map(function (id) {
     const i = id.lastIndexOf('#');
     return { id: id, unit: UNITS[id.slice(0, i)], n: Number(id.slice(i + 1)), r: wrongBook[id] };
   }).filter(x => x.unit && unitAvailable(x.unit));
 
   if (!items.length) {
-    w.append(el('div', 'card empty', Object.keys(wrongBook).length
+    w.append(el('div', 'card empty', wrongIds(subj).length
       ? '收录的题都在还没上传书页的板块里 —— 用本地的「启动网站.command」可以看到它们。'
       : '还没有收录题目。做题时点 ☆ 收录,把值得重做的题收进来。'));
     $app.append(w);
     return;
   }
+  w.append(reviewCard(items));
   w.append(exportBar(items));
   BANK.books.forEach(function (book) {
     const mine = items.filter(x => x.unit.book === book);
@@ -1453,6 +1498,57 @@ function renderWrong() {
     w.append(sec);
   });
   $app.append(w);
+}
+
+/* ───────────── 错题复习:加权伪随机抽题 ─────────────
+   权重 = 1 + 0.6×重做错次数 − 0.3×重做对次数,限制在 [0.4, 3];
+   刚抽过的题(最近 3 次)权重×0.2,避免反复抽到同一题。抽中的题保持不变,直到去做或点「换一题」。
+   数学、逻辑各抽各的。 */
+const KEY_REVIEW = 'gzb.review.v2';
+const reviews = load(KEY_REVIEW, {});
+function rv() {
+  const k = curSubject();
+  return reviews[k] || (reviews[k] = { pick: null, recent: [] });
+}
+function reviewWeight(id) {
+  const r = wrongBook[id] || {};
+  let w = Math.min(3, Math.max(0.4, 1 + 0.6 * (r.t || 0) - 0.3 * (r.ok || 0)));
+  if (rv().recent.indexOf(id) >= 0) w *= 0.2;
+  return w;
+}
+function drawReview(items) {
+  const pool = items.filter(x => x.id !== rv().pick && x.id !== rv().recent[0]);   // 不连续抽到同一题
+  if (!pool.length) return items[0] ? items[0].id : null;
+  let total = 0;
+  pool.forEach(x => { total += reviewWeight(x.id); });
+  let roll = Math.random() * total;
+  for (const x of pool) { roll -= reviewWeight(x.id); if (roll <= 0) return x.id; }
+  return pool[pool.length - 1].id;
+}
+function setPick(id) {
+  rv().pick = id;
+  if (id) rv().recent = [id].concat(rv().recent.filter(x => x !== id)).slice(0, 3);
+  store(KEY_REVIEW, reviews);
+}
+function reviewCard(items) {
+  if (!rv().pick || !items.some(x => x.id === rv().pick)) setPick(drawReview(items));
+  const x = items.find(i => i.id === rv().pick);
+  const c = el('section', 'card reviewcard');
+  if (!x) return c;
+  const u = x.unit, q = u.qs && u.qs[x.n];
+  c.append(el('div', 'rv-label', '🎲 今日抽到 · ' + esc(unitName(u)) + ' · 第 ' + x.n + ' 题' +
+    (x.r.t ? ' · 重做错 ' + x.r.t + ' 次' : '')));
+  const body = el('div', 'rv-stem', q ? q.stem : '原书' + pageLabel(u.book, getSheet(u.key).pg[x.n] || u.start) + '的第 ' + x.n + ' 题');
+  if (q && q.fig) { const img = el('img', 'qfig'); img.src = q.fig; body.append(img); }
+  c.append(typeset(body));
+  const acts = el('div', 'setacts');
+  const go = el('button', 'btn', '开始做这题');
+  go.onclick = function () { setPick(null); startRedo(u.key, [x.n], '#/wrong'); };
+  const next = el('button', 'btn ghost', '换一题');
+  next.onclick = function () { setPick(drawReview(items)); render(); };
+  acts.append(go, next);
+  c.append(acts);
+  return c;
 }
 
 /* ───────────── 错题本导出(自动排版 → 打印/存为 PDF) ───────────── */
@@ -1566,7 +1662,7 @@ document.addEventListener('touchend', function (ev) {
 }, { passive: true });
 
 /* ───────────── 键盘 ─────────────
-   A–E / 1–5 作答 · ←→ 换题 · Enter 下一题 · S 收录 · X 复制图片 · V 原页 · G 题号 · [ ] 翻页 · Esc 退出 */
+   A–E / 1–5 作答 · ←→ 换题 · Enter 下一题 · S 收录 · X 复制图片 · G 题号 · [ ] 翻页 · Esc 退出 */
 document.addEventListener('keydown', function (ev) {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
@@ -1587,7 +1683,6 @@ document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') nextOrFinish(); else goQ(quiz.idx + 1);
   } else if (ev.key === 'ArrowLeft') goQ(quiz.idx - 1);
   else if (k === 'S') { toggleStar(quiz.unit.key, n); render(); }
-  else if (k === 'V' && quiz.unit.qs && pagesOk(quiz.unit.book)) { quiz.showPage = !quiz.showPage; render(); }
   else if (k === 'G') { quiz.showNav = !quiz.showNav; render(); }
   else if (ev.key === ']') goPage(quiz.page + 1);
   else if (ev.key === '[') goPage(quiz.page - 1);
@@ -1595,6 +1690,6 @@ document.addEventListener('keydown', function (ev) {
   ev.preventDefault();
 });
 
-probePages();          // 先探测书页图,探完会自动重画(有书页 → 全站;没书页 → 只留真题)
+PAGES.done = true;     // 不再加载原书页面:全站只用逐题转录的题,启动时不请求任何书页图
 render();
 restoreFromRepo();

@@ -423,3 +423,55 @@ input,textarea{color:var(--ink)}
 .g-name{font-size:13px;font-weight:600;margin:0 2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g-units{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
 @media (max-width:560px){.groupgrid{grid-template-columns:1fr}}
+.choose-bg{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center}
+.choose{background:var(--card);border-radius:14px;padding:18px 20px;min-width:260px;box-shadow:0 8px 30px rgba(0,0,0,.15)}
+.choose-title{font-size:15px;margin-bottom:14px;color:var(--ink)}
+.choose-row{display:flex;gap:8px;justify-content:flex-end}
+/* 错题复习抽题卡 */
+.reviewcard{padding:16px 18px;border:1.5px dashed color-mix(in srgb,var(--accent) 45%,var(--line));
+  background:linear-gradient(135deg,var(--accent-soft),var(--card) 60%)}
+.rv-label{font-size:12.5px;color:var(--accent);font-weight:600;margin-bottom:8px}
+.rv-stem{font-size:15.5px;line-height:1.85;max-height:9.5em;overflow:hidden;margin-bottom:12px}
+.rv-stem .qfig{max-width:180px}
+.reviewcard .setacts{margin-left:0}
+
+/* 主页科目切换 */
+.subjtabs { display: flex; gap: 4px; padding: 4px; margin: 4px auto 14px; width: max-content;
+  background: var(--card, #fff); border: 1px solid var(--line, #e5e5e5); border-radius: 999px; }
+.subjtab { border: 0; background: transparent; color: var(--muted, #777); font: inherit; font-weight: 600;
+  padding: 7px 26px; border-radius: 999px; cursor: pointer; }
+.subjtab.on { background: var(--accent); color: var(--card); }
+
+/* ───── 主页 v2:科目切换并入头部、统计条、书卡色标 ───── */
+.hero{padding:22px 6px 4px;text-align:center}
+.hero .subjtabs{margin:0 auto 18px}
+.hero .badge{font-size:11.5px;letter-spacing:.14em;color:var(--muted)}
+.hero h1{font-size:28px;letter-spacing:.08em;margin:6px 0 8px}
+.herostats{display:grid;grid-template-columns:repeat(4,1fr);max-width:440px;margin:0 auto;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.hstat{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px}
+.hstat + .hstat{border-left:1px solid var(--line)}
+.hstat b{font-size:18px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums}
+.hstat span{font-size:11.5px;color:var(--muted);letter-spacing:.04em}
+.homegrid.books{gap:16px}
+.hsec{position:relative;padding-top:16px;overflow:hidden}
+.hsec::before{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:var(--book,var(--accent));opacity:.55}
+.hsec .bookhead{gap:12px;margin-bottom:10px}
+.hsec .bookinfo{flex:1;min-width:0}
+.hsec .sec-title{font-size:16.5px;letter-spacing:.02em}
+.bookcount{flex:0 0 auto;font-size:12px;color:var(--ink2);background:var(--soft);border:1px solid var(--line);
+  padding:3px 10px;border-radius:999px;font-variant-numeric:tabular-nums}
+.resumecard{border-left:0;border:1px solid var(--line);background:var(--accent-soft)}
+.helpcard{background:transparent;border-style:dashed}
+@media (max-width:520px){
+  .hero{padding:12px 2px 0}
+  .hero h1{font-size:23px;margin-bottom:12px}
+  .hero .subjtabs{margin-bottom:14px}
+  .hstat{padding:8px 2px}
+  .hstat b{font-size:16px}
+}
+
+/* 原书解析截图:白底扫描件,夜间模式反色降亮 */
+.solimg{display:block;max-width:100%;height:auto;margin:8px 0 2px;border-radius:8px;border:1px solid var(--line)}
+:root[data-theme="dark"] .solimg{filter:invert(.88) hue-rotate(180deg)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .solimg{filter:invert(.88) hue-rotate(180deg)}}
