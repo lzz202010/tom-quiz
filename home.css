@@ -1,0 +1,119 @@
+/* 主页精修:只改质感与对齐,沿用原来的暖纸色,不增加颜色。放在 book.css 之后加载。 */
+
+:root{
+  --serif:"Songti SC","Noto Serif SC","Source Han Serif SC","STSong",serif;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+
+/* ── 顶部一行:选题打印 · 科目切换 · 外观,三者垂直居中对齐 ── */
+.hero:has(.subjtabs){display:grid;grid-template-columns:1fr auto 1fr;align-items:center;column-gap:10px;padding:16px 2px 2px}
+.hero:has(.subjtabs) .pickentry{position:static;grid-column:1;grid-row:1;justify-self:start;margin:0;height:36px;font-size:13px}
+.hero:has(.subjtabs) .subjtabs{grid-column:2;grid-row:1;margin:0}
+.hero:has(.subjtabs) .themefab{position:static;grid-column:3;grid-row:1;justify-self:end;width:36px;height:36px}
+.subjtab{padding:7px 24px;transition:background .25s var(--ease),color .25s var(--ease)}
+
+/* 标题:宋体字形,像书的封面;下面一道短短的细线收住 */
+.hero:has(.subjtabs) h1{grid-column:1/-1;grid-row:2;margin:30px 0 4px;font-family:var(--serif);
+  font-size:34px;font-weight:700;letter-spacing:.16em;text-indent:.16em;line-height:1.25}
+.hero:has(.subjtabs) h1::after{content:"";display:block;width:30px;height:2px;margin:16px auto 6px;border-radius:2px;
+  background:var(--accent);opacity:.45}
+
+/* ── 书卡 ── */
+.homegrid.books{gap:18px}
+.hsec{padding:20px 22px 18px;border-radius:22px;transition:box-shadow .25s var(--ease)}
+/* 原来整条的色带改成挂在卡片上沿的一小片书签:保留书的识别色,但只有一点点 */
+.hsec::before{left:26px;right:auto;top:0;width:30px;height:4px;border-radius:0 0 4px 4px;opacity:1;
+  background:color-mix(in srgb,var(--book,var(--accent)) 62%,var(--card))}
+.hsec .bookhead{gap:12px;margin-bottom:14px;transition:margin-bottom .3s var(--ease)}
+.hsec .sec-title{font-family:var(--serif);font-size:18.5px;font-weight:700;letter-spacing:.04em;line-height:1.35}
+.hsec .bookstat{margin-top:2px;font-size:12.5px;letter-spacing:.02em}
+.bookcount{background:none;border:0;padding:0 2px;font-size:12.5px;color:var(--muted);letter-spacing:.04em}
+
+/* 拖动手柄:两列三点,平时很淡,指到卡片上才显出来 */
+.bk-handle2{font-size:0;width:12px;height:21px;padding:0;margin:0 0 0 -2px;opacity:.28;color:var(--muted);transition:opacity .2s;
+  background:radial-gradient(circle,currentColor 1.25px,transparent 1.7px) 0 0/6px 7px repeat}
+.hsec:hover .bk-handle2{opacity:.6}
+.bk-handle2:hover{opacity:1}
+@media (hover:none){.bk-handle2{opacity:.5}}
+
+/* 折叠箭头:画出来的小 V 形,折叠时转向右 */
+.bk-chev{font-size:0;width:30px;height:30px;padding:0;border-radius:50%;position:relative;
+  transition:transform .3s var(--ease),background .2s}
+.bk-chev::before{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-6px 0 0 -4px;
+  border:solid var(--muted);border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+.bk-chev:hover{background:var(--soft)}
+
+/* 折叠时高度平滑收起,不再「啪」地消失 */
+.bookbody{display:grid;grid-template-rows:1fr;transition:grid-template-rows .32s var(--ease)}
+.bk-inner{min-height:0;overflow:hidden;padding:3px;margin:-3px}
+.hsec.folded .bookbody{display:grid;grid-template-rows:0fr}
+.hsec.folded .bk-inner{visibility:hidden;transition:visibility 0s .32s}
+
+/* 进入主页时,书卡依次轻轻浮现 */
+@keyframes bkrise{from{opacity:0;transform:translateY(10px)}}
+.homegrid.fresh>.hsec{animation:bkrise .55s var(--ease) backwards;animation-delay:calc(var(--i,0)*70ms)}
+@media (prefers-reduced-motion:reduce){.homegrid.fresh>.hsec{animation:none}.bookbody,.bk-chev{transition:none}}
+
+/* ── 格子:年份 / 单元 ── */
+.yeargrid{grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:9px;margin-top:2px}
+.yeargrid.titled{grid-template-columns:repeat(auto-fill,minmax(158px,1fr))}
+.yeargrid.titled .y-year{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.unitgrid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px}
+@media (max-width:560px){.unitgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .unitgrid .u-name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35}}
+.ycell,.ucell{min-height:60px;padding:10px 12px 9px;border-radius:13px;
+  /* 格子在卡片里面,再做一层毛玻璃既看不出来又费性能 */
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  background-color:color-mix(in srgb,var(--card) 50%,var(--bg));
+  box-shadow:inset 0 0 0 1px var(--lg-edge2)!important;
+  transition:transform .2s var(--ease),box-shadow .2s var(--ease),background .2s}
+.ycell.started,.ucell.started{background-color:var(--card)}
+.ycell:hover,.ucell:hover{transform:translateY(-1.5px);background-color:var(--card);
+  box-shadow:inset 0 0 0 1px var(--line-strong),0 6px 14px rgba(60,50,30,.07)!important}
+.ycell:active,.ucell:active{transform:scale(.985);transition-duration:.08s}
+.y-year{font-size:16px;font-weight:650;letter-spacing:.03em}
+.u-name{font-size:13.5px}
+.y-meta,.u-meta{font-size:11.5px;margin-top:1px}
+.y-bar{height:3px;border-radius:3px;margin-top:7px}
+.y-bar i{border-radius:3px;opacity:.7}
+.gcard{border-radius:14px;padding:10px 11px 11px;border-color:var(--line)}
+.g-name{font-family:var(--serif);font-size:13.5px;letter-spacing:.03em}
+.foldgroup{border-radius:13px}
+
+/* ── 继续做题 / 最近成绩 ── */
+.resumecard{border-radius:20px;padding:14px 18px}
+.rtitle{font-size:14.5px}
+.rmeta{font-size:12.5px}
+.sec-title{letter-spacing:.03em}
+
+/* ── 侧栏(电脑) ── */
+.brand-title{font-family:var(--serif);font-size:19px;font-weight:800;letter-spacing:.12em}
+.brand-sub{letter-spacing:.04em;font-size:11px}
+.brand{border-bottom-color:var(--lg-edge2);padding-bottom:14px;margin-bottom:12px}
+.sitem{gap:11px;padding:10px 12px;border-radius:12px;font-size:14.5px;transition:background .2s,color .2s}
+.sicon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px}
+.sicon svg{display:block}
+.sitem.active{font-weight:650}
+.side-foot{font-size:11px;line-height:1.75;color:var(--faint)}
+
+/* ── 手机:底栏做成悬浮的小药丸,四周留白 ── */
+@media (max-width:760px){
+  body #side{left:14px;right:14px;bottom:calc(10px + env(safe-area-inset-bottom));width:auto;
+    padding:5px 6px;border:1px solid var(--lg-edge2);border-radius:26px}
+  #app{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  .sitem{padding:6px 2px 5px;border-radius:20px}
+  .sicon{width:24px;height:22px}
+  .sicon svg{width:21px;height:21px}
+  .hero:has(.subjtabs) h1{font-size:27px;margin-top:24px;letter-spacing:.12em;text-indent:.12em}
+  .hero:has(.subjtabs) h1::after{margin-top:12px}
+  .subjtab{padding:7px 20px}
+  .hsec{padding:18px 16px 16px}
+  .hsec .sec-title{font-size:17px}
+}
+@media (max-width:480px){
+  .hsec .sec-title{text-wrap:balance}
+  .bookcount{display:none}
+}
+@media (max-width:420px){
+  .hero:has(.subjtabs) .pickentry{padding:0 11px;font-size:12.5px}
+}
