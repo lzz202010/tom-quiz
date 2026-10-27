@@ -61,7 +61,7 @@ function themeToggle(cls) {
 /* ───────────── 书与练习单元 ─────────────
    页码统一用 PDF 页号(1 起);书本页码 = PDF 页号 - offset - 1 */
 // 每本书以目录的哪一级作为一个练习单元
-const UNIT_LEVEL = { wbq: 1, jz200: 0, dw1000: 2 };
+const UNIT_LEVEL = { jz200: 0, dw1000: 2 };
 
 const BOOKS = {};
 const UNITS = {};
@@ -415,7 +415,7 @@ const TEX_SYM = { le: '≤', leq: '≤', ge: '≥', geq: '≥', neq: '≠', ne: 
   in: '∈', cup: '∪', cap: '∩', alpha: 'α', beta: 'β', theta: 'θ', lambda: 'λ', circ: '°', Rightarrow: '⇒',
   quad: ' ', qquad: '  ', ldots: '…', cdots: '⋯', left: '', right: '', lt: '<', gt: '>',
   varnothing: '∅', emptyset: '∅', subset: '⊂', mathbb: '', begin: '', end: '',
-  sigma: 'σ', Delta: 'Δ', sim: '∼', cong: '≅', iff: '⇔', to: '→', mid: '|', sum: 'Σ', limits: '', ln: 'ln', min: 'min', max: 'max' };
+  sigma: 'σ', odot: '⊙', overset: '', frown: '⌒', sin: 'sin', cos: 'cos', lg: 'lg', log: 'log', dfrac: '', Delta: 'Δ', sim: '∼', cong: '≅', iff: '⇔', to: '→', mid: '|', sum: 'Σ', limits: '', ln: 'ln', min: 'min', max: 'max' };
 // 取出 s[i] 起的一个 {…} 组或单个字符,返回 [内容, 结束位置]
 function texGroup(s, i) {
   while (s[i] === ' ') i++;
