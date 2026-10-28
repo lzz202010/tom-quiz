@@ -184,15 +184,7 @@
 .btn:active{transform:scale(.97)}
 .btn.ghost{background-color:var(--card)}
 
-/* 荧光笔:逻辑题干线索标记 */
-.qstem mark.hl{font-size:inherit;line-height:inherit;font-family:inherit;background:linear-gradient(transparent 18%,rgba(255,210,0,.5) 18%,rgba(255,210,0,.5) 94%,transparent 94%);
-  color:inherit;padding:0 1px;border-radius:2px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
-body.hlpen .qstem{cursor:text}
-body.hlpen .qstem mark.hl{cursor:pointer}
-body.hlpen .qstem mark.hl:hover{background:linear-gradient(transparent 18%,rgba(255,90,60,.35) 18%,rgba(255,90,60,.35) 94%,transparent 94%)}
-.qtools .tool.hl-pen.on{background:rgba(255,210,0,.35);border-color:rgba(230,170,0,.8);color:inherit}
-
-/* 逻辑提示:线索词分类着色(与荧光笔 mark.hl 并存) */
+/* 逻辑提示:线索词分类着色 */
 .qstem mark.hint{background:none;color:inherit;font-size:inherit;line-height:inherit;font-family:inherit;border-bottom:2px solid;padding:0 1px;font-weight:600}
 .qstem mark.hint.k1{border-color:#2f7fd1;color:#1f66b5}
 .qstem mark.hint.k2{border-color:#2f9e6a;color:#1d7f50}

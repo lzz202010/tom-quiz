@@ -1418,67 +1418,13 @@ function decorateBookCard(sec, book, ui) {
   };
 }
 
-/* 荧光笔(逻辑题干):开着笔时划选文字即标成荧光线索,点已标的文字取消;按文字偏移存 localStorage */
-const KEY_HL = 'gzb.hl.v1', KEY_HLPEN = 'gzb.hlpen.v1';
-let hlStore = load(KEY_HL, {});            // 'unitKey:题号' -> [[起, 止], ...](题干 textContent 的偏移)
-let hlPen = load(KEY_HLPEN, false);
 function hlLead(stem) { const q = stem.querySelector('.qno'); return q ? q.textContent.length + 1 : 0; }   // 题号「3. 」不可标
 function paintStem(stem, n, q, hkey) {
   stem.innerHTML = '<span class="qno">' + n + '.</span> ' + q.stem;
-  if (hintOn) wrapRanges(stem, hintRanges(stem.textContent, hlLead(stem)), 'hint');
-  const ranges = hlStore[hkey] || [];
-  if (ranges.length) wrapRanges(stem, ranges, 'hl');
-}
-function hlAdd(stem, hkey, a, b) {
-  const lead = hlLead(stem);
-  a = Math.max(a, lead);
-  if (b <= a) return false;
-  const rs = (hlStore[hkey] || []).concat([[a, b]]).sort(function (x, y) { return x[0] - y[0]; });
-  const merged = [];
-  rs.forEach(function (r) {
-    const last = merged[merged.length - 1];
-    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else merged.push(r.slice());
-  });
-  hlStore[hkey] = merged;
-  store(KEY_HL, hlStore);
-  return true;
-}
-function hlRemove(hkey, i) {
-  const rs = hlStore[hkey] || [];
-  rs.splice(i, 1);
-  if (rs.length) hlStore[hkey] = rs; else delete hlStore[hkey];
-  store(KEY_HL, hlStore);
-}
-function bindHighlighter(stem, n, q, hkey) {
-  stem.onclick = function (e) {
-    const m = e.target.closest && e.target.closest('mark.hl');
-    if (!hlPen || !m) return;
-    hlRemove(hkey, +m.dataset.i);
-    paintStem(stem, n, q, hkey);
-    refreshHlClear();
-  };
-  function grab() {
-    if (!hlPen) return;
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
-    const r = sel.getRangeAt(0);
-    if (!stem.contains(r.startContainer) || !stem.contains(r.endContainer)) return;
-    const pre = document.createRange();
-    pre.selectNodeContents(stem);
-    pre.setEnd(r.startContainer, r.startOffset);
-    const a = pre.toString().length, b = a + r.toString().length;
-    sel.removeAllRanges();
-    if (hlAdd(stem, hkey, a, b)) { paintStem(stem, n, q, hkey); refreshHlClear(); }
-  }
-  stem.onmouseup = function () { setTimeout(grab, 0); };
-  stem.ontouchend = function () { setTimeout(grab, 350); };
-}
-function refreshHlClear() {
-  const b = document.querySelector('.hl-clear');
-  if (b) b.style.display = hlStore[b.dataset.k] ? '' : 'none';
+  if (hintOn && /^lj/.test(hkey)) wrapRanges(stem, hintRanges(stem.textContent, hlLead(stem)), 'hint');   // 提示只给逻辑题
 }
 
-/* 逻辑提示:按词典把题干里的逻辑线索词标出(条件 / 并列选择 / 数量 / 否定情态),与荧光笔互不影响 */
+/* 逻辑提示:按词典把题干里的逻辑线索词标出(条件 / 并列选择 / 数量 / 否定情态) */
 const KEY_HINT = 'gzb.hint.v1';
 let hintOn = load(KEY_HINT, false);
 const HINT_WORDS = {
@@ -1547,23 +1493,6 @@ function questionCard(s) {
   bkBtn.onclick = function () { toggleBasket(u.key, n); render(); };
   const logic = u.book.id.slice(0, 2) === 'lj', hkey = u.key + ':' + n, legend = el('div', 'hint-legend');
   if (logic) {
-    const penBtn = el('button', 'tool hl-pen' + (hlPen ? ' on' : ''), '🖍 荧光笔');
-    penBtn.title = '开着时,划选题干里的线索文字即标成荧光色;点已标的文字取消';
-    penBtn.onclick = function () {
-      hlPen = !hlPen;
-      store(KEY_HLPEN, hlPen);
-      document.body.classList.toggle('hlpen', hlPen);
-      penBtn.classList.toggle('on', hlPen);
-    };
-    const clrBtn = el('button', 'tool hl-clear', '清除标记');
-    clrBtn.dataset.k = hkey;
-    clrBtn.style.display = hlStore[hkey] ? '' : 'none';
-    clrBtn.onclick = function () {
-      delete hlStore[hkey];
-      store(KEY_HL, hlStore);
-      paintStem(cardEl.querySelector('.qstem'), n, q, hkey);
-      clrBtn.style.display = 'none';
-    };
     const hintBtn = el('button', 'tool hint-btn' + (hintOn ? ' on' : ''), '💡 提示');
     hintBtn.title = '标出题干里的逻辑线索词:蓝=条件,绿=并列/选择,橙=数量,紫=否定/情态';
     hintBtn.onclick = function () {
@@ -1573,9 +1502,8 @@ function questionCard(s) {
       paintStem(cardEl.querySelector('.qstem'), n, q, hkey);
       legend.style.display = hintOn ? '' : 'none';
     };
-    tools.append(hintBtn, penBtn, clrBtn);
+    tools.append(hintBtn);
   }
-  document.body.classList.toggle('hlpen', logic && hlPen);
   tools.append(imgBtn);
   if (picking) tools.append(bkBtn);
   tools.append(starBtn);
@@ -1584,7 +1512,6 @@ function questionCard(s) {
 
   const stem = el('div', 'qstem');
   paintStem(stem, n, q, hkey);
-  if (logic) bindHighlighter(stem, n, q, hkey);
   cardEl.append(stem);
   if (logic) {
     legend.innerHTML = '<i class="k1">条件</i><i class="k2">并列/选择</i><i class="k3">数量</i><i class="k4">否定/情态</i>';
