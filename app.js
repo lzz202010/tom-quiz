@@ -6,6 +6,28 @@
 
 const BANK = window.BANK;
 const QBANK = window.QBANK || {};
+/* 解析单独放在 solutions.js(约占题库一半体积):首屏只加载题目,渲染完在后台加载解析,合并回各题的 q.sol */
+let solState = window.QSOL_SRC ? 0 : 2;       // 0 未加载 · 1 加载中 · 2 已就绪(旧版题库自带解析)
+const solWaiters = [];
+function loadSols(cb) {
+  if (solState === 2) { if (cb) cb(); return; }
+  if (cb && solWaiters.indexOf(cb) < 0) solWaiters.push(cb);
+  if (solState === 1) return;
+  solState = 1;
+  const sc = document.createElement('script');
+  sc.src = window.QSOL_SRC;
+  sc.onload = function () {
+    const all = window.QSOL || {};
+    Object.keys(all).forEach(function (sid) {
+      if (QBANK[sid]) QBANK[sid].qs.forEach(function (q) { if (all[sid][q.no] != null) q.sol = all[sid][q.no]; });
+    });
+    solState = 2;
+    solWaiters.splice(0).forEach(f => f());
+  };
+  sc.onerror = function () { solState = 0; sc.remove(); };      // 网络不好时,下次用到再试
+  document.head.append(sc);
+}
+const rerenderQuiz = function () { if (quiz) render(); };
 const LETTERS = 'ABCDE';
 const COND_OPTS = [
   '条件(1)充分,但条件(2)不充分',
@@ -61,7 +83,7 @@ function themeToggle(cls) {
 /* ───────────── 书与练习单元 ─────────────
    页码统一用 PDF 页号(1 起);书本页码 = PDF 页号 - offset - 1 */
 // 每本书以目录的哪一级作为一个练习单元
-const UNIT_LEVEL = { wbq: 1, jz200: 0, dw1000: 2, lj: 1 };
+const UNIT_LEVEL = { wbq: 1, kd: 1, jz200: 0, dw1000: 2, lj: 1 };
 
 const BOOKS = {};
 const UNITS = {};
@@ -274,7 +296,7 @@ function saveSession() {
   if (!quiz) return;
   if (quiz.done) { localStorage.removeItem(KEY_SESSION); return; }
   store(KEY_SESSION, { unit: quiz.unit.key, list: quiz.list, idx: quiz.idx,
-                       page: quiz.page, redo: quiz.redo, origin: quiz.origin });
+                       page: quiz.page, redo: quiz.redo, origin: quiz.origin, lvf: quiz.lvf });
 }
 function loadSession() {
   const s = load(KEY_SESSION, null);
@@ -284,6 +306,7 @@ function restoreSession() {
   const s = loadSession();
   if (!s) return null;
   quiz = makeQuiz(UNITS[s.unit], s.list, s.redo, s.origin);
+  quiz.lvf = s.lvf;
   quiz.idx = Math.min(s.idx || 0, quiz.list.length - 1);
   quiz.page = s.page || quiz.page;
   return quiz;
@@ -300,12 +323,55 @@ function makeQuiz(unit, list, redo, origin) {
 }
 function range(a, b) { const r = []; for (let i = a; i <= b; i++) r.push(i); return r; }
 
+/* ───────────── 难度分级 ─────────────
+   每题的 lv(1 基础 · 2 中等 · 3 较难 · 4 挑战)由 scripts/difficulty.py 按解题步骤、知识点、题位估计;
+   主页可按难度筛选,只影响新开始的练习(断点续做、错题重做不筛) */
+const LV_NAME = ['', '基础', '中等', '较难', '挑战'];
+const KEY_LVF = 'gzb.lvfilter.v1';
+let lvFilter = load(KEY_LVF, []);
+const LV_BARS = '<span class="lvbars"><i></i><i></i><i></i><i></i></span>';
+function lvBadge(lv, mini) {
+  if (!lv) return '';
+  return '<span class="lv lv' + lv + (mini ? ' mini' : '') + '" title="难度:' + LV_NAME[lv] + '">' + LV_BARS +
+    (mini ? '' : LV_NAME[lv]) + '</span>';
+}
+function lvCounts(u) {           // [基础, 中等, 较难, 挑战] 各几题
+  const c = [0, 0, 0, 0];
+  (u.qnos || []).forEach(function (n) { const lv = u.qs[n].lv; if (lv) c[lv - 1]++; });
+  return c;
+}
+function lvAvg(c) {
+  const t = c[0] + c[1] + c[2] + c[3];
+  return t ? Math.round((c[0] + 2 * c[1] + 3 * c[2] + 4 * c[3]) / t) : 0;
+}
+function lvTitle(c) {
+  return c.map(function (k, i) { return k ? LV_NAME[i + 1] + ' ' + k : ''; }).filter(Boolean).join(' · ');
+}
+function lvSpectrum(c) {         // 一条按难度分色的细条,宽度即各档占比
+  if (!(c[0] + c[1] + c[2] + c[3])) return '';
+  return '<span class="lvspec" title="难度分布:' + lvTitle(c) + '">' +
+    c.map(function (k, i) { return k ? '<i class="lv' + (i + 1) + '" style="flex:' + k + '"></i>' : ''; }).join('') + '</span>';
+}
+function lvPick(u, list) {       // 按主页的难度筛选取题
+  return list.filter(n => u.qs[n] && lvFilter.indexOf(u.qs[n].lv) >= 0);
+}
+function lvFilterName() { return lvFilter.map(lv => LV_NAME[lv]).join('、'); }
+
 function startUnit(unitKey, at) {
   const u = UNITS[unitKey], s = getSheet(unitKey);
   const done = Object.keys(s.ans).length;
+  const picked = !at && u.qs && lvFilter.length ? lvPick(u, u.qnos) : null;
+  if (picked && !picked.length) {
+    choose('这一节没有「' + lvFilterName() + '」难度的题', [['做全部 ' + u.qnos.length + ' 题', function () {
+      quiz = makeQuiz(u, null, false, '#/');
+      location.hash = '#/quiz';
+    }, true]]);
+    return;
+  }
   const go = function (reset) {
     if (reset) { s.ans = {}; s.pg = {}; putSheet(unitKey, s); }
-    quiz = makeQuiz(u, null, false, '#/');
+    quiz = makeQuiz(u, picked, false, '#/');
+    if (picked) quiz.lvf = lvFilter.slice();
     if (at && at.page) quiz.page = at.page;
     if (at && at.no != null) quiz.idx = Math.max(0, quiz.list.indexOf(at.no));
     else if (!reset) {                       // 继续:跳到第一道没做的题
@@ -565,11 +631,22 @@ function flash(btn, text, ok) {
   btn.classList.toggle('copied', ok !== false);
   setTimeout(function () { btn.textContent = old; btn.classList.remove('copied'); }, 1500);
 }
+/* html2canvas 只在点「复制图片」时才加载(200KB,平时用不到) */
+let h2cLoad = null;
+function loadH2C() {
+  if (window.html2canvas) return Promise.resolve();
+  return h2cLoad || (h2cLoad = new Promise(function (ok, bad) {
+    const sc = document.createElement('script');
+    sc.src = 'vendor/katex/html2canvas.min.js';
+    sc.onload = ok;
+    sc.onerror = function () { h2cLoad = null; bad(new Error('html2canvas')); };
+    document.head.append(sc);
+  }));
+}
 function copyQuestionImage(u, n, btn) {
-  if (!window.html2canvas) { copyText(questionPlainText(u, n), btn); return; }
   const node = captureNode(u, n);
   document.body.append(node);
-  const blob = Promise.all([...node.querySelectorAll('img')].map(i => i.decode().catch(() => {})))
+  const blob = Promise.all([loadH2C(), ...[...node.querySelectorAll('img')].map(i => i.decode().catch(() => {}))])
     .then(() => window.html2canvas(node, { backgroundColor: '#ffffff', scale: 2, logging: false }))
     .then(c => new Promise(r => c.toBlob(r, 'image/png')))
     .finally(() => node.remove());
@@ -579,7 +656,7 @@ function copyQuestionImage(u, n, btn) {
     a.download = unitName(u) + '-第' + n + '题.png';
     a.click();
     flash(btn, '已存为图片');
-  });
+  }).catch(() => copyText(questionPlainText(u, n), btn));
   // ClipboardItem 需在点击时同步创建,内容可以是 Promise(Safari 要求如此)
   if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
     navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
@@ -689,6 +766,7 @@ const HELP_HTML =
   '<h3>怎么刷</h3>' +
   '<p><b>已转录的题</b>:一题一卡,点选项立即判分,并显示答案与解析;真题答案已与官方答案核对;1000 题的答案取自原书解析,个别拆分的小问由 AI 解出;如发现有误请以原书为准。点 <b>复制图片</b> 可把整题(含图形)截成图片直接粘贴。</p>' +
   '<p><b>未转录的部分</b>:左边看原书页面,右边答题卡选 A–E;选完翻到答案页,点出正确选项即判分。答案键会被记住,重做时自动判分。</p>' +
+  '<p><b>难度分级</b>:每题标有 基础 · 中等 · 较难 · 挑战 四档(信号格越满越难),按解题步骤、知识点和真题题位估计,仅供参考。主页顶部可按难度筛选(可多选),只刷想练的档位;每节卡片上的小信号格是这一节的平均难度,书名旁的彩色细条是全书的难度分布;做完一节,成绩页会按难度统计正确率。</p>' +
   '<p><b>错题本是纯收录模式</b>:答错不会自动进本,做题时点 <b>☆ 收录</b> 把值得重做的题收进来;收录的题不会自动移出,可随时手动移出。</p>' +
   '<p><b>选题打印</b>:点主页顶部的「选题打印」进入选题模式(页面出现虚线边框,右下角有个小小的「选题单」浮标);主页点单元勾选题目、做题页点 <b>＋ 选题单</b>(或按 <code>B</code>)。选好后点浮标 → 打印,会先问要不要附答案(可含解析)。选题单记在本机,下次还在。</p>' +
   '<p>快捷键:<code>A</code>–<code>E</code> 作答 · <code>Enter</code> 下一题 · <code>←</code><code>→</code> 换题 · <code>S</code> 收录 · <code>X</code> 复制图片 · <code>G</code> 题号 · <code>Esc</code> 退出</p>' +
@@ -716,6 +794,30 @@ function subjectTabs() {
   return bar;
 }
 
+/* 主页的难度筛选:可多选,全不选 = 全部;选中后各单元显示符合的题数,开始练习时只出这些题 */
+function lvFilterBar() {
+  const bar = el('div', 'lvfilter');
+  bar.append(el('span', 'lvf-label', '难度'));
+  const set = function (f) {
+    lvFilter = f.length === 4 ? [] : f;
+    store(KEY_LVF, lvFilter);
+    saveView(lastRoute);           // 保留展开的分组和滚动位置
+    render();
+    restoreView(lastRoute);
+  };
+  const all = el('button', 'lvf all' + (lvFilter.length ? '' : ' on'), '全部');
+  all.onclick = () => set([]);
+  bar.append(all);
+  [1, 2, 3, 4].forEach(function (lv) {
+    const on = lvFilter.indexOf(lv) >= 0;
+    const b = el('button', 'lvf lv' + lv + (on ? ' on' : ''), LV_BARS + LV_NAME[lv]);
+    b.title = on ? '取消筛选「' + LV_NAME[lv] + '」' : '只练「' + LV_NAME[lv] + '」(可多选)';
+    b.onclick = () => set(on ? lvFilter.filter(x => x !== lv) : lvFilter.concat(lv).sort());
+    bar.append(b);
+  });
+  return bar;
+}
+
 function renderHome() {
   $app.innerHTML = '';
   const w = el('div', 'wrap');
@@ -728,6 +830,7 @@ function renderHome() {
   head.append(el('h1', '', subj === 'logic' ? '逻辑 · 真题精练' : '数学 · 冲刺精练'));
   const books = visibleBooks().filter(b => subjectOf(b) === subj);
   w.append(head);
+  w.append(lvFilterBar());
 
   const sess = loadSession();
   if (sess && UNITS[sess.unit] && unitAvailable(UNITS[sess.unit]) && subjectOf(UNITS[sess.unit].book) === subj) {
@@ -820,8 +923,10 @@ function bookCard(book) {
   const info = el('div', 'bookinfo');
   info.append(el('h2', 'sec-title', esc(book.title)));
   const st = bookStats(book);
+  const bc = [0, 0, 0, 0];
+  units.forEach(function (u) { if (u.qs) lvCounts(u).forEach(function (k, i) { bc[i] += k; }); });
   info.append(el('div', 'bookstat', esc(book.author) + (book.pages ? ' · ' + book.pages + ' 页' : '') +
-    (st.done ? ' · 已做 <b>' + st.done + '</b> 题' : '')));
+    (st.done ? ' · 已做 <b>' + st.done + '</b> 题' : '') + lvSpectrum(bc)));
   head.append(info);
   head.append(el('span', 'bookcount', units.length + (book.id === 'zt' ? ' 套' : ' 节')));
   sec.style.setProperty('--book', book.color);
@@ -883,11 +988,13 @@ function yearCell(u) {
   const s = sheets[u.key] && getSheet(u.key);
   const total = s ? unitList(u, s).length : (u.qnos ? u.qnos.length : u.count);
   const st = s ? progStats(s) : { done: 0, ok: 0, bad: 0 };
-  const b = el('button', 'ycell' + (st.done ? ' started' : '') + (u.qs ? '' : ' raw'));
-  b.title = unitName(u) + (u.qs ? '' : '(原卷页面作答)');
+  const lc = u.qs && lvCounts(u), want = lc && lvFilter.length ? lvPick(u, u.qnos).length : -1;
+  const b = el('button', 'ycell' + (st.done ? ' started' : '') + (u.qs ? '' : ' raw') + (want === 0 ? ' lvnone' : ''));
+  b.title = unitName(u) + (u.qs ? '' : '(原卷页面作答)') + (lc ? '\n难度:' + lvTitle(lc) : '');
   b.dataset.u = u.key;
   b.append(el('span', 'y-year', (u.group.match(/\d{4}/) || [u.title])[0]));
-  b.append(el('span', 'y-meta', st.done ? st.ok + '/' + total : total + ' 题'));
+  b.append(el('span', 'y-meta', (lc ? lvBadge(lvAvg(lc), true) : '') +
+    (want >= 0 ? want + '/' + total + ' 题' : st.done ? st.ok + '/' + total : total + ' 题')));
   b.append(el('span', 'y-bar', '<i style="width:' + Math.round(st.done / total * 100) + '%"></i>'));
   b.onclick = () => unitClick(u);
   return b;
@@ -897,11 +1004,14 @@ function unitCell(u, label) {
   const s = sheets[u.key] && getSheet(u.key);
   const total = u.qnos ? u.qnos.length : (u.count || (s && s.count) || 0);
   const st = s ? progStats(s) : { done: 0, ok: 0 };
-  const b = el('button', 'ucell' + (st.done ? ' started' : ''));
-  b.title = unitName(u);
+  const lc = u.qs && lvCounts(u), want = lc && lvFilter.length ? lvPick(u, u.qnos).length : -1;
+  const b = el('button', 'ucell' + (st.done ? ' started' : '') + (want === 0 ? ' lvnone' : ''));
+  b.title = unitName(u) + (lc ? '\n难度:' + lvTitle(lc) : '');
   b.dataset.u = u.key;
   b.append(el('span', 'u-name', esc(label.replace(/^第.节\s*/, ''))));
-  b.append(el('span', 'u-meta', (st.done ? '已做 ' + st.done + (total ? '/' + total : '') : (total ? total + ' 题' : '原页'))));
+  b.append(el('span', 'u-meta', (lc ? lvBadge(lvAvg(lc), true) : '') +
+    (st.done ? '已做 ' + st.done + (total ? '/' + total : '') : (total ? total + ' 题' : '原页')) +
+    (want >= 0 ? ' · 选中 ' + want : '')));
   if (total) b.append(el('span', 'y-bar', '<i style="width:' + Math.min(100, Math.round(st.done / total * 100)) + '%"></i>'));
   b.onclick = () => unitClick(u);
   return b;
@@ -1104,7 +1214,8 @@ function quizTopbar() {
   back.onclick = exitQuiz;
   bar.append(back);
   const t = el('div', 'topbar-title');
-  t.append(el('span', 'fb-title', esc(unitName(u)) + (quiz.redo ? ' · 重做' : '')));
+  t.append(el('span', 'fb-title', esc(unitName(u)) + (quiz.redo ? ' · 重做' : '') +
+    (quiz.lvf ? ' · 只做' + quiz.lvf.map(lv => LV_NAME[lv]).join('、') : '')));
   if (!(quiz.done && quiz.showResult)) {
     // 进度条即拉条:拖动可快速跳题,底色显示已答比例
     const s = getSheet(u.key), st = sheetStats(s, quiz.list);
@@ -1202,6 +1313,8 @@ function navCls(s, n, i) {
   const st = status(s, n);
   if (st === 'ok' || st === 'bad' || st === 'ans') c += ' ' + st;
   if (isStar(quiz.unit.key, n)) c += ' star';
+  const q = quiz.unit.qs && quiz.unit.qs[n];
+  if (q && q.lv) c += ' lv' + q.lv;            // 题号下方的小圆点标出难度
   return c;
 }
 function navGrid(s) {
@@ -1310,7 +1423,8 @@ function questionCard(s) {
   const u = quiz.unit, n = quiz.list[quiz.idx], q = u.qs[n];
   const cardEl = el('div', 'card qcard');
   const meta = el('div', 'qmeta');
-  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id === 'lj' ? '逻辑推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '')));
+  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id === 'lj' ? '逻辑推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '') +
+    lvBadge(q.lv)));
   const tools = el('span', 'qtools');
   const imgBtn = el('button', 'tool', '复制图片');
   imgBtn.title = '把整道题(含图形)截成图片复制,可直接粘贴(X)';
@@ -1385,6 +1499,7 @@ function questionCard(s) {
     html += chosen === key ? '<span class="yourok">✓ 答对</span>' : '<span class="yourbad">你的答案:' + chosen + '</span>';
     html += '</div>';
     if (q.sol) html += '<div class="solmain">' + q.sol + '</div>';
+    else if (solState !== 2) { html += '<div class="solmain solwait">解析加载中…</div>'; loadSols(rerenderQuiz); }
     else if (q.solimg) html += '<img class="solimg" loading="lazy" alt="原书解析" src="' + q.solimg + '">';   // 还没重写成文字的题,先显示原书解析截图
     if (!q.ans) {
       html += '<div class="ainote">答案由你对照原书填写 · <button class="fixkey" id="fixkey">填错了?</button></div>';
@@ -1530,11 +1645,31 @@ function resultView() {
   c.append(el('div', 'score-big', st.ok + '<span class="score-total"> / ' + total + '</span>'));
   c.append(el('div', 'score-sub', '已判 ' + (st.ok + st.bad) + ' 题' +
     (st.pending ? ' · <b>' + st.pending + ' 题待对答案</b>' : '') + (blank ? ' · 未作答 ' + blank : '')));
+  // 按难度统计:哪一档最容易丢分
+  const qs = quiz.unit.qs;
+  const byLv = qs ? [1, 2, 3, 4].map(function (lv) {
+    const ns = quiz.list.filter(n => qs[n] && qs[n].lv === lv);
+    const judged = ns.filter(n => status(s, n) === 'ok' || status(s, n) === 'bad');
+    return { lv: lv, total: ns.length, judged: judged.length, ok: ns.filter(n => status(s, n) === 'ok').length };
+  }).filter(x => x.total) : [];
+  if (byLv.length > 1) {
+    const box = el('div', 'lvres');
+    byLv.forEach(function (x) {
+      const rate = x.judged ? Math.round(x.ok / x.judged * 100) : null;
+      const row = el('div', 'lvres-row lv' + x.lv);
+      row.append(el('span', '', lvBadge(x.lv)));
+      row.append(el('span', 'lvres-bar', '<i style="width:' + (rate || 0) + '%"></i>'));
+      row.append(el('span', 'lvres-num', x.ok + '/' + x.total + (rate == null ? '' : ' · ' + rate + '%')));
+      box.append(row);
+    });
+    c.append(box);
+  }
 
   const grid = el('div', 'chipgrid');
   quiz.list.forEach(function (n, i) {
     const x = status(s, n);
-    const chip = el('button', 'chip ' + (x === 'ok' ? 'ok' : x === 'bad' ? 'bad' : 'un'), String(n));
+    const q = quiz.unit.qs && quiz.unit.qs[n];
+    const chip = el('button', 'chip ' + (x === 'ok' ? 'ok' : x === 'bad' ? 'bad' : 'un') + (q && q.lv ? ' lv' + q.lv : ''), String(n));
     chip.onclick = function () { quiz.showResult = false; quiz.idx = i; render(); };
     grid.append(chip);
   });
@@ -1603,6 +1738,9 @@ function renderWrong() {
     $app.append(w);
     return;
   }
+  const wc = [0, 0, 0, 0];
+  items.forEach(function (x) { const q = x.unit.qs && x.unit.qs[x.n]; if (q && q.lv) wc[q.lv - 1]++; });
+  if (wc.some(Boolean)) w.append(el('div', 'wronglv', '收录难度' + lvSpectrum(wc) + '<span>' + lvTitle(wc) + '</span>'));
   w.append(reviewCard(items));
   w.append(exportBar(items));
   BANK.books.forEach(function (book) {
@@ -1626,6 +1764,7 @@ function renderWrong() {
         const row = el('div', 'wq');
         row.append(el('span', 'wq-no', '第 ' + x.n + ' 题'));
         const q = u.qs && u.qs[x.n];
+        if (q && q.lv) row.append(el('span', 'wq-lv', lvBadge(q.lv)));
         const preview = q ? questionPlainText(u, x.n).split('\n')[1] : '';
         row.append(el('span', 'wq-meta', [
           preview ? esc(preview.slice(0, 42)) + (preview.length > 42 ? '…' : '') : '',
@@ -1688,7 +1827,7 @@ function reviewCard(items) {
   if (!x) return c;
   const u = x.unit, q = u.qs && u.qs[x.n];
   c.append(el('div', 'rv-label', '🎲 今日抽到 · ' + esc(unitName(u)) + ' · 第 ' + x.n + ' 题' +
-    (x.r.t ? ' · 重做错 ' + x.r.t + ' 次' : '')));
+    (x.r.t ? ' · 重做错 ' + x.r.t + ' 次' : '') + (q ? lvBadge(q.lv) : '')));
   const body = el('div', 'rv-stem', q ? q.stem : '原书' + pageLabel(u.book, getSheet(u.key).pg[x.n] || u.start) + '的第 ' + x.n + ' 题');
   if (q && q.fig) { const img = el('img', 'qfig'); img.src = q.fig; body.append(img); }
   c.append(typeset(body));
@@ -1728,6 +1867,7 @@ function printWrong(items) {
 }
 // 通用打印:items = [{unit, n, ...}],opt = {ans, sol, space},noteFn(x) 给题目来源行追加说明
 function printItems(items, title, opt, noteFn) {
+  if (opt && opt.sol && solState !== 2) { loadSols(function () { printItems(items, title, opt, noteFn); }); return; }
   // 与页面一致的顺序:按书、单元、题号
   const order = [];
   BANK.books.forEach(function (b) {
@@ -1744,7 +1884,7 @@ function printItems(items, title, opt, noteFn) {
     const u = x.unit, q = u.qs && u.qs[x.n], s = getSheet(u.key);
     const box = el('div', 'pq');
     box.append(el('div', 'pq-src', '<b>' + (k + 1) + '.</b> ' + esc(unitName(u)) + ' · 第 ' + x.n + ' 题' +
-      (noteFn ? noteFn(x) : '')));
+      (q && q.lv ? ' · ' + LV_NAME[q.lv] : '') + (noteFn ? noteFn(x) : '')));
     if (q) {
       box.append(el('div', 'pq-stem', q.stem));
       if (q.fig) { const img = el('img', 'pq-fig'); img.src = q.fig; box.append(img); }
@@ -1995,7 +2135,7 @@ function openPicker(u) {
     cb.onchange = function () { basketAdd(u, [n], cb.checked); upd(); };
     const txt = el('span', 'bk-rtxt');
     const kind = q.kind === 'cond' ? '条件充分' : '';
-    txt.innerHTML = '<b>' + n + '.</b> ' + (kind ? '<em>' + kind + '</em> ' : '') + q.stem;
+    txt.innerHTML = '<b>' + n + '.</b> ' + lvBadge(q.lv, true) + (kind ? '<em>' + kind + '</em> ' : '') + q.stem;
     row.append(cb, txt);
     body.append(row);
     rows.push(cb);
@@ -2006,9 +2146,18 @@ function openPicker(u) {
   all.onclick = function () { basketAdd(u, nums, true); rows.forEach(c => c.checked = true); upd(); };
   const none = el('button', 'btn ghost small', '全不选');
   none.onclick = function () { basketAdd(u, nums, false); rows.forEach(c => c.checked = false); upd(); };
+  const hard = el('button', 'btn ghost small', '只选较难以上');
+  hard.title = '只勾选难度为「较难」「挑战」的题';
+  hard.onclick = function () {
+    const hs = nums.filter(n => u.qs[n].lv >= 3);
+    basketAdd(u, nums, false);
+    basketAdd(u, hs, true);
+    rows.forEach(function (c, i) { c.checked = hs.indexOf(nums[i]) >= 0; });
+    upd();
+  };
   const ok = el('button', 'btn small', '完成');
   ok.onclick = function () { ov.remove(); };
-  foot.append(all, none, ok);
+  foot.append(all, none, hard, ok);
   dlg.append(foot);
   function upd() {
     const c = nums.filter(n => inBasket(u.key, n)).length;
@@ -2060,3 +2209,15 @@ basketSync(true);
 PAGES.done = true;     // 不再加载原书页面:全站只用逐题转录的题,启动时不请求任何书页图
 render();
 restoreFromRepo();
+// 首屏画完后在后台加载解析,等做完第一题时通常早已就绪
+if (window.requestIdleCallback) requestIdleCallback(function () { loadSols(); }, { timeout: 2000 });
+else setTimeout(function () { loadSols(); }, 300);
+
+/* 离线缓存(Service Worker):只在线上启用;本地预览时注销,免得改完代码还看到缓存里的旧文件 */
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+    navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(function () {});
+  } else {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+}

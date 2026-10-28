@@ -522,7 +522,7 @@ input,textarea{color:var(--ink)}
       background-image:var(--lg-fill);background-color:var(--lg-solid);border-top:1px solid var(--lg-edge2);
       border-radius:22px 22px 0 0;box-shadow:inset 0 1.5px 0 var(--lg-edge),var(--lg-shadow)}
   }
-  .card{border-radius:22px}
+  .card{border-radius:22px;-webkit-backdrop-filter:none;backdrop-filter:none}   /* 大量卡片同时做毛玻璃会让滚动掉帧 */
   .bk-pill,.recall-chip,.pickentry,.hero .badge{border-radius:99px}
   .bk-pill{color:#fff;background-image:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,0) 60%);
     background-color:color-mix(in srgb,var(--accent) 88%,transparent);border-color:rgba(255,255,255,.4)}
@@ -531,8 +531,8 @@ input,textarea{color:var(--ink)}
   .bk-ov{-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);background:rgba(20,22,28,.22)}
   /* 题卡与选项:保持可读,但依然透出背景 */
   .qcard{background-color:color-mix(in srgb,var(--card) 80%,transparent)}
-  .opt{background-color:color-mix(in srgb,var(--card) 60%,transparent);
-    -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  /* 选项本身在题卡里,不再叠毛玻璃(5 个选项同时模糊会让手机滚动掉帧) */
+  .opt{background-color:color-mix(in srgb,var(--card) 72%,transparent);
     border-color:var(--lg-edge2);box-shadow:inset 0 1px 0 var(--lg-edge2)}
   .opt.ok{background-color:color-mix(in srgb,var(--ok) 22%,transparent)}
   .opt.bad{background-color:color-mix(in srgb,var(--bad) 20%,transparent)}
