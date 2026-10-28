@@ -184,18 +184,32 @@
 .btn:active{transform:scale(.97)}
 .btn.ghost{background-color:var(--card)}
 
-/* 逻辑提示:线索词分类着色 */
-.qstem mark.hint{background:none;color:inherit;font-size:inherit;line-height:inherit;font-family:inherit;border-bottom:2px solid;padding:0 1px;font-weight:600}
-.qstem mark.hint.k1{border-color:#2f7fd1;color:#1f66b5}
-.qstem mark.hint.k2{border-color:#2f9e6a;color:#1d7f50}
-.qstem mark.hint.k3{border-color:#e08a1e;color:#b8690a}
-.qstem mark.hint.k4{border-color:#8b5cf6;color:#6d3fd4}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .qstem mark.hint.k1{color:#7db7f5}
-:root:not([data-theme="light"]) .qstem mark.hint.k2{color:#6fd3a3}:root:not([data-theme="light"]) .qstem mark.hint.k3{color:#f2b562}
-:root:not([data-theme="light"]) .qstem mark.hint.k4{color:#b89bff}}
-:root[data-theme="dark"] .qstem mark.hint.k1{color:#7db7f5}:root[data-theme="dark"] .qstem mark.hint.k2{color:#6fd3a3}
-:root[data-theme="dark"] .qstem mark.hint.k3{color:#f2b562}:root[data-theme="dark"] .qstem mark.hint.k4{color:#b89bff}
-.hint-legend{display:flex;gap:12px;flex-wrap:wrap;margin:-4px 0 10px;font-size:12px;color:var(--muted,#888)}
-.hint-legend i{font-style:normal;border-bottom:2px solid;padding:0 2px;font-weight:600}
-.hint-legend .k1{border-color:#2f7fd1}.hint-legend .k2{border-color:#2f9e6a}.hint-legend .k3{border-color:#e08a1e}.hint-legend .k4{border-color:#8b5cf6}
-.qtools .tool.hint-btn.on{background:rgba(47,127,209,.16);border-color:rgba(47,127,209,.6);color:inherit}
+/* 逻辑题答题后:选项下方的逐项小字解读 */
+.optwrap{display:flex;flex-direction:column}
+.optnote{font-size:12.5px;line-height:1.65;color:var(--muted);margin:2px 4px 8px 38px}
+.optwrap.ok .optnote{color:var(--ok)}
+
+.bk-menu .btn.arm{color:#c0392b;border-color:#c0392b;font-weight:600}
+
+/* 答题后选项不要发灰:文字保持原色,只用对错底色区分 */
+.opt:disabled,.opt:disabled:not(.ok):not(.bad){opacity:1;color:var(--ink)}
+.opt:disabled .ot{color:var(--ink)}
+.stemnote{margin:2px 0 12px;padding:8px 12px;border-radius:10px;background:var(--accent-soft);border-left:3px solid var(--accent);font-size:13.5px;line-height:1.7;color:var(--ink)}
+.stemnote b{color:var(--accent)}
+
+/* 解读文字较长时用正文字号,短的才用小字 */
+.optnote.long{font-size:14.5px;line-height:1.8;color:var(--ink);margin-left:34px}
+.optwrap.ok .optnote.long{color:var(--ok)}
+.stemnote{font-size:14.5px;line-height:1.8}
+
+/* 开胃小菜(老吕):主页上缩成一个小条 */
+.hsec[data-book="lj7"]{padding-top:8px;padding-bottom:8px}
+.hsec[data-book="lj7"] .bookhead{margin-bottom:0}
+.hsec[data-book="lj7"] .sec-title{font-size:15px}
+.hsec[data-book="lj7"] .bookstat,.hsec[data-book="lj7"] .bookcount,.hsec[data-book="lj7"] .bookcover{display:none}
+
+/* 公考:图形题的题图和解析里的公式图 */
+.gk-img{display:block;max-width:100%;height:auto;margin:8px auto;border-radius:6px;background:#fff}
+.gk-tex{display:inline-block;height:1.35em;width:auto;vertical-align:-.3em}
+.gk-t{border-collapse:collapse;margin:8px 0;font-size:13.5px;max-width:100%;display:block;overflow-x:auto}
+.gk-t td,.gk-t th{border:1px solid var(--line);padding:4px 8px;text-align:center}

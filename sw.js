@@ -1,5 +1,5 @@
 /* 离线缓存:静态资源优先走缓存(秒开),页面与脚本后台更新 */
-const CACHE = 'gzb-v2';
+const CACHE = 'gzb-v3';
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (ks) {

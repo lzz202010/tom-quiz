@@ -6,26 +6,49 @@
 
 const BANK = window.BANK;
 const QBANK = window.QBANK || {};
-/* 解析单独放在 solutions.js(约占题库一半体积):首屏只加载题目,渲染完在后台加载解析,合并回各题的 q.sol */
-let solState = window.QSOL_SRC ? 0 : 2;       // 0 未加载 · 1 加载中 · 2 已就绪(旧版题库自带解析)
+/* 题库按科目拆成三份(qb-math/logic/gk.js),解析另放 sol-*.js:首屏只加载当前科目的题,渲染完再在后台加载它的解析 */
+const loadedQ = {}, loadedS = {};
+let solState = 2;                 // 2 = 已加载的科目解析都就绪;0 = 有科目的解析还没载;1 = 加载中
 const solWaiters = [];
+function loadScript(src, ok, bad) {
+  const sc = document.createElement('script');
+  sc.src = src;
+  sc.onload = ok;
+  sc.onerror = function () { sc.remove(); if (bad) bad(); };
+  document.head.append(sc);
+}
+function loadGroup(g, cb) {
+  if (loadedQ[g] || !window.QFILES) { loadedQ[g] = true; cb(); return; }
+  loadScript(window.QFILES[g], function () {
+    loadedQ[g] = true;
+    BANK.books.filter(b => subjectOf(b) === g).forEach(function (b) {      // 题到了,重建这个科目各书的练习单元
+      b.units = buildUnits(b);
+      b.units.forEach(function (u) { UNITS[u.key] = u; });
+    });
+    solState = 0;
+    cb();
+  }, function () { alert('题库加载失败,请检查网络后刷新重试'); });
+}
 function loadSols(cb) {
-  if (solState === 2) { if (cb) cb(); return; }
+  const need = Object.keys(loadedQ).filter(g => !loadedS[g]);
+  if (!need.length) { solState = 2; if (cb) cb(); return; }
   if (cb && solWaiters.indexOf(cb) < 0) solWaiters.push(cb);
   if (solState === 1) return;
   solState = 1;
-  const sc = document.createElement('script');
-  sc.src = window.QSOL_SRC;
-  sc.onload = function () {
-    const all = window.QSOL || {};
-    Object.keys(all).forEach(function (sid) {
-      if (QBANK[sid]) QBANK[sid].qs.forEach(function (q) { if (all[sid][q.no] != null) q.sol = all[sid][q.no]; });
-    });
-    solState = 2;
-    solWaiters.splice(0).forEach(f => f());
-  };
-  sc.onerror = function () { solState = 0; sc.remove(); };      // 网络不好时,下次用到再试
-  document.head.append(sc);
+  let left = need.length;
+  need.forEach(function (g) {
+    loadScript(window.QSOLF[g], function () {
+      const all = window.QSOL || {}, oe = window.QOE || {};
+      Object.keys(all).forEach(function (sid) {
+        if (QBANK[sid]) QBANK[sid].qs.forEach(function (q) { if (all[sid][q.no] != null) q.sol = all[sid][q.no]; });
+      });
+      Object.keys(oe).forEach(function (sid) {
+        if (QBANK[sid]) QBANK[sid].qs.forEach(function (q) { if (oe[sid][q.no]) q.oe = oe[sid][q.no]; });
+      });
+      loadedS[g] = true;
+      if (--left === 0) { solState = Object.keys(loadedQ).every(k => loadedS[k]) ? 2 : 0; solWaiters.splice(0).forEach(f => f()); }
+    }, function () { solState = 0; left = -99; });      // 网络不好时,下次用到再试
+  });
 }
 const rerenderQuiz = function () { if (quiz) render(); };
 const LETTERS = 'ABCDE';
@@ -369,7 +392,7 @@ function startUnit(unitKey, at) {
     return;
   }
   const go = function (reset) {
-    if (reset) { s.ans = {}; s.pg = {}; putSheet(unitKey, s); }
+    if (reset) { s.ans = {}; s.pg = {}; putSheet(unitKey, s); render(); return; }     // 重置:只清空记录,留在当前页面,不进答题页
     quiz = makeQuiz(u, picked, false, '#/');
     if (picked) quiz.lvf = lvFilter.slice();
     if (at && at.page) quiz.page = at.page;
@@ -776,9 +799,11 @@ const HELP_HTML =
 
 /* 主页顶部的科目切换:逻辑题库单独一栏,数学是其余各书 */
 const KEY_SUBJECT = 'gzb.subject';
-const SUBJECTS = [['math', '数学'], ['logic', '逻辑']];
-function subjectOf(book) { return book.id.slice(0, 2) === 'lj' ? 'logic' : 'math'; }
-function curSubject() { return localStorage.getItem(KEY_SUBJECT) === 'logic' ? 'logic' : 'math'; }
+const SUBJECTS = [['math', '数学'], ['logic', '逻辑'], ['gk', '公考']];
+function subjectOf(book) { return book.id.slice(0, 2) === 'lj' ? 'logic' : book.id === 'gk' ? 'gk' : 'math'; }
+function curSubject() { const v = localStorage.getItem(KEY_SUBJECT); return v === 'logic' || v === 'gk' ? v : 'math'; }
+const SUBJ_TITLE = { math: '数学 · 冲刺精练', logic: '逻辑 · 真题精练', gk: '公考 · 判断推理' };
+const SUBJ_NAME = { math: '数学', logic: '逻辑', gk: '公考' };
 function subjectTabs() {
   const bar = el('div', 'subjtabs');
   SUBJECTS.forEach(function (x) {
@@ -786,8 +811,7 @@ function subjectTabs() {
     b.onclick = function () {
       if (curSubject() === x[0]) return;
       localStorage.setItem(KEY_SUBJECT, x[0]);
-      render();
-      window.scrollTo(0, 0);
+      loadGroup(x[0], function () { render(); window.scrollTo(0, 0); if (window.requestIdleCallback) requestIdleCallback(function () { loadSols(); }, { timeout: 2000 }); else setTimeout(function () { loadSols(); }, 300); });
     };
     bar.append(b);
   });
@@ -827,10 +851,9 @@ function renderHome() {
   head.append(themeToggle('themefab'));
   head.append(subjectTabs());
   head.append(entryButton());
-  head.append(el('h1', '', subj === 'logic' ? '逻辑 · 真题精练' : '数学 · 冲刺精练'));
+  head.append(el('h1', '', SUBJ_TITLE[subj]));
   const books = visibleBooks().filter(b => subjectOf(b) === subj);
   w.append(head);
-  w.append(lvFilterBar());
 
   const sess = loadSession();
   if (sess && UNITS[sess.unit] && unitAvailable(UNITS[sess.unit]) && subjectOf(UNITS[sess.unit].book) === subj) {
@@ -860,7 +883,7 @@ function renderHome() {
   const homeUi = load(KEY_HOMEUI, { order: [], collapsed: {} });
   books.slice().sort(function (x, y) {
     const i = homeUi.order.indexOf(x.id), j = homeUi.order.indexOf(y.id);
-    return (i < 0 ? 99 : i) - (j < 0 ? 99 : j);
+    return (x.id === 'lj7' ? 100 : i < 0 ? 99 : i) - (y.id === 'lj7' ? 100 : j < 0 ? 99 : j);     // 开胃小菜固定排最后
   }).forEach(function (book) {
     const c = bookCard(book);
     if (c) { decorateBookCard(c, book, homeUi); c.style.setProperty('--i', grid.children.length); grid.append(c); }
@@ -926,7 +949,7 @@ function bookCard(book) {
   const bc = [0, 0, 0, 0];
   units.forEach(function (u) { if (u.qs) lvCounts(u).forEach(function (k, i) { bc[i] += k; }); });
   info.append(el('div', 'bookstat', esc(book.author) + (book.pages ? ' · ' + book.pages + ' 页' : '') +
-    (st.done ? ' · 已做 <b>' + st.done + '</b> 题' : '') + lvSpectrum(bc)));
+    (st.done ? ' · 已做 <b>' + st.done + '</b> 题' : '')));
   head.append(info);
   head.append(el('span', 'bookcount', units.length + (book.id === 'zt' ? ' 套' : ' 节')));
   sec.style.setProperty('--book', book.color);
@@ -1368,10 +1391,10 @@ function decorateBookCard(sec, book, ui) {
   const fold = function (on) {
     sec.classList.toggle('folded', on);
     ui.collapsed[book.id] = on || undefined;
-    if (!on) delete ui.collapsed[book.id];
+    if (!on) { if (book.id === 'lj7') ui.collapsed[book.id] = false; else delete ui.collapsed[book.id]; }
     store(KEY_HOMEUI, ui);
   };
-  if (ui.collapsed[book.id]) sec.classList.add('folded');
+  if (ui.collapsed[book.id] || (book.id === 'lj7' && ui.collapsed[book.id] === undefined)) sec.classList.add('folded');   // 开胃小菜默认收起
   const chev = el('button', 'bk-chev', '▾');
   chev.title = '折叠 / 展开';
   chev.onclick = function (ev) { ev.stopPropagation(); fold(!sec.classList.contains('folded')); };
@@ -1418,68 +1441,15 @@ function decorateBookCard(sec, book, ui) {
   };
 }
 
-function hlLead(stem) { const q = stem.querySelector('.qno'); return q ? q.textContent.length + 1 : 0; }   // 题号「3. 」不可标
-function paintStem(stem, n, q, hkey) {
+function paintStem(stem, n, q) {
   stem.innerHTML = '<span class="qno">' + n + '.</span> ' + q.stem;
-  if (hintOn && /^lj/.test(hkey)) wrapRanges(stem, hintRanges(stem.textContent, hlLead(stem)), 'hint');   // 提示只给逻辑题
-}
-
-/* 逻辑提示:按词典把题干里的逻辑线索词标出(条件 / 并列选择 / 数量 / 否定情态) */
-const KEY_HINT = 'gzb.hint.v1';
-let hintOn = load(KEY_HINT, false);
-const HINT_WORDS = {
-  k1: '当且仅当 只有 除非 否则 只要 如果 假如 倘若 一旦 不然 那么 才 就 则 若',
-  k2: '或者 要么 并且 而且 同时 不仅 或 且',
-  k3: '所有 每个 每位 每种 任何 全部 有的 有些 有人 至少 至多 恰好 恰有 仅有 多数 少数 半数 都',
-  k4: '没有 不都 并非 不可能 不一定 未必 必然 一定 必须 可能 不能 不会 不是 无法',
-};
-const HINT_KIND = {}, HINT_RE = (function () {
-  const all = [];
-  Object.keys(HINT_WORDS).forEach(function (k) { HINT_WORDS[k].split(' ').forEach(function (w) { HINT_KIND[w] = k; all.push(w); }); });
-  all.sort(function (a, b) { return b.length - a.length; });
-  return new RegExp(all.join('|'), 'g');
-})();
-function hintRanges(text, from) {
-  const out = [];
-  let m;
-  HINT_RE.lastIndex = from;
-  while ((m = HINT_RE.exec(text))) {
-    const w = m[0], prev = text.charAt(m.index - 1), next = text.charAt(m.index + w.length);
-    if ((w === '才' || w === '就' || w === '则') && !/[,,;;:。、]/.test(prev) && !/[么]/.test(prev)) continue;   // 只取分句开头的「才/就/则」,避开「规则」「成就」
-    if (w === '都' && (/[首京成]/.test(prev) || /[市会城]/.test(next))) continue;
-    if (w === '或' && next === '者') continue;
-    out.push([m.index, m.index + w.length, HINT_KIND[w]]);
-  }
-  return out;
-}
-function wrapRanges(stem, ranges, cls) {           // ranges: [起, 止, 附加类?] 按 textContent 偏移套 <mark>
-  const segs = [], w = document.createTreeWalker(stem, NodeFilter.SHOW_TEXT);
-  let pos = 0, t;
-  while ((t = w.nextNode())) {
-    const a = pos, b = pos + t.length;
-    ranges.forEach(function (r, i) {
-      const s0 = Math.max(r[0], a), e0 = Math.min(r[1], b);
-      if (s0 < e0) segs.push({ node: t, s: s0 - a, e: e0 - a, i: i, c: r[2] });
-    });
-    pos = b;
-  }
-  segs.reverse().forEach(function (g) {            // 倒序套,前面的偏移不受影响
-    let node = g.node;
-    if (g.e < node.length) node.splitText(g.e);
-    if (g.s > 0) node = node.splitText(g.s);
-    const m = document.createElement('mark');
-    m.className = cls + (g.c ? ' ' + g.c : '');
-    m.dataset.i = g.i;
-    node.parentNode.insertBefore(m, node);
-    m.appendChild(node);
-  });
 }
 /* 一题一卡(已转录的题) */
 function questionCard(s) {
   const u = quiz.unit, n = quiz.list[quiz.idx], q = u.qs[n];
   const cardEl = el('div', 'card qcard');
   const meta = el('div', 'qmeta');
-  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id.slice(0, 2) === 'lj' ? '逻辑推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '') +
+  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id.slice(0, 2) === 'lj' ? '逻辑推理' : u.book.id === 'gk' ? '判断推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '') +
     lvBadge(q.lv)));
   const tools = el('span', 'qtools');
   const imgBtn = el('button', 'tool', '复制图片');
@@ -1491,19 +1461,6 @@ function questionCard(s) {
   const bkBtn = el('button', 'tool bk-add' + (inBasket(u.key, n) ? ' on' : ''), inBasket(u.key, n) ? '✓ 在选题单' : '＋ 选题单');
   bkBtn.title = '加入 / 移出打印选题单(B)';
   bkBtn.onclick = function () { toggleBasket(u.key, n); render(); };
-  const logic = u.book.id.slice(0, 2) === 'lj', hkey = u.key + ':' + n, legend = el('div', 'hint-legend');
-  if (logic) {
-    const hintBtn = el('button', 'tool hint-btn' + (hintOn ? ' on' : ''), '💡 提示');
-    hintBtn.title = '标出题干里的逻辑线索词:蓝=条件,绿=并列/选择,橙=数量,紫=否定/情态';
-    hintBtn.onclick = function () {
-      hintOn = !hintOn;
-      store(KEY_HINT, hintOn);
-      hintBtn.classList.toggle('on', hintOn);
-      paintStem(cardEl.querySelector('.qstem'), n, q, hkey);
-      legend.style.display = hintOn ? '' : 'none';
-    };
-    tools.append(hintBtn);
-  }
   tools.append(imgBtn);
   if (picking) tools.append(bkBtn);
   tools.append(starBtn);
@@ -1511,13 +1468,8 @@ function questionCard(s) {
   cardEl.append(meta);
 
   const stem = el('div', 'qstem');
-  paintStem(stem, n, q, hkey);
+  paintStem(stem, n, q);
   cardEl.append(stem);
-  if (logic) {
-    legend.innerHTML = '<i class="k1">条件</i><i class="k2">并列/选择</i><i class="k3">数量</i><i class="k4">否定/情态</i>';
-    legend.style.display = hintOn ? '' : 'none';
-    cardEl.append(legend);
-  }
   if (q.fig) {
     const img = el('img', 'qfig');
     img.src = q.fig;
@@ -1528,6 +1480,10 @@ function questionCard(s) {
   const chosen = s.ans[n];
   const key = q.ans || s.key[n];          // 题目自带答案,或用户对照原书点出的答案
   const reveal = !!chosen && !!key;
+  if (reveal && q.oe && q.oe.Q) {            // 答题后:题干下方一段「人话」概括
+    const sn = el('div', 'stemnote', '<b>这题在说:</b>' + esc(q.oe.Q));
+    cardEl.insertBefore(sn, stem.nextSibling);
+  }
   const grid = el('div', 'optgrid');
   function optButton(L, txt) {
     const b = el('button', 'opt');
@@ -1549,7 +1505,14 @@ function questionCard(s) {
     cardEl.append(el('div', 'cond', '(2) ' + q.c2));
     COND_OPTS.forEach(function (txt, li) { grid.append(optButton(LETTERS[li], txt)); });
   } else {
-    q.opts.forEach(function (o, li) { grid.append(optButton(LETTERS[li], o)); });
+    q.opts.forEach(function (o, li) {
+      if (o === '(无此选项)') return;      // 4 选项题的占位 E 不显示
+      const L = LETTERS[li], note = reveal && q.oe && q.oe[L];
+      if (!note) { grid.append(optButton(L, o)); return; }
+      const w = el('div', 'optwrap' + (key === L ? ' ok' : ''));       // 答题后:每个选项下方一行小字「人话」解读
+      w.append(optButton(L, o), el('div', 'optnote' + (note.length > 34 ? ' long' : ''), esc(note)));
+      grid.append(w);
+    });
   }
   cardEl.append(grid);
 
@@ -1800,7 +1763,7 @@ function renderWrong() {
   const w = el('div', 'wrap');
   const subj = curSubject();
   w.append(subjectTabs());
-  w.append(el('h2', 'pagetitle', (subj === 'logic' ? '逻辑' : '数学') + '错题本'));
+  w.append(el('h2', 'pagetitle', SUBJ_NAME[subj] + '错题本'));
 
   let items = wrongIds(subj).map(function (id) {
     const i = id.lastIndexOf('#');
@@ -2185,7 +2148,18 @@ function basketSync(rebuild) {
   go.onclick = function () { fab.classList.remove('open'); openPrintAsk(items); };
   const clr = el('button', 'btn ghost small', '清空');
   clr.disabled = !items.length;
-  clr.onclick = function () { if (confirm('清空选题单里的 ' + items.length + ' 道题?')) { basket = []; saveBasket(); basketSync(true); } };
+  // 不用 confirm():部分内置浏览器/主屏幕应用会吞掉弹窗,点了没反应。改成页面内二次确认(再点一次才清空,4 秒后复原)
+  let clrTimer = 0;
+  clr.onclick = function () {
+    if (clr.classList.contains('arm')) {
+      clearTimeout(clrTimer);
+      basket = []; saveBasket(); basketSync(true);
+      return;
+    }
+    clr.classList.add('arm');
+    clr.textContent = '再点一次,清空 ' + items.length + ' 题';
+    clrTimer = setTimeout(function () { clr.classList.remove('arm'); clr.textContent = '清空'; }, 4000);
+  };
   const done = el('button', 'btn ghost small', '退出选题');
   done.onclick = function () { setPicking(false); };
   menu.append(el('div', 'bk-tip', '选题模式:主页点单元挑题,做题页点「＋ 选题单」(B)'), go, clr, done);
@@ -2306,11 +2280,14 @@ function openPrintAsk(items) {
 basketSync(true);
 
 PAGES.done = true;     // 不再加载原书页面:全站只用逐题转录的题,启动时不请求任何书页图
-render();
+loadGroup(curSubject(), function () {
+  render();
+  if (window.requestIdleCallback) requestIdleCallback(function () { loadSols(); }, { timeout: 2000 });
+  else setTimeout(function () { loadSols(); }, 300);
+});
 restoreFromRepo();
 // 首屏画完后在后台加载解析,等做完第一题时通常早已就绪
-if (window.requestIdleCallback) requestIdleCallback(function () { loadSols(); }, { timeout: 2000 });
-else setTimeout(function () { loadSols(); }, 300);
+
 
 /* 离线缓存(Service Worker):只在线上启用;本地预览时注销,免得改完代码还看到缓存里的旧文件 */
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
