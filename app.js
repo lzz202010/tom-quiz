@@ -1719,6 +1719,8 @@ function wrongIds(subj) {
     return u && subjectOf(u.book) === subj;
   });
 }
+const KEY_WRONGLV = 'gzb.wronglv.v1';
+let wrongLv = load(KEY_WRONGLV, []);
 function renderWrong() {
   $app.innerHTML = '';
   const w = el('div', 'wrap');
@@ -1726,7 +1728,7 @@ function renderWrong() {
   w.append(subjectTabs());
   w.append(el('h2', 'pagetitle', (subj === 'logic' ? '逻辑' : '数学') + '错题本'));
 
-  const items = wrongIds(subj).map(function (id) {
+  let items = wrongIds(subj).map(function (id) {
     const i = id.lastIndexOf('#');
     return { id: id, unit: UNITS[id.slice(0, i)], n: Number(id.slice(i + 1)), r: wrongBook[id] };
   }).filter(x => x.unit && unitAvailable(x.unit));
@@ -1738,9 +1740,32 @@ function renderWrong() {
     $app.append(w);
     return;
   }
+  // 按难度筛选错题(可多选,全不选 = 全部):复习抽题、导出、下面的列表都只看筛出来的题
+  const lvOf = x => (x.unit.qs && x.unit.qs[x.n] && x.unit.qs[x.n].lv) || 0;
   const wc = [0, 0, 0, 0];
-  items.forEach(function (x) { const q = x.unit.qs && x.unit.qs[x.n]; if (q && q.lv) wc[q.lv - 1]++; });
-  if (wc.some(Boolean)) w.append(el('div', 'wronglv', '收录难度' + lvSpectrum(wc) + '<span>' + lvTitle(wc) + '</span>'));
+  items.forEach(function (x) { if (lvOf(x)) wc[lvOf(x) - 1]++; });
+  if (wc.some(Boolean)) {
+    const bar = el('div', 'wronglv');
+    bar.append(el('span', 'lvf-label', '难度'), el('span', '', lvSpectrum(wc)));
+    const set = function (f) { wrongLv = f.length === 4 ? [] : f; store(KEY_WRONGLV, wrongLv); render(); };
+    const all = el('button', 'lvf all' + (wrongLv.length ? '' : ' on'), '全部 ' + items.length);
+    all.onclick = () => set([]);
+    bar.append(all);
+    [1, 2, 3, 4].forEach(function (lv) {
+      if (!wc[lv - 1]) return;
+      const on = wrongLv.indexOf(lv) >= 0;
+      const b = el('button', 'lvf lv' + lv + (on ? ' on' : ''), LV_BARS + LV_NAME[lv] + ' ' + wc[lv - 1]);
+      b.onclick = () => set(on ? wrongLv.filter(x => x !== lv) : wrongLv.concat(lv).sort());
+      bar.append(b);
+    });
+    w.append(bar);
+    if (wrongLv.length) items = items.filter(x => wrongLv.indexOf(lvOf(x)) >= 0);
+    if (!items.length) {
+      w.append(el('div', 'card empty', '所选难度下没有收录的题。'));
+      $app.append(w);
+      return;
+    }
+  }
   w.append(reviewCard(items));
   w.append(exportBar(items));
   BANK.books.forEach(function (book) {

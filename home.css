@@ -173,7 +173,6 @@
 .wq-lv .lv{margin:0}
 .bk-rtxt .lv.mini{vertical-align:-1px}
 @media print{.lv{background:none;padding:0}}
-.wronglv{display:flex;align-items:center;flex-wrap:wrap;gap:4px 0;margin:-4px 2px 12px;font-size:12.5px;color:var(--muted)}
-.wronglv .lvspec{width:120px}
-.wronglv span{margin-left:10px}
+.wronglv{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:-4px 2px 14px}
+.wronglv .lvspec{width:80px;margin:0 6px 0 0}
 .solwait{color:var(--muted);font-size:13px}
