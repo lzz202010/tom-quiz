@@ -83,7 +83,7 @@ function themeToggle(cls) {
 /* ───────────── 书与练习单元 ─────────────
    页码统一用 PDF 页号(1 起);书本页码 = PDF 页号 - offset - 1 */
 // 每本书以目录的哪一级作为一个练习单元
-const UNIT_LEVEL = { wbq: 1, kd: 1, jz200: 0, dw1000: 2, lj: 1 };
+const UNIT_LEVEL = { wbq: 1, kd: 1, jz200: 0, dw1000: 2, lj: 1, lj7: 1 };
 
 const BOOKS = {};
 const UNITS = {};
@@ -777,7 +777,7 @@ const HELP_HTML =
 /* 主页顶部的科目切换:逻辑题库单独一栏,数学是其余各书 */
 const KEY_SUBJECT = 'gzb.subject';
 const SUBJECTS = [['math', '数学'], ['logic', '逻辑']];
-function subjectOf(book) { return book.id === 'lj' ? 'logic' : 'math'; }
+function subjectOf(book) { return book.id.slice(0, 2) === 'lj' ? 'logic' : 'math'; }
 function curSubject() { return localStorage.getItem(KEY_SUBJECT) === 'logic' ? 'logic' : 'math'; }
 function subjectTabs() {
   const bar = el('div', 'subjtabs');
@@ -1418,12 +1418,122 @@ function decorateBookCard(sec, book, ui) {
   };
 }
 
+/* 荧光笔(逻辑题干):开着笔时划选文字即标成荧光线索,点已标的文字取消;按文字偏移存 localStorage */
+const KEY_HL = 'gzb.hl.v1', KEY_HLPEN = 'gzb.hlpen.v1';
+let hlStore = load(KEY_HL, {});            // 'unitKey:题号' -> [[起, 止], ...](题干 textContent 的偏移)
+let hlPen = load(KEY_HLPEN, false);
+function hlLead(stem) { const q = stem.querySelector('.qno'); return q ? q.textContent.length + 1 : 0; }   // 题号「3. 」不可标
+function paintStem(stem, n, q, hkey) {
+  stem.innerHTML = '<span class="qno">' + n + '.</span> ' + q.stem;
+  if (hintOn) wrapRanges(stem, hintRanges(stem.textContent, hlLead(stem)), 'hint');
+  const ranges = hlStore[hkey] || [];
+  if (ranges.length) wrapRanges(stem, ranges, 'hl');
+}
+function hlAdd(stem, hkey, a, b) {
+  const lead = hlLead(stem);
+  a = Math.max(a, lead);
+  if (b <= a) return false;
+  const rs = (hlStore[hkey] || []).concat([[a, b]]).sort(function (x, y) { return x[0] - y[0]; });
+  const merged = [];
+  rs.forEach(function (r) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else merged.push(r.slice());
+  });
+  hlStore[hkey] = merged;
+  store(KEY_HL, hlStore);
+  return true;
+}
+function hlRemove(hkey, i) {
+  const rs = hlStore[hkey] || [];
+  rs.splice(i, 1);
+  if (rs.length) hlStore[hkey] = rs; else delete hlStore[hkey];
+  store(KEY_HL, hlStore);
+}
+function bindHighlighter(stem, n, q, hkey) {
+  stem.onclick = function (e) {
+    const m = e.target.closest && e.target.closest('mark.hl');
+    if (!hlPen || !m) return;
+    hlRemove(hkey, +m.dataset.i);
+    paintStem(stem, n, q, hkey);
+    refreshHlClear();
+  };
+  function grab() {
+    if (!hlPen) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    if (!stem.contains(r.startContainer) || !stem.contains(r.endContainer)) return;
+    const pre = document.createRange();
+    pre.selectNodeContents(stem);
+    pre.setEnd(r.startContainer, r.startOffset);
+    const a = pre.toString().length, b = a + r.toString().length;
+    sel.removeAllRanges();
+    if (hlAdd(stem, hkey, a, b)) { paintStem(stem, n, q, hkey); refreshHlClear(); }
+  }
+  stem.onmouseup = function () { setTimeout(grab, 0); };
+  stem.ontouchend = function () { setTimeout(grab, 350); };
+}
+function refreshHlClear() {
+  const b = document.querySelector('.hl-clear');
+  if (b) b.style.display = hlStore[b.dataset.k] ? '' : 'none';
+}
+
+/* 逻辑提示:按词典把题干里的逻辑线索词标出(条件 / 并列选择 / 数量 / 否定情态),与荧光笔互不影响 */
+const KEY_HINT = 'gzb.hint.v1';
+let hintOn = load(KEY_HINT, false);
+const HINT_WORDS = {
+  k1: '当且仅当 只有 除非 否则 只要 如果 假如 倘若 一旦 不然 那么 才 就 则 若',
+  k2: '或者 要么 并且 而且 同时 不仅 或 且',
+  k3: '所有 每个 每位 每种 任何 全部 有的 有些 有人 至少 至多 恰好 恰有 仅有 多数 少数 半数 都',
+  k4: '没有 不都 并非 不可能 不一定 未必 必然 一定 必须 可能 不能 不会 不是 无法',
+};
+const HINT_KIND = {}, HINT_RE = (function () {
+  const all = [];
+  Object.keys(HINT_WORDS).forEach(function (k) { HINT_WORDS[k].split(' ').forEach(function (w) { HINT_KIND[w] = k; all.push(w); }); });
+  all.sort(function (a, b) { return b.length - a.length; });
+  return new RegExp(all.join('|'), 'g');
+})();
+function hintRanges(text, from) {
+  const out = [];
+  let m;
+  HINT_RE.lastIndex = from;
+  while ((m = HINT_RE.exec(text))) {
+    const w = m[0], prev = text.charAt(m.index - 1), next = text.charAt(m.index + w.length);
+    if ((w === '才' || w === '就' || w === '则') && !/[,,;;:。、]/.test(prev) && !/[么]/.test(prev)) continue;   // 只取分句开头的「才/就/则」,避开「规则」「成就」
+    if (w === '都' && (/[首京成]/.test(prev) || /[市会城]/.test(next))) continue;
+    if (w === '或' && next === '者') continue;
+    out.push([m.index, m.index + w.length, HINT_KIND[w]]);
+  }
+  return out;
+}
+function wrapRanges(stem, ranges, cls) {           // ranges: [起, 止, 附加类?] 按 textContent 偏移套 <mark>
+  const segs = [], w = document.createTreeWalker(stem, NodeFilter.SHOW_TEXT);
+  let pos = 0, t;
+  while ((t = w.nextNode())) {
+    const a = pos, b = pos + t.length;
+    ranges.forEach(function (r, i) {
+      const s0 = Math.max(r[0], a), e0 = Math.min(r[1], b);
+      if (s0 < e0) segs.push({ node: t, s: s0 - a, e: e0 - a, i: i, c: r[2] });
+    });
+    pos = b;
+  }
+  segs.reverse().forEach(function (g) {            // 倒序套,前面的偏移不受影响
+    let node = g.node;
+    if (g.e < node.length) node.splitText(g.e);
+    if (g.s > 0) node = node.splitText(g.s);
+    const m = document.createElement('mark');
+    m.className = cls + (g.c ? ' ' + g.c : '');
+    m.dataset.i = g.i;
+    node.parentNode.insertBefore(m, node);
+    m.appendChild(node);
+  });
+}
 /* 一题一卡(已转录的题) */
 function questionCard(s) {
   const u = quiz.unit, n = quiz.list[quiz.idx], q = u.qs[n];
   const cardEl = el('div', 'card qcard');
   const meta = el('div', 'qmeta');
-  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id === 'lj' ? '逻辑推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '') +
+  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id.slice(0, 2) === 'lj' ? '逻辑推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '') +
     lvBadge(q.lv)));
   const tools = el('span', 'qtools');
   const imgBtn = el('button', 'tool', '复制图片');
@@ -1435,6 +1545,37 @@ function questionCard(s) {
   const bkBtn = el('button', 'tool bk-add' + (inBasket(u.key, n) ? ' on' : ''), inBasket(u.key, n) ? '✓ 在选题单' : '＋ 选题单');
   bkBtn.title = '加入 / 移出打印选题单(B)';
   bkBtn.onclick = function () { toggleBasket(u.key, n); render(); };
+  const logic = u.book.id.slice(0, 2) === 'lj', hkey = u.key + ':' + n, legend = el('div', 'hint-legend');
+  if (logic) {
+    const penBtn = el('button', 'tool hl-pen' + (hlPen ? ' on' : ''), '🖍 荧光笔');
+    penBtn.title = '开着时,划选题干里的线索文字即标成荧光色;点已标的文字取消';
+    penBtn.onclick = function () {
+      hlPen = !hlPen;
+      store(KEY_HLPEN, hlPen);
+      document.body.classList.toggle('hlpen', hlPen);
+      penBtn.classList.toggle('on', hlPen);
+    };
+    const clrBtn = el('button', 'tool hl-clear', '清除标记');
+    clrBtn.dataset.k = hkey;
+    clrBtn.style.display = hlStore[hkey] ? '' : 'none';
+    clrBtn.onclick = function () {
+      delete hlStore[hkey];
+      store(KEY_HL, hlStore);
+      paintStem(cardEl.querySelector('.qstem'), n, q, hkey);
+      clrBtn.style.display = 'none';
+    };
+    const hintBtn = el('button', 'tool hint-btn' + (hintOn ? ' on' : ''), '💡 提示');
+    hintBtn.title = '标出题干里的逻辑线索词:蓝=条件,绿=并列/选择,橙=数量,紫=否定/情态';
+    hintBtn.onclick = function () {
+      hintOn = !hintOn;
+      store(KEY_HINT, hintOn);
+      hintBtn.classList.toggle('on', hintOn);
+      paintStem(cardEl.querySelector('.qstem'), n, q, hkey);
+      legend.style.display = hintOn ? '' : 'none';
+    };
+    tools.append(hintBtn, penBtn, clrBtn);
+  }
+  document.body.classList.toggle('hlpen', logic && hlPen);
   tools.append(imgBtn);
   if (picking) tools.append(bkBtn);
   tools.append(starBtn);
@@ -1442,8 +1583,14 @@ function questionCard(s) {
   cardEl.append(meta);
 
   const stem = el('div', 'qstem');
-  stem.innerHTML = '<span class="qno">' + n + '.</span> ' + q.stem;
+  paintStem(stem, n, q, hkey);
+  if (logic) bindHighlighter(stem, n, q, hkey);
   cardEl.append(stem);
+  if (logic) {
+    legend.innerHTML = '<i class="k1">条件</i><i class="k2">并列/选择</i><i class="k3">数量</i><i class="k4">否定/情态</i>';
+    legend.style.display = hintOn ? '' : 'none';
+    cardEl.append(legend);
+  }
   if (q.fig) {
     const img = el('img', 'qfig');
     img.src = q.fig;

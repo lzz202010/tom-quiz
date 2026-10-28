@@ -183,3 +183,27 @@
 .btn:not(.ghost):hover{filter:none;background-color:color-mix(in srgb,var(--accent) 86%,#000)}
 .btn:active{transform:scale(.97)}
 .btn.ghost{background-color:var(--card)}
+
+/* 荧光笔:逻辑题干线索标记 */
+.qstem mark.hl{font-size:inherit;line-height:inherit;font-family:inherit;background:linear-gradient(transparent 18%,rgba(255,210,0,.5) 18%,rgba(255,210,0,.5) 94%,transparent 94%);
+  color:inherit;padding:0 1px;border-radius:2px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+body.hlpen .qstem{cursor:text}
+body.hlpen .qstem mark.hl{cursor:pointer}
+body.hlpen .qstem mark.hl:hover{background:linear-gradient(transparent 18%,rgba(255,90,60,.35) 18%,rgba(255,90,60,.35) 94%,transparent 94%)}
+.qtools .tool.hl-pen.on{background:rgba(255,210,0,.35);border-color:rgba(230,170,0,.8);color:inherit}
+
+/* 逻辑提示:线索词分类着色(与荧光笔 mark.hl 并存) */
+.qstem mark.hint{background:none;color:inherit;font-size:inherit;line-height:inherit;font-family:inherit;border-bottom:2px solid;padding:0 1px;font-weight:600}
+.qstem mark.hint.k1{border-color:#2f7fd1;color:#1f66b5}
+.qstem mark.hint.k2{border-color:#2f9e6a;color:#1d7f50}
+.qstem mark.hint.k3{border-color:#e08a1e;color:#b8690a}
+.qstem mark.hint.k4{border-color:#8b5cf6;color:#6d3fd4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .qstem mark.hint.k1{color:#7db7f5}
+:root:not([data-theme="light"]) .qstem mark.hint.k2{color:#6fd3a3}:root:not([data-theme="light"]) .qstem mark.hint.k3{color:#f2b562}
+:root:not([data-theme="light"]) .qstem mark.hint.k4{color:#b89bff}}
+:root[data-theme="dark"] .qstem mark.hint.k1{color:#7db7f5}:root[data-theme="dark"] .qstem mark.hint.k2{color:#6fd3a3}
+:root[data-theme="dark"] .qstem mark.hint.k3{color:#f2b562}:root[data-theme="dark"] .qstem mark.hint.k4{color:#b89bff}
+.hint-legend{display:flex;gap:12px;flex-wrap:wrap;margin:-4px 0 10px;font-size:12px;color:var(--muted,#888)}
+.hint-legend i{font-style:normal;border-bottom:2px solid;padding:0 2px;font-weight:600}
+.hint-legend .k1{border-color:#2f7fd1}.hint-legend .k2{border-color:#2f9e6a}.hint-legend .k3{border-color:#e08a1e}.hint-legend .k4{border-color:#8b5cf6}
+.qtools .tool.hint-btn.on{background:rgba(47,127,209,.16);border-color:rgba(47,127,209,.6);color:inherit}
