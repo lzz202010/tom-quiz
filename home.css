@@ -176,3 +176,10 @@
 .wronglv{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:-4px 2px 14px}
 .wronglv .lvspec{width:80px;margin:0 6px 0 0}
 .solwait{color:var(--muted);font-size:13px}
+
+/* 主按钮:纯色扁平,去掉高光和大投影 */
+.btn:not(.ghost){background-image:none;border-color:transparent;font-weight:600;letter-spacing:.02em;
+  box-shadow:0 1px 2px rgba(20,40,50,.12);transition:background-color .15s,transform .1s}
+.btn:not(.ghost):hover{filter:none;background-color:color-mix(in srgb,var(--accent) 86%,#000)}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background-color:var(--card)}
