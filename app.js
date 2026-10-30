@@ -518,11 +518,11 @@ function relDays(ts) {
 }
 function pct(ok, total) { return total ? Math.round(ok / total * 100) + '%' : '—'; }
 /* 渲染节点内的 $...$ 公式(KaTeX 未加载时保留原文) */
-function typeset(node) {
+function typeset(node, compact) {
   if (window.renderMathInElement) {
-    // 分数统一用正常大小(\dfrac),与试卷排版一致、更易读
+    // 分数统一用正常大小(\dfrac),与试卷排版一致、更易读;导出 PDF 时(compact)用行内小分数省行高
     window.renderMathInElement(node, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false,
-                                       macros: { '\\frac': '\\dfrac' } });
+                                       macros: compact ? {} : { '\\frac': '\\dfrac' } });
   }
   return node;
 }
@@ -1907,7 +1907,7 @@ function reviewCard(items) {
 }
 
 /* ───────────── 错题本导出(自动排版 → 打印/存为 PDF) ───────────── */
-let exportOpt = load('gzb.export.v1', { ans: true, space: true });
+let exportOpt = load('gzb.export.v2', { ans: true, space: false });
 function exportBar(items) {
   const bar = el('div', 'card sec exportbar');
   bar.append(el('div', 'eb-title', '导出错题 <span class="setmeta">自动排版,在打印窗口选「存储为 PDF」即可</span>'));
@@ -1917,7 +1917,7 @@ function exportBar(items) {
     const cb = el('input');
     cb.type = 'checkbox';
     cb.checked = !!exportOpt[o[0]];
-    cb.onchange = function () { exportOpt[o[0]] = cb.checked; store('gzb.export.v1', exportOpt); };
+    cb.onchange = function () { exportOpt[o[0]] = cb.checked; store('gzb.export.v2', exportOpt); };
     lab.append(cb, document.createTextNode(' ' + o[1]));
     opts.append(lab);
   });
@@ -1948,23 +1948,29 @@ function printItems(items, title, opt, noteFn) {
   order.forEach(function (x, k) {
     const u = x.unit, q = u.qs && u.qs[x.n], s = getSheet(u.key);
     const box = el('div', 'pq');
-    box.append(el('div', 'pq-src', '<b>' + (k + 1) + '.</b> ' + esc(unitName(u)) + ' · 第 ' + x.n + ' 题' +
-      (q && q.lv ? ' · ' + LV_NAME[q.lv] : '') + (noteFn ? noteFn(x) : '')));
+    // 来源小字放在最后一行右端,不单占一行
+    const src = el('span', 'pq-src', esc(unitName(u)) + ' · 第 ' + x.n + ' 题' +
+      (q && q.lv ? ' · ' + LV_NAME[q.lv] : '') + (noteFn ? noteFn(x) : ''));
+    const no = '<b class="pq-no">' + (k + 1) + '.</b> ';
     if (q) {
-      box.append(el('div', 'pq-stem', q.stem));
+      box.append(el('div', 'pq-stem', no + q.stem));
       if (q.fig) { const img = el('img', 'pq-fig'); img.src = q.fig; box.append(img); }
       if (q.kind === 'cond') {
         box.append(el('div', 'pq-cond', '(1) ' + q.c1));
-        box.append(el('div', 'pq-cond', '(2) ' + q.c2));
+        const c2 = el('div', 'pq-cond pq-last', '(2) ' + q.c2);
+        c2.append(src);
+        box.append(c2);
       } else {
         const op = el('div', 'pq-opts');
         q.opts.forEach(function (o, i) { op.append(el('span', '', LETTERS[i] + '. ' + o)); });
+        op.append(src);
         box.append(op);
       }
       answers.push({ k: k + 1, ans: q.ans || s.key[x.n] || '—', sol: q.sol });
     } else {
       // 未转录的题:附原书页面
       const pg = s.pg[x.n] || u.start;
+      const hd = el('div', 'pq-stem', no); hd.append(src); box.append(hd);
       box.append(el('div', 'pq-note', '原书' + pageLabel(u.book, pg) + '(未转录,附原页)'));
       const img = el('img', 'pq-page'); img.src = pageImg(u.book, pg); box.append(img);
       answers.push({ k: k + 1, ans: s.key[x.n] || '—' });
@@ -1990,7 +1996,7 @@ function printItems(items, title, opt, noteFn) {
 }
 
 /* 打印预览:先把内容排成 A4 页给人看;「存为 PDF」直接生成文件(手机上弹分享),「打印」才调打印机 */
-const PV_W = 794, PV_H = 1123, PV_PAD = 60;   // A4 @96dpi,上下边距 16mm
+const PV_W = 794, PV_H = 1123, PV_PAD = 42;   // A4 @96dpi,上下边距 11mm
 function openPrintPreview(doc, title) {
   const pv = el('div', 'pv');
   const bar = el('div', 'pv-bar');
@@ -2018,7 +2024,7 @@ function openPrintPreview(doc, title) {
   prt.onclick = function () { window.print(); };
 
   // 拆成不可分割的块:抬头、每道题、答案表、每条解析
-  typeset(doc);
+  typeset(doc, true);
   const blocks = [];
   [...doc.children].forEach(function (c) {
     if (!c.classList.contains('pd-ans')) { blocks.push(c); return; }
@@ -2381,7 +2387,7 @@ function openPrintAsk(items) {
   const cb = el('input');
   cb.type = 'checkbox';
   cb.checked = !!exportOpt.space;
-  cb.onchange = function () { exportOpt.space = cb.checked; store('gzb.export.v1', exportOpt); };
+  cb.onchange = function () { exportOpt.space = cb.checked; store('gzb.export.v2', exportOpt); };
   lab.append(cb, document.createTextNode(' 每题下面留出答题空白'));
   dlg.append(lab);
   const acts = el('div', 'bk-ask-acts');
