@@ -850,8 +850,11 @@ function renderHome() {
   const head = el('header', 'hero');
   head.append(themeToggle('themefab'));
   head.append(subjectTabs());
-  head.append(entryButton());
   head.append(el('h1', '', SUBJ_TITLE[subj]));
+  // 选题打印按钮放进零高度的 sticky 坞,滚动时始终停在最上方
+  const dock = el('div', 'pickdock');
+  dock.append(entryButton());
+  w.append(dock);
   const books = visibleBooks().filter(b => subjectOf(b) === subj);
   w.append(head);
 
@@ -1983,13 +1986,137 @@ function printItems(items, title, opt, noteFn) {
     }
     doc.append(sec);
   }
+  openPrintPreview(doc, title);
+}
+
+/* 打印预览:先把内容排成 A4 页给人看;「存为 PDF」直接生成文件(手机上弹分享),「打印」才调打印机 */
+const PV_W = 794, PV_H = 1123, PV_PAD = 60;   // A4 @96dpi,上下边距 16mm
+function openPrintPreview(doc, title) {
+  const pv = el('div', 'pv');
+  const bar = el('div', 'pv-bar');
+  const info = el('span', 'pv-info', '排版中…');
+  const pdf = el('button', 'btn', '生成 PDF…');
+  const prt = el('button', 'btn ghost', '打印');
+  const x = el('button', 'btn ghost', '关闭');
+  pdf.disabled = true;
+  bar.append(el('b', 'pv-title', esc(title)), info, pdf, prt, x);
+  const pages = el('div', 'pv-pages');
+  pv.append(bar, pages);
+  document.body.append(pv);
+  document.body.classList.add('previewing');
+  let closed = false, file = null;
+  const fit = function () { pages.style.zoom = Math.min(1, (window.innerWidth - 24) / PV_W); };
+  const close = function () {
+    closed = true; pv.remove(); document.body.classList.remove('previewing');
+    window.removeEventListener('resize', fit); document.removeEventListener('keydown', esc_);
+  };
+  const esc_ = function (ev) { if (ev.key === 'Escape') close(); };
+  x.onclick = close;
+  window.addEventListener('resize', fit);
+  document.addEventListener('keydown', esc_);
+  fit();
+  prt.onclick = function () { window.print(); };
+
+  // 拆成不可分割的块:抬头、每道题、答案表、每条解析
   typeset(doc);
-  document.body.append(doc);
-  document.body.classList.add('printing');
-  const done = function () { document.body.classList.remove('printing'); doc.remove(); window.removeEventListener('afterprint', done); };
-  window.addEventListener('afterprint', done);
-  Promise.all([...doc.querySelectorAll('img')].map(i => i.decode().catch(() => {})))
-    .then(function () { window.print(); });
+  const blocks = [];
+  [...doc.children].forEach(function (c) {
+    if (!c.classList.contains('pd-ans')) { blocks.push(c); return; }
+    const head = el('div', 'pd-ans'), sols = [];
+    [...c.children].forEach(function (k) {
+      if (k.classList.contains('pa-sol')) sols.push(k); else head.append(k);
+    });
+    blocks.push(head, ...sols);
+  });
+  // 先在页里排好再等图片和字体,量出高度后逐块装页,装不下就换新页
+  const newPage = function () {
+    const pg = el('div', 'pv-page'), inner = el('div', 'pv-in');
+    pg.append(inner); pages.append(pg); return inner;
+  };
+  let inner = newPage();
+  blocks.forEach(b => inner.append(b));
+  Promise.all([...pages.querySelectorAll('img')].map(i => i.decode().catch(() => {}))
+    .concat(document.fonts ? [document.fonts.ready] : []))
+    .then(function () {
+      if (closed) return;
+      pages.innerHTML = '';
+      inner = newPage();
+      blocks.forEach(function (b) {
+        inner.append(b);
+        if (inner.offsetHeight > PV_H - 2 * PV_PAD && inner.children.length > 1) { inner = newPage(); inner.append(b); }
+      });
+      const n = pages.children.length;
+      info.textContent = n + ' 页';
+      return renderPdf([...pages.children], function (k) { if (!closed) info.textContent = '生成 PDF ' + k + '/' + n; });
+    })
+    .then(function (blob) {
+      if (closed || !blob) return;
+      const d = new Date();
+      file = new File([blob], title + '-' + d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate() + '.pdf',
+                      { type: 'application/pdf' });
+      info.textContent = pages.children.length + ' 页 · ' + Math.max(1, Math.round(blob.size / 1024)) + ' KB';
+      pdf.disabled = false;
+      const share = matchMedia('(pointer:coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] });
+      pdf.textContent = share ? '分享 PDF' : '下载 PDF';
+      pdf.onclick = function () {
+        if (share) { navigator.share({ files: [file], title: title }).catch(function () {}); return; }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.download = file.name;
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+      };
+    })
+    .catch(function () { if (!closed) { info.textContent = 'PDF 生成失败,可用「打印 → 存储为 PDF」'; pdf.remove(); } });
+}
+// 每页用 html2canvas 截成 JPEG,再拼成 PDF(页面在屏幕外克隆一份截,避开预览的缩放)
+function renderPdf(pageEls, progress) {
+  const box = el('div', 'pv-shot');
+  document.body.append(box);
+  const out = [];
+  let chain = loadH2C();
+  pageEls.forEach(function (pg, i) {
+    chain = chain.then(function () {
+      progress(i + 1);
+      const c = pg.cloneNode(true);
+      box.innerHTML = ''; box.append(c);
+      return Promise.all([...c.querySelectorAll('img')].map(im => im.decode().catch(() => {})))
+        .then(() => window.html2canvas(c, { backgroundColor: '#ffffff', scale: 2, logging: false }))
+        .then(cv => new Promise(r => cv.toBlob(r, 'image/jpeg', 0.88)).then(b => b.arrayBuffer())
+          .then(buf => out.push({ data: new Uint8Array(buf), w: cv.width, h: cv.height,
+                                  pw: c.offsetWidth * 0.75, ph: c.offsetHeight * 0.75 })));
+    });
+  });
+  return chain.then(() => buildPdf(out)).finally(() => box.remove());
+}
+// 最小 PDF:每页一张 JPEG 铺满
+function buildPdf(pages) {
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let len = 0;
+  const put = function (d) { if (typeof d === 'string') d = enc.encode(d); parts.push(d); len += d.length; };
+  const obj = function (id, dict, stream) {
+    offs[id] = len;
+    put(id + ' 0 obj\n' + dict);
+    if (stream) { put('\nstream\n'); put(stream); put('\nendstream'); }
+    put('\nendobj\n');
+  };
+  const f = v => +v.toFixed(2);
+  put('%PDF-1.4\n');
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, '<< /Type /Pages /Kids [' + pages.map((p, i) => (3 + i * 3) + ' 0 R').join(' ') + '] /Count ' + pages.length + ' >>');
+  pages.forEach(function (p, i) {
+    const id = 3 + i * 3, cs = enc.encode('q ' + f(p.pw) + ' 0 0 ' + f(p.ph) + ' 0 0 cm /I0 Do Q');
+    obj(id, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + f(p.pw) + ' ' + f(p.ph) + '] /Resources << /XObject << /I0 ' +
+        (id + 2) + ' 0 R >> >> /Contents ' + (id + 1) + ' 0 R >>');
+    obj(id + 1, '<< /Length ' + cs.length + ' >>', cs);
+    obj(id + 2, '<< /Type /XObject /Subtype /Image /Width ' + p.w + ' /Height ' + p.h +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + p.data.length + ' >>', p.data);
+  });
+  const xref = len, size = 3 + pages.length * 3;
+  let t = 'xref\n0 ' + size + '\n0000000000 65535 f \n';
+  for (let i = 1; i < size; i++) t += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
+  put(t + 'trailer\n<< /Size ' + size + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+  return new Blob(parts, { type: 'application/pdf' });
 }
 
 /* ───────────── 备份恢复 ─────────────
@@ -2248,7 +2375,7 @@ function openPicker(u) {
 function openPrintAsk(items) {
   const ov = el('div', 'bk-ov');
   const dlg = el('div', 'bk-dlg ask');
-  dlg.append(el('div', 'bk-dtitle', '打印 ' + items.length + ' 道题'));
+  dlg.append(el('div', 'bk-dtitle', '导出 ' + items.length + ' 道题'));
   dlg.append(el('div', 'bk-dsub', '需要附上答案吗?答案会单独排在最后一页,方便先做题再对照。'));
   const lab = el('label', 'bk-space');
   const cb = el('input');

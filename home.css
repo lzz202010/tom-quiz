@@ -7,7 +7,8 @@
 
 /* ── 顶部一行:选题打印 · 科目切换 · 外观,三者垂直居中对齐 ── */
 .hero:has(.subjtabs){display:grid;grid-template-columns:1fr auto 1fr;align-items:center;column-gap:10px;padding:16px 2px 2px}
-.hero:has(.subjtabs) .pickentry{position:static;grid-column:1;grid-row:1;justify-self:start;margin:0;height:36px;font-size:13px}
+.pickdock{position:sticky;top:0;height:0;margin-bottom:-14px;z-index:40}
+.pickdock .pickentry{position:absolute;top:23px;left:2px;margin:0;height:36px;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
 .hero:has(.subjtabs) .subjtabs{grid-column:2;grid-row:1;margin:0}
 .hero:has(.subjtabs) .themefab{position:static;grid-column:3;grid-row:1;justify-self:end;width:36px;height:36px}
 .subjtab{padding:7px 24px;transition:background .25s var(--ease),color .25s var(--ease)}
@@ -115,7 +116,7 @@
   .bookcount{display:none}
 }
 @media (max-width:420px){
-  .hero:has(.subjtabs) .pickentry{padding:0 11px;font-size:12.5px}
+  .pickdock .pickentry{padding:0 11px;font-size:12.5px}
 }
 
 
