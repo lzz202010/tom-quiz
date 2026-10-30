@@ -997,7 +997,7 @@ function bookCard(book) {
     const used = g.units.reduce((n, u) => n + (sheets[u.key] ? progStats(sheets[u.key]).done : 0), 0);
     const box = el('details', 'foldgroup');
     box.append(el('summary', '', '<b>' + esc(g.name) + '</b><span class="catcnt">' + g.units.length + ' 节' +
-      (used ? ' · 已做 ' + used + ' 题' : '') + ' ▾</span>'));
+      (used ? ' · 已做 ' + used + ' 题' : '') + '</span>'));
     if (used) box.open = true;
     // 组内单元排成紧凑格子,整块可点
     const ug = el('div', 'unitgrid');
@@ -2430,3 +2430,8 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
   }
 }
+
+// iOS Safari 忽略 user-scalable=no:拦掉捏合手势和双击放大
+['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
+  document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+});

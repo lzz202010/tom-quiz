@@ -214,3 +214,28 @@
 .gk-tex{display:inline-block;height:1.35em;width:auto;vertical-align:-.3em}
 .gk-t{border-collapse:collapse;margin:8px 0;font-size:13.5px;max-width:100%;display:block;overflow-x:auto}
 .gk-t td,.gk-t th{border:1px solid var(--line);padding:4px 8px;text-align:center}
+
+/* ── 手机:禁止缩放(双击放大、捏合、输入框聚焦自动放大) ── */
+html,body{touch-action:manipulation}
+@media (max-width:760px){input,textarea,select{font-size:16px!important}}
+
+/* ── 主页书卡整理:去掉「卡片套卡片套格子」三层框,专项只留小标题 + 一行格子 ── */
+.groupgrid{gap:18px 22px;margin-top:12px}
+.gcard{border:0!important;background:none!important;box-shadow:none!important;padding:0}
+.g-name{display:flex;align-items:center;gap:7px;margin:0 0 7px 1px;font-size:13px;font-weight:600;color:var(--ink);letter-spacing:.04em}
+.g-name::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--book,var(--accent));opacity:.7;flex:none}
+.g-units{gap:8px}
+.foldgroup{margin-top:10px}
+.hsec .unitgrid,.hsec .yeargrid{margin-top:4px}
+
+/* 折叠分组:不再是一个个小方框,改成细线分隔的行,箭头只留右侧一个 */
+.foldgroup{border:0!important;border-radius:0;background:none!important;box-shadow:none!important;
+  border-top:1px solid var(--line)!important;margin-top:8px;padding:0}
+.foldgroup:first-of-type{margin-top:4px}
+.foldgroup summary{padding:12px 2px;font-size:14.5px;gap:0;justify-content:space-between}
+.foldgroup summary::before{content:none}
+.foldgroup summary::after{content:"";flex:none;width:6px;height:6px;margin:0 4px 0 12px;order:3;
+  border:solid var(--muted);border-width:0 1.6px 1.6px 0;transform:rotate(-45deg);transition:transform .2s var(--ease)}
+.foldgroup[open] summary::after{transform:rotate(45deg)}
+.foldgroup summary .catcnt{margin-left:auto;font-size:12.5px;font-weight:400;color:var(--muted)}
+.foldgroup .unitgrid{padding:2px 0 12px}
