@@ -106,7 +106,7 @@ function themeToggle(cls) {
 /* ───────────── 书与练习单元 ─────────────
    页码统一用 PDF 页号(1 起);书本页码 = PDF 页号 - offset - 1 */
 // 每本书以目录的哪一级作为一个练习单元
-const UNIT_LEVEL = { wbq: 1, kd: 1, jz200: 0, dw1000: 2, lj: 1, lj7: 1 };
+const UNIT_LEVEL = { wbq: 1, kd: 1, jz200: 0, dw1000: 2, lj: 1, lj7: 1, lj27: 1 };
 
 const BOOKS = {};
 const UNITS = {};
@@ -288,7 +288,8 @@ function pickAnswer(n, L) {
   s.pg[n] = quiz.page;
   putSheet(quiz.unit.key, s);
   if (s.key[n]) {
-    recordResult(quiz.unit.key, n, L, L === s.key[n]);
+    if (quiz.ultra) ultraRecord(n, L, L === s.key[n]);
+    else recordResult(quiz.unit.key, n, L, L === s.key[n]);
     afterJudge();
   }
   render();
@@ -316,7 +317,7 @@ function afterJudge() {
 
 /* ───────────── 会话 ───────────── */
 function saveSession() {
-  if (!quiz) return;
+  if (!quiz || quiz.ultra) return;          // Ultra 的进度记在 ultra.cur 里
   if (quiz.done) { localStorage.removeItem(KEY_SESSION); return; }
   store(KEY_SESSION, { unit: quiz.unit.key, list: quiz.list, idx: quiz.idx,
                        page: quiz.page, redo: quiz.redo, origin: quiz.origin, lvf: quiz.lvf });
@@ -436,6 +437,7 @@ function finishQuiz() {
   stopQTimer();
   localStorage.removeItem(KEY_SESSION);
   quiz.done = true; quiz.showResult = true;
+  if (quiz.ultra) { ultraFinish(); return; }
   if (!quiz.redo && sheetStats(getSheet(quiz.unit.key), quiz.list).done >= 3) {
     quiz.histId = Date.now();
     hist.unshift({ id: quiz.histId, d: todayStr(), unit: quiz.unit.key, ok: 0, total: 0 });
@@ -716,11 +718,12 @@ function renderSidebar(hash) {
   const nav = el('nav', 'snav');
   const ICON = {
     home: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.2 12 4l8 7.2"/><path d="M6 10v9.2h12V10"/><path d="M10 19.2v-5h4v5"/></svg>',
+    ultra: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 13.4A8.3 8.3 0 1 1 18.4 6.6"/><path d="M18.9 3v3.9H15"/><path d="M13.1 7 9.3 12.7h3.2l-1.1 4.3 3.9-5.8h-3.2z" fill="currentColor" stroke-width="1"/></svg>',
     star: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2l2.4 5 5.4.7-4 3.8 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.8 5.4-.7z"/></svg>'
   };
-  [['#/', '主页', ICON.home], ['#/wrong', '错题本', ICON.star]]
+  [['#/', '主页', ICON.home], ['#/wrong', '错题本', ICON.star], ['#/ultra', 'Ultra', ICON.ultra]]
     .forEach(function (item) {
-      const active = item[0] === '#/' ? hash.indexOf('#/wrong') !== 0 : hash.indexOf(item[0]) === 0;
+      const active = item[0] === '#/' ? !/^#\/(wrong|ultra)/.test(hash) : hash.indexOf(item[0]) === 0;
       const a = el('a', 'sitem' + (active ? ' active' : ''));
       a.href = item[0];
       a.append(el('span', 'sicon', item[2]));
@@ -762,6 +765,7 @@ function render() {
   renderSidebar(hash);
   document.body.classList.toggle('focus', hash.indexOf('#/quiz') === 0);   // 做题时隐藏侧栏,专注
   if (hash.indexOf('#/quiz') === 0) {
+    if (!quiz && ultra.cur && ultra.cur.active) { location.hash = '#/ultra'; return; }     // 刷新时在做 Ultra:回 Ultra 页继续
     if (!quiz && !restoreSession()) { location.hash = '#/'; return; }
     if (quiz && !unitAvailable(quiz.unit)) {      // 书页没上传,断点/收藏的单元打不开,回首页
       quiz = null;
@@ -775,9 +779,11 @@ function render() {
     return;
   }
   if (quiz && !quiz.done) saveSession();     // 主动退出也保留断点
+  if (ultra.cur && ultra.cur.active) { ultra.cur.active = false; saveUltra(); }
   stopQTimer();
   quiz = null;
-  if (hash.indexOf('#/wrong') === 0) renderWrong();
+  if (hash.indexOf('#/ultra') === 0) renderUltra();
+  else if (hash.indexOf('#/wrong') === 0) renderWrong();
   else renderHome();
   if (entered) restoreView(route);
   if (typeof refreshPicked === 'function') refreshPicked();
@@ -799,7 +805,7 @@ const HELP_HTML =
 
 /* 主页顶部的科目切换:逻辑题库单独一栏,数学是其余各书 */
 const KEY_SUBJECT = 'gzb.subject';
-const SUBJECTS = [['math', '数学'], ['logic', '逻辑'], ['gk', '公考']];
+const SUBJECTS = [['math', '数学'], ['logic', '逻辑'], ['gk', '公考'], ['writing', '写作']];   // 写作是独立的静态页 writing.html(scripts/build_writing.py 生成)
 function subjectOf(book) { return book.id.slice(0, 2) === 'lj' ? 'logic' : book.id === 'gk' ? 'gk' : 'math'; }
 function curSubject() { const v = localStorage.getItem(KEY_SUBJECT); return v === 'logic' || v === 'gk' ? v : 'math'; }
 const SUBJ_TITLE = { math: '数学 · 冲刺精练', logic: '逻辑 · 真题精练', gk: '公考 · 判断推理' };
@@ -809,6 +815,7 @@ function subjectTabs() {
   SUBJECTS.forEach(function (x) {
     const b = el('button', 'subjtab' + (curSubject() === x[0] ? ' on' : ''), x[1]);
     b.onclick = function () {
+      if (x[0] === 'writing') { location.href = 'writing.html'; return; }
       if (curSubject() === x[0]) return;
       localStorage.setItem(KEY_SUBJECT, x[0]);
       loadGroup(x[0], function () { render(); window.scrollTo(0, 0); if (window.requestIdleCallback) requestIdleCallback(function () { loadSols(); }, { timeout: 2000 }); else setTimeout(function () { loadSols(); }, 300); });
@@ -1068,7 +1075,7 @@ function unitRow(u, label) {
 }
 
 function exportBackup() {
-  const data = { app: 'gzb', exported: new Date().toISOString(), sheets: sheets, wrong: wrongBook, hist: hist };
+  const data = { app: 'gzb', exported: new Date().toISOString(), sheets: sheets, wrong: wrongBook, hist: hist, ultra: ultra };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1088,6 +1095,7 @@ function importBackup() {
       if (d.app !== 'gzb' || !d.sheets) throw new Error('bad');
       if (!confirm('导入会覆盖当前的全部记录,确定?')) return;
       sheets = d.sheets; wrongBook = d.wrong || {}; hist = d.hist || [];
+      if (d.ultra) { ultra = d.ultra; saveUltra(); }
       saveSheets(); saveWrong(); saveHist();
       render();
     }).catch(function () { alert('导入失败:文件不是本站导出的备份'); });
@@ -1447,37 +1455,70 @@ function decorateBookCard(sec, book, ui) {
 function paintStem(stem, n, q) {
   stem.innerHTML = '<span class="qno">' + n + '.</span> ' + q.stem;
 }
+/* 横屏分栏的中间竖线:拖动改左右宽度,记在本机 */
+const KEY_SPLIT = 'gzb.split.v1';
+let splitPct = load(KEY_SPLIT, 50);
+function splitDivider(split) {
+  const d = el('div', 'qdiv');
+  d.title = '拖动调整左右宽度,双击恢复一半一半';
+  split.style.setProperty('--qs', splitPct + '%');
+  d.onpointerdown = function (ev) {
+    ev.preventDefault();
+    d.setPointerCapture(ev.pointerId);
+    split.classList.add('dragging');
+    const r = split.getBoundingClientRect();
+    d.onpointermove = function (e) {
+      splitPct = Math.round(Math.max(25, Math.min(75, (e.clientX - r.left) / r.width * 100)) * 10) / 10;
+      split.style.setProperty('--qs', splitPct + '%');
+    };
+    d.onpointerup = d.onpointercancel = function () {
+      d.onpointermove = d.onpointerup = d.onpointercancel = null;
+      split.classList.remove('dragging');
+      store(KEY_SPLIT, splitPct);
+    };
+  };
+  d.ondblclick = function () { splitPct = 50; split.style.setProperty('--qs', '50%'); store(KEY_SPLIT, 50); };
+  return d;
+}
 /* 一题一卡(已转录的题) */
 function questionCard(s) {
   const u = quiz.unit, n = quiz.list[quiz.idx], q = u.qs[n];
+  const src = u.src ? u.src[n] : null;            // Ultra 混合组:每题来自不同的书
+  const book = src ? src.unit.book : u.book;
+  const rk = src ? src.unit.key : u.key, rn = src ? src.n : n;     // 收录、选题单都记到原书原题上
   const cardEl = el('div', 'card qcard');
+  // 横屏时左右分栏:左边题干,右边选项+解析,中间竖线可拖动(竖屏照常上下排)
+  const split = el('div', 'qsplit'), left = el('div', 'qleft'), right = el('div', 'qright');
+  split.append(left, splitDivider(split), right);
   const meta = el('div', 'qmeta');
-  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : u.book.id.slice(0, 2) === 'lj' ? '逻辑推理' : u.book.id === 'gk' ? '判断推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '') +
+  meta.append(el('span', '', (q.kind === 'cond' ? '条件充分性判断' : book.id.slice(0, 2) === 'lj' ? '逻辑推理' : book.id === 'gk' ? '判断推理' : '问题求解') + (q.tag ? ' · ' + esc(q.tag) : '') +
     lvBadge(q.lv)));
   const tools = el('span', 'qtools');
   const imgBtn = el('button', 'tool', '复制图片');
   imgBtn.title = '把整道题(含图形)截成图片复制,可直接粘贴(X)';
-  imgBtn.onclick = function () { copyQuestionImage(u, n, imgBtn); };
-  const starBtn = el('button', 'tool star' + (isStar(u.key, n) ? ' on' : ''), isStar(u.key, n) ? '★ 已收录' : '☆ 收录');
+  imgBtn.onclick = function () { copyQuestionImage(src ? src.unit : u, rn, imgBtn); };
+  const starBtn = el('button', 'tool star' + (isStar(rk, rn) ? ' on' : ''), isStar(rk, rn) ? '★ 已收录' : '☆ 收录');
   starBtn.title = '收录到错题本 / 移出(S)';
-  starBtn.onclick = function () { toggleStar(u.key, n); render(); };
-  const bkBtn = el('button', 'tool bk-add' + (inBasket(u.key, n) ? ' on' : ''), inBasket(u.key, n) ? '✓ 在选题单' : '＋ 选题单');
+  starBtn.onclick = function () { toggleStar(rk, rn); render(); };
+  const bkBtn = el('button', 'tool bk-add' + (inBasket(rk, rn) ? ' on' : ''), inBasket(rk, rn) ? '✓ 在选题单' : '＋ 选题单');
   bkBtn.title = '加入 / 移出打印选题单(B)';
-  bkBtn.onclick = function () { toggleBasket(u.key, n); render(); };
+  bkBtn.onclick = function () { toggleBasket(rk, rn); render(); };
   tools.append(imgBtn);
   if (picking) tools.append(bkBtn);
   tools.append(starBtn);
   meta.append(tools);
-  cardEl.append(meta);
+  left.append(meta);
+  if (src) left.append(el('div', 'qsrc', esc(unitName(src.unit)) + ' · 第 ' + src.n + ' 题'));
 
   const stem = el('div', 'qstem');
   paintStem(stem, n, q);
-  cardEl.append(stem);
+  left.append(stem);
+  cardEl.append(split);
   if (q.fig) {
     const img = el('img', 'qfig');
     img.src = q.fig;
     img.alt = '原题图示';
-    cardEl.append(img);
+    left.append(img);
   }
 
   const chosen = s.ans[n];
@@ -1485,7 +1526,7 @@ function questionCard(s) {
   const reveal = !!chosen && !!key;
   if (reveal && q.oe && q.oe.Q) {            // 答题后:题干下方一段「人话」概括
     const sn = el('div', 'stemnote', '<b>这题在说:</b>' + esc(q.oe.Q));
-    cardEl.insertBefore(sn, stem.nextSibling);
+    left.insertBefore(sn, stem.nextSibling);
   }
   const grid = el('div', 'optgrid');
   function optButton(L, txt) {
@@ -1504,8 +1545,8 @@ function questionCard(s) {
     return b;
   }
   if (q.kind === 'cond') {
-    cardEl.append(el('div', 'cond', '(1) ' + q.c1));
-    cardEl.append(el('div', 'cond', '(2) ' + q.c2));
+    left.append(el('div', 'cond', '(1) ' + q.c1));
+    left.append(el('div', 'cond', '(2) ' + q.c2));
     COND_OPTS.forEach(function (txt, li) { grid.append(optButton(LETTERS[li], txt)); });
   } else {
     q.opts.forEach(function (o, li) {
@@ -1517,7 +1558,7 @@ function questionCard(s) {
       grid.append(w);
     });
   }
-  cardEl.append(grid);
+  right.append(grid);
 
   if (chosen && !key) {
     // 题目没有内置答案:对照原书答案页点出正确选项,之后自动判分
@@ -1530,7 +1571,7 @@ function questionCard(s) {
       kl.append(b);
     });
     kr.append(kl);
-    cardEl.append(kr);
+    right.append(kr);
   }
   if (reveal) {
     const p = el('div', 'panel');
@@ -1549,7 +1590,7 @@ function questionCard(s) {
       html += '<div class="ainote">' + (u.verified ? '解析由 AI 撰写,答案已与题库核对' : '答案与解析由 AI 解出,待核对') + '</div>';
     }
     p.innerHTML = html;
-    cardEl.append(p);
+    right.append(p);
     const fk = p.querySelector('#fixkey');
     if (fk) fk.onclick = () => clearKey(n);
   }
@@ -1737,6 +1778,18 @@ function resultView() {
     c.append(tbl);
   }
 
+  if (quiz.ultra) {
+    c.append(el('div', 'rtitle', '下次推送'));
+    c.append(ultraResultList());
+    const ua = el('div', 'actions');
+    const back = el('button', 'btn ghost', '返回 Ultra');
+    back.onclick = function () { quiz = null; location.hash = '#/ultra'; };
+    const more = el('button', 'btn', '再来一组');
+    more.onclick = function () { quiz = null; ultraLoadAll(ultraNewSet); };
+    ua.append(back, more);
+    c.append(ua);
+    return c;
+  }
   const acts = el('div', 'actions');
   const home = el('button', 'btn ghost', quiz.origin === '#/wrong' ? '返回错题本' : '返回主页');
   home.onclick = function () { const o = quiz.origin || '#/'; quiz = null; location.hash = o; };
@@ -2183,12 +2236,12 @@ document.addEventListener('keydown', function (ev) {
     else pickAnswer(n, L);
   } else if (k === 'X' && quiz.unit.qs) {
     const b = document.querySelector('.qtools .tool');
-    if (b) copyQuestionImage(quiz.unit, n, b);
+    if (b) b.click();
   } else if (ev.key === 'Enter' || ev.key === 'ArrowRight') {
     if (ev.key === 'Enter') nextOrFinish(); else goQ(quiz.idx + 1);
   } else if (ev.key === 'ArrowLeft') goQ(quiz.idx - 1);
-  else if (k === 'S') { toggleStar(quiz.unit.key, n); render(); }
-  else if (k === 'B' && picking && quiz.unit.qs) { toggleBasket(quiz.unit.key, n); render(); }
+  else if (k === 'S') { const sb = document.querySelector('.qtools .star'); if (sb) sb.click(); else { toggleStar(quiz.unit.key, n); render(); } }
+  else if (k === 'B' && picking && quiz.unit.qs) { const bb = document.querySelector('.qtools .bk-add'); if (bb) bb.click(); }
   else if (k === 'G') { quiz.showNav = !quiz.showNav; render(); }
   else if (ev.key === ']') goPage(quiz.page + 1);
   else if (ev.key === '[') goPage(quiz.page - 1);
@@ -2408,6 +2461,272 @@ function openPrintAsk(items) {
   ov.onclick = function (ev) { if (ev.target === ov) ov.remove(); };
   ov.append(dlg);
   document.body.append(ov);
+}
+
+/* ───────────── Ultra 模式:艾宾浩斯遗忘曲线推题 ─────────────
+   每组 7 题。选题范围按「书 → 分组」勾选;取消勾选只是不再推送,记录一直保留,重新勾上接着按原进度推。
+   每道题一张卡:stage = 连续答对的复习轮次,due = 下次该复习的时间。
+   答对 stage+1,下次间隔按艾宾浩斯复习点拉长;答错 stage 归零,20 分钟后再推。答了就锁定,错了就是错了。
+   推题顺序:到期的卡按「估计记忆保持率」从低到高(忘得最多的先推),不够 7 题再补新题
+   (先补平时练习里做错过的,再补没做过的),还不够就提前推保持率最低的未到期卡。 */
+const KEY_ULTRA = 'gzb.ultra.v1';
+const ULTRA_N = 7;
+const ULTRA_IV = [20, 540, 1440, 2880, 8640, 21600, 44640, 86400];   // 分钟:20分 · 9时 · 1天 · 2天 · 6天 · 15天 · 31天 · 60天
+let ultra = load(KEY_ULTRA, null) || { on: {}, cards: {}, cur: null, log: [] };
+const saveUltra = () => store(KEY_ULTRA, ultra);
+const ultraGroupId = u => u.book.id + '|' + u.group;
+function ultraIv(stage) { return ULTRA_IV[Math.min(stage, ULTRA_IV.length - 1)] * 60000; }
+// 记忆保持率 R = 0.9^(已过时间 / 复习间隔):到期时约 90%,拖得越久越低
+function ultraR(c, now) {
+  return Math.pow(0.9, (now - c.last) / ultraIv(c.stage));
+}
+function ultraFmtIv(ms) {
+  const m = Math.round(ms / 60000);
+  if (m < 60) return Math.max(1, m) + ' 分钟';
+  if (m < 1440) return Math.round(m / 60) + ' 小时';
+  return Math.round(m / 1440) + ' 天';
+}
+// 题号 id → {unit, n, q};题库没加载或题没了返回 null
+function ultraRef(id) {
+  const i = id.lastIndexOf('#'), u = UNITS[id.slice(0, i)], n = +id.slice(i + 1);
+  const q = u && u.qs && u.qs[n];
+  return q && q.ans ? { unit: u, n: n, q: q } : null;
+}
+// 范围内全部可推的题(有内置答案的已转录题)
+function ultraPool() {
+  const ids = [];
+  BANK.books.forEach(function (b) {
+    if (subjectOf(b) === 'writing') return;
+    b.units.forEach(function (u) {
+      if (!u.qs || !ultra.on[ultraGroupId(u)]) return;
+      u.qnos.forEach(function (n) { if (u.qs[n].ans) ids.push(u.key + '#' + n); });
+    });
+  });
+  return ids;
+}
+function ultraShuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a;
+}
+function ultraPick() {
+  const now = Date.now(), pool = ultraPool();
+  const seen = pool.filter(id => ultra.cards[id]), fresh = pool.filter(id => !ultra.cards[id]);
+  const byR = (a, b) => ultraR(ultra.cards[a], now) - ultraR(ultra.cards[b], now);
+  const due = seen.filter(id => ultra.cards[id].due <= now).sort(byR);
+  const out = due.slice(0, ULTRA_N);
+  if (out.length < ULTRA_N) {
+    // 新题:平时练习里做错过的优先
+    const wasBad = function (id) {
+      const i = id.lastIndexOf('#'), sh = sheets[id.slice(0, i)];
+      return sh ? status(getSheet(id.slice(0, i)), id.slice(i + 1)) === 'bad' : false;
+    };
+    const bad = ultraShuffle(fresh.filter(wasBad)), rest = ultraShuffle(fresh.filter(id => !wasBad(id)));
+    bad.concat(rest).slice(0, ULTRA_N - out.length).forEach(id => out.push(id));
+  }
+  if (out.length < ULTRA_N) {
+    seen.filter(id => out.indexOf(id) < 0).sort(byR).slice(0, ULTRA_N - out.length).forEach(id => out.push(id));
+  }
+  return out;
+}
+// 把这一组题装成一个临时单元,复用做题页
+function ultraUnit(ids) {
+  const u = { key: 'ultra', book: { id: 'ultra', title: 'Ultra', pages: 1, offset: 0 }, title: 'Ultra · 艾宾浩斯复习',
+              group: '', start: 1, end: 1, ans: null, first: 1, count: 0, qs: {}, qnos: [], src: {}, verified: true };
+  ids.forEach(function (id, i) {
+    const r = ultraRef(id);
+    if (!r) return;
+    const n = i + 1;
+    u.qs[n] = Object.assign({}, r.q, { no: n });
+    u.qnos.push(n);
+    u.src[n] = { unit: r.unit, n: r.n, id: id };
+  });
+  u.verified = u.qnos.every(n => u.src[n].unit.verified);
+  UNITS.ultra = u;
+  return u;
+}
+function ultraStartQuiz() {
+  const u = ultraUnit(ultra.cur.ids);
+  if (!u.qnos.length) { ultra.cur = null; saveUltra(); render(); return; }
+  sheets.ultra = { count: 0, ans: ultra.cur.ans || {}, key: {}, pg: {} };
+  quiz = makeQuiz(u, u.qnos.slice(), false, '#/ultra');
+  quiz.ultra = true;
+  ultra.cur.active = true; saveUltra();
+  const k = quiz.list.findIndex(n => !sheets.ultra.ans[n]);
+  quiz.idx = k >= 0 ? k : 0;
+  location.hash = '#/quiz';
+}
+// 用到的科目题库都加载完再回调
+function ultraLoadAll(cb) {
+  const gs = ['math', 'logic', 'gk'].filter(g => !loadedQ[g]);
+  const next = function () { if (!gs.length) { cb(); return; } loadGroup(gs.shift(), next); };
+  next();
+}
+function ultraNewSet() {
+  const ids = ultraPick();
+  if (!ids.length) { alert('选题范围里还没有可推送的题,先勾选范围'); return; }
+  ultra.cur = { ids: ids, ans: {}, ts: Date.now() };
+  saveUltra();
+  ultraStartQuiz();
+}
+// 作答即记录(在 pickAnswer 里调用):答了就锁定,不能改
+function ultraRecord(n, pick, right) {
+  const src = quiz.unit.src[n];
+  if (!src || !ultra.cur) return;
+  ultra.cur.ans[n] = pick;
+  const now = Date.now(), c = ultra.cards[src.id] || { stage: 0, last: now, due: now, ok: 0, bad: 0, lapse: 0 };
+  if (right) c.stage = ultra.cards[src.id] ? c.stage + 1 : 2;     // 新题一次答对:直接跳到 1 天后
+  else { if (ultra.cards[src.id]) c.lapse++; c.stage = 0; }
+  if (right) c.ok++; else c.bad++;
+  c.last = now;
+  c.due = now + ultraIv(c.stage);
+  c.pick = pick;
+  ultra.cards[src.id] = c;
+  saveUltra();
+  recordResult(src.unit.key, src.n, pick, right);          // 原题若已收录进错题本,照常累计
+}
+function ultraFinish() {
+  if (!ultra.cur) return;
+  const s = getSheet('ultra');
+  const st = sheetStats(s, quiz.list);
+  ultra.log.unshift({ ts: Date.now(), ok: st.ok, n: quiz.list.length });
+  ultra.log = ultra.log.slice(0, 60);
+  ultra.cur = null;
+  saveUltra();
+}
+
+/* Ultra 主页 */
+let ultraOpen = {};          // 选题范围里展开了哪几本书(只在本次浏览里记)
+function renderUltra() {
+  $app.innerHTML = '';
+  const w = el('div', 'wrap ultra');
+  if (['math', 'logic', 'gk'].some(g => !loadedQ[g])) {
+    w.append(el('div', 'card sec ul-loading', '正在加载题库…'));
+    $app.append(w);
+    ultraLoadAll(function () { if ((location.hash || '').indexOf('#/ultra') === 0) render(); });
+    return;
+  }
+  const now = Date.now(), pool = ultraPool();
+  const cards = pool.map(id => ultra.cards[id]).filter(Boolean);
+  const due = cards.filter(c => c.due <= now).length;
+  const firm = cards.filter(c => c.stage >= 5).length;
+  const next = cards.filter(c => c.due > now).reduce((m, c) => Math.min(m, c.due), Infinity);
+
+  const head = el('header', 'ul-head');
+  head.append(el('h1', '', 'Ultra'));
+  head.append(el('div', 'ul-sub', '按艾宾浩斯遗忘曲线推题 · 每组 ' + ULTRA_N + ' 题 · 答了就锁定,错题自动记下次再推'));
+  w.append(head);
+
+  const box = el('div', 'card sec ul-go');
+  const stats = el('div', 'ul-stats');
+  [[due, '到期待复习'], [pool.length - cards.length, '新题'], [cards.length, '已在复习'], [firm, '已牢固']].forEach(function (x) {
+    stats.append(el('div', 'ul-stat', '<b>' + x[0] + '</b><span>' + x[1] + '</span>'));
+  });
+  box.append(stats);
+  const acts = el('div', 'ul-acts');
+  if (ultra.cur) {
+    const done = Object.keys(ultra.cur.ans).length;
+    const b = el('button', 'btn', '继续本组(已答 ' + done + ' / ' + ultra.cur.ids.length + ')');
+    b.onclick = ultraStartQuiz;
+    acts.append(b);
+  } else {
+    const b = el('button', 'btn', '开始一组 · ' + ULTRA_N + ' 题');
+    b.disabled = !pool.length;
+    b.onclick = ultraNewSet;
+    acts.append(b);
+  }
+  acts.append(el('span', 'ul-hint', !pool.length ? '先在下面勾选选题范围' :
+    due ? '有 ' + due + ' 题到期,会优先推送' : next < Infinity ? '下一题 ' + ultraFmtIv(next - now) + '后到期,现在开始会补新题' : '还没开始复习,先推新题'));
+  box.append(acts);
+  w.append(box);
+
+  // 选题范围:书 → 分组
+  const sc = el('div', 'card sec ul-scope');
+  sc.append(el('h2', 'sec-title', '选题范围<span class="catcnt">取消勾选只是不推送,记录保留</span>'));
+  ['math', 'logic', 'gk'].forEach(function (g) {
+    const books = visibleBooks().filter(b => subjectOf(b) === g);
+    if (!books.length) return;
+    sc.append(el('div', 'ul-subj', SUBJ_NAME[g]));
+    books.forEach(function (b) {
+      const groups = [];
+      b.units.forEach(function (u) {
+        if (!u.qs) return;
+        const gid = ultraGroupId(u);
+        let x = groups.find(y => y.id === gid);
+        if (!x) { x = { id: gid, name: u.group, n: 0, seen: 0 }; groups.push(x); }
+        u.qnos.forEach(function (n) { if (u.qs[n].ans) { x.n++; if (ultra.cards[u.key + '#' + n]) x.seen++; } });
+      });
+      const gs = groups.filter(x => x.n);
+      if (!gs.length) return;
+      const onN = gs.filter(x => ultra.on[x.id]).length;
+      const row = el('div', 'ul-book' + (ultraOpen[b.id] ? ' open' : ''));
+      const lab = el('label', 'ul-bk');
+      const cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = onN === gs.length;
+      cb.indeterminate = onN > 0 && onN < gs.length;
+      cb.onchange = function () { gs.forEach(x => { if (cb.checked) ultra.on[x.id] = true; else delete ultra.on[x.id]; }); saveUltra(); render(); };
+      const tot = gs.reduce((m, x) => m + x.n, 0), seen = gs.reduce((m, x) => m + x.seen, 0);
+      lab.append(cb, el('span', 'ul-bname', esc(b.title)), el('span', 'ul-cnt', tot + ' 题' + (seen ? ' · 复习中 ' + seen : '')));
+      const tg = el('button', 'ul-tg', ultraOpen[b.id] ? '收起' : '分组 ' + onN + '/' + gs.length);
+      tg.onclick = function () { ultraOpen[b.id] = !ultraOpen[b.id]; render(); };
+      const line = el('div', 'ul-bline');
+      line.append(lab, tg);
+      row.append(line);
+      if (ultraOpen[b.id]) {
+        const chips = el('div', 'ul-chips');
+        gs.forEach(function (x) {
+          const c = el('button', 'ul-chip' + (ultra.on[x.id] ? ' on' : ''), esc(x.name) + ' <small>' + x.n + '</small>');
+          c.onclick = function () { if (ultra.on[x.id]) delete ultra.on[x.id]; else ultra.on[x.id] = true; saveUltra(); render(); };
+          chips.append(c);
+        });
+        row.append(chips);
+      }
+      sc.append(row);
+    });
+  });
+  w.append(sc);
+
+  // 未来 7 天到期量
+  const fc = el('div', 'card sec ul-fore');
+  fc.append(el('h2', 'sec-title', '接下来 7 天'));
+  const bars = el('div', 'ul-bars');
+  const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+  const counts = [];
+  for (let d = 0; d < 7; d++) {
+    const a = day0.getTime() + d * 864e5, z = a + 864e5;
+    counts.push(cards.filter(c => (d === 0 ? c.due < z : c.due >= a && c.due < z)).length);
+  }
+  const mx = Math.max(1, ...counts);
+  counts.forEach(function (n, d) {
+    const dt = new Date(day0.getTime() + d * 864e5);
+    const col = el('div', 'ul-bar');
+    col.append(el('span', 'ul-bn', n ? String(n) : ''), el('i', '', ''), el('span', 'ul-bd', d === 0 ? '今天' : (dt.getMonth() + 1) + '/' + dt.getDate()));
+    col.querySelector('i').style.height = Math.round(n / mx * 100) + '%';
+    bars.append(col);
+  });
+  fc.append(bars);
+  if (ultra.log.length) {
+    const lg = el('div', 'ul-log');
+    ultra.log.slice(0, 6).forEach(function (r) {
+      lg.append(el('span', 'ul-lg', relDays(r.ts) + ' <b>' + r.ok + '/' + r.n + '</b>'));
+    });
+    fc.append(lg);
+  }
+  w.append(fc);
+  $app.append(w);
+}
+// 成绩页:每题下次什么时候再推
+function ultraResultList() {
+  const box = el('div', 'ul-res');
+  const now = Date.now();
+  quiz.list.forEach(function (n) {
+    const src = quiz.unit.src[n], c = src && ultra.cards[src.id];
+    const st = status(getSheet('ultra'), n);
+    box.append(el('div', 'ul-ri ' + (st === 'ok' ? 'ok' : st === 'bad' ? 'bad' : 'un'),
+      '<b>' + n + '</b><span>' + esc(unitName(src.unit)) + ' · 第 ' + src.n + ' 题</span><em>' +
+      (st === 'un' ? '未作答,仍在待推' : c ? ultraFmtIv(c.due - now) + '后再推' : '') + '</em>'));
+  });
+  return box;
 }
 
 basketSync(true);
