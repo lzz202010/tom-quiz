@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>写作</title><style>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f5f3ee"><title>写作 · 管综精练</title><style>
 :root{--bg:#f6f7fb;--card:#fff;--ink:#1f2937;--mut:#64748b;--line:#e2e8f0;--acc:#7c3aed;--soft:#f3effe;--ok:#16a34a;--warn:#d97706}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1115;--card:#171a21;--ink:#e5e7eb;--mut:#94a3b8;--line:#2a2f3a;--acc:#a78bfa;--soft:#221d33;--ok:#4ade80;--warn:#fbbf24}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
@@ -16,23 +16,52 @@ th{background:var(--soft)}.tw{overflow-x:auto}
 ol,ul{padding-left:1.3em;margin:.3em 0}li{margin:.2em 0}
 .back{font-size:.9rem}
 
-.nav{position:sticky;top:0;z-index:20;background:var(--bg);padding:8px 0 6px;border-bottom:1px solid var(--line)}
-.subj{display:flex;gap:6px;margin-bottom:6px}.subj a{flex:1;text-align:center;padding:6px 0;border-radius:10px;background:var(--card);border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:.95rem}
-.subj a.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}.tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:5px 12px;border-radius:999px;font-size:.88rem;cursor:pointer}
+/* 与主站统一:暖纸色 + 蓝绿主色、宋体标题、胶囊式科目切换;深浅色跟主站的 gzb.theme.v1 */
+:root{--bg:#f5f3ee;--card:#fffefb;--paper:#faf8f3;--ink:#24231f;--mut:#8a867c;--line:#e7e3da;--line2:#d6d1c4;
+  --acc:#1f6f8b;--soft:#e6f0f3;--ok:#2e8a57;--warn:#b7791f;--glass:rgba(245,243,238,.94);
+  --serif:"Songti SC","Noto Serif SC","Source Han Serif SC","STSong",serif;color-scheme:light}
+:root[data-theme=dark]{--bg:#17181a;--card:#202124;--paper:#25272a;--ink:#e6e3dc;--mut:#8f8b82;--line:#2f3135;--line2:#43464c;
+  --acc:#6fb3c9;--soft:#1f3239;--ok:#5cbf86;--warn:#d9a54a;--glass:rgba(23,24,26,.94);color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17181a;--card:#202124;--paper:#25272a;--ink:#e6e3dc;
+  --mut:#8f8b82;--line:#2f3135;--line2:#43464c;--acc:#6fb3c9;--soft:#1f3239;--ok:#5cbf86;--warn:#d9a54a;--glass:rgba(23,24,26,.94);color-scheme:dark}}
+body{font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:860px;padding:0 16px 80px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+h1{font-family:var(--serif);font-size:1.6rem;letter-spacing:.06em;margin:.9em 0 .3em}
+h2{border-left-width:3px;font-size:1.15rem}
+.card{border-radius:14px;padding:14px 16px}
+th{background:var(--paper)}
+.nav{position:sticky;top:0;z-index:20;background:var(--bg);padding:10px 0 8px;padding-top:max(10px,env(safe-area-inset-top));
+  border-bottom:1px solid var(--line);margin:0 -16px;padding-left:16px;padding-right:16px}
+.subj{display:flex;gap:4px;padding:4px;margin:0 auto 8px;width:max-content;max-width:100%;background:var(--card);
+  border:1px solid var(--line);border-radius:999px}
+.subj a{padding:6px 22px;border-radius:999px;color:var(--mut);text-decoration:none;font-weight:600;font-size:.95rem;
+  transition:background .2s,color .2s}
+.subj a:hover{color:var(--acc)}
+.subj a.on{background:var(--acc);color:var(--card)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--mut);padding:5px 13px;border-radius:999px;
+  font:inherit;font-size:.86rem;cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.tabs button:hover{color:var(--acc);border-color:var(--acc)}
 .tabs button.on{background:var(--soft);color:var(--acc);border-color:var(--acc);font-weight:700}
 .pane{display:none}.pane.on{display:block}
-details.item{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:2px 14px}
-details.item>summary{cursor:pointer;padding:10px 0;font-weight:600;list-style:none}details.item>summary::-webkit-details-marker{display:none}
+details.item{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:10px 0;padding:2px 16px}
+details.item>summary{cursor:pointer;padding:12px 0;font-weight:600;list-style:none}details.item>summary::-webkit-details-marker{display:none}
 details.item>summary::before{content:"▸ ";color:var(--acc)}details.item[open]>summary::before{content:"▾ "}
 .yr{display:inline-block;min-width:4.4em;color:var(--acc);margin-right:6px}
-h4{font-size:.95rem;margin:1em 0 .3em;color:var(--acc)}h5{font-size:.92rem;margin:.8em 0 .1em}
-.mat p,.ana p,.essay p{margin:.45em 0;text-indent:0}.mat{background:var(--soft);border-radius:8px;padding:6px 12px}
-.essay{border-left:4px solid var(--acc);padding:2px 14px;background:var(--card);margin:.4em 0 1em}.essay h4{color:var(--ink);font-size:1.02rem;text-align:center}
-.pts li{margin:.35em 0}.ex{background:var(--card);border:1px dashed var(--line);border-radius:8px;padding:6px 12px;margin:6px 0}.exl{display:inline-block;background:var(--soft);color:var(--acc);border-radius:6px;padding:0 6px;margin-right:6px;font-size:.82rem}
-figure.pg{margin:12px 0;text-align:center}figure.pg img{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}figcaption{color:var(--mut);font-size:.85rem}
-.filter{margin:8px 0}.filter button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:3px 12px;margin-right:6px;cursor:pointer}.filter button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-@media (max-width:560px){.wrap{padding:10px 12px 60px}table{font-size:.82rem}th,td{padding:4px 5px}}
+h4{font-size:.95rem;margin:1.1em 0 .3em;color:var(--acc)}h5{font-size:.92rem;margin:.8em 0 .1em}
+.mat p,.ana p,.essay p{margin:.45em 0;text-indent:0}.mat{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:6px 14px}
+.essay{border-left:3px solid var(--acc);padding:4px 16px;background:var(--paper);border-radius:0 10px 10px 0;margin:.4em 0 1em}
+.essay h4{color:var(--ink);font-family:var(--serif);font-size:1.08rem;text-align:center}
+.essay p{text-indent:2em}
+.pts li{margin:.35em 0}.ex{background:var(--card);border:1px dashed var(--line2);border-radius:10px;padding:6px 12px;margin:6px 0}.exl{display:inline-block;background:var(--soft);color:var(--acc);border-radius:6px;padding:0 6px;margin-right:6px;font-size:.82rem}
+figure.pg{margin:12px 0;text-align:center}figure.pg img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fff}figcaption{color:var(--mut);font-size:.85rem}
+.filter{margin:10px 0;display:flex;gap:6px}.filter button{border:1px solid var(--line);background:var(--card);color:var(--mut);border-radius:999px;padding:3px 14px;font:inherit;font-size:.88rem;cursor:pointer}.filter button.on{background:var(--acc);color:var(--card);border-color:var(--acc)}
+.tip{border-left-width:3px;background:var(--paper)}
+.tw{-webkit-overflow-scrolling:touch;border-radius:10px}
+@media (max-width:560px){.tw table{min-width:620px}.wrap{padding:0 12px 60px}.nav{margin:0 -12px;padding-left:12px;padding-right:12px}
+  .subj a{padding:6px 16px}h1{font-size:1.35rem}table{font-size:.82rem}th,td{padding:4px 5px}details.item{padding:2px 12px}}
 </style></head><body><div class="wrap"><div class="nav"><div class="subj"><a href="./" data-s="math">数学</a><a href="./" data-s="logic">逻辑</a><a href="./" data-s="gk">公考</a><a class="on" href="writing.html">写作</a></div><div class="tabs"><button data-t="overview">近六年规律与预测</button><button data-t="lzhow">论证有效性 · 怎么写</button><button data-t="lshow">论说文 · 怎么写</button><button data-t="lzexam">论证真题 + 范文</button><button data-t="lsexam">论说文真题 + 范文</button><button data-t="mock">模拟三套</button></div></div><section class="pane" id="overview"><h1>写作 · 近六年真题规律</h1><div class="sub">管综 + 经综 2021–2026 共 12 套论证有效性分析、12 套论说文,按「记得住、用得上」重新归了一遍。</div>
 <div class="card"><div class="big">论证有效性:概念 · 因果 · 条件 · 范围 · 绝对</div>
 <div>五个词对应五类漏洞——<b>偷换概念、强加因果、误用条件关系、以偏概全、绝对化</b>;再加两个小类(不当类比、自相矛盾)。真题一共 68 个得分点,这五类占了 56 个。</div></div>

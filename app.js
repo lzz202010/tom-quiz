@@ -293,6 +293,10 @@ function pickAnswer(n, L) {
     afterJudge();
   }
   render();
+  if (SPLIT_MQ.matches && !quiz.showResult) {
+    const qr = $app.querySelector('.qright'), p = qr && qr.querySelector('.panel');
+    if (p) qr.scrollTo({ top: Math.max(0, p.getBoundingClientRect().top - qr.getBoundingClientRect().top + qr.scrollTop - 6), behavior: 'smooth' });
+  }
 }
 /* 对答案(未转录的单元):点出正确选项 */
 function setKey(n, L, silent) {
@@ -1291,6 +1295,19 @@ function quizTopbar() {
   }
   bar.append(t);
   const right = el('div', 'topbar-right');
+  if (u.qs && !(quiz.done && quiz.showResult)) {
+    const n = quiz.list[quiz.idx], sh = getSheet(u.key), q = u.qs[n];
+    const reveal = !!sh.ans[n] && !!(q.ans || sh.key[n]);
+    const pv = el('button', 'quietbtn tbnav', '‹');
+    pv.title = '上一题(←)';
+    pv.disabled = quiz.idx === 0;
+    pv.onclick = () => goQ(quiz.idx - 1);
+    const last = quiz.idx === quiz.list.length - 1;
+    const nx = el('button', 'quietbtn tbnav tbnext' + (reveal ? ' on' : ''), quiz.done ? '成绩' : last ? '完成' : '下一题 ›');
+    nx.title = '下一题(Enter)';
+    nx.onclick = nextOrFinish;
+    right.append(pv, nx);
+  }
   right.append(themeToggle('quietbtn themeq'));
   if (!(quiz.done && quiz.showResult)) {
     const nb = el('button', 'quietbtn' + (quiz.showNav ? ' on' : ''), '题号');
@@ -1303,7 +1320,11 @@ function quizTopbar() {
 }
 function exitQuiz() { const org = quiz.origin || '#/'; quiz = null; location.hash = org; }
 
+// 同一题重画(作答、收录等)时保留左右两栏的滚动位置,不跳回顶部
+let splitScroll = null;
 function renderQuiz() {
+  const ql = $app.querySelector('.qleft'), qr = $app.querySelector('.qright');
+  const keep = ql && splitScroll && splitScroll.idx === quiz.idx && splitScroll.unit === quiz.unit.key ? [ql.scrollTop, qr.scrollTop] : null;
   $app.innerHTML = '';
   const u = quiz.unit, s = getSheet(u.key);
   const w = el('div', u.qs ? 'wrap' : 'wrap wide');
@@ -1318,6 +1339,8 @@ function renderQuiz() {
     if (quiz.showNav) w.append(navGrid(s));
     w.append(questionCard(s));
     $app.append(w);
+    splitScroll = { idx: quiz.idx, unit: u.key };
+    if (keep) { $app.querySelector('.qleft').scrollTop = keep[0]; $app.querySelector('.qright').scrollTop = keep[1]; }
     return;
   }
 
@@ -2192,12 +2215,15 @@ function restoreFromRepo() {
     }).catch(function () {});
 }
 
-/* ───────────── 触屏左右滑动换题 ───────────── */
+/* ───────────── 触屏左右滑动换题 ─────────────
+   横屏分栏时关闭:两栏各自上下滚动、中间线可拖,横滑极易误判;换题用顶栏的 ‹ / 下一题 或键盘 */
+const SPLIT_MQ = matchMedia('(orientation:landscape) and (min-width:700px)');
 let touchX = null, touchY = 0;
 document.addEventListener('touchstart', function (ev) {
   const t = ev.target;
   // 拉条、表格等可横向操作的元素上不触发
-  if (!quiz || ev.touches.length !== 1 || (t.closest && t.closest('input,.qtable,.pagewrap'))) { touchX = null; return; }
+  if (!quiz || ev.touches.length !== 1 || SPLIT_MQ.matches ||
+      (t.closest && t.closest('input,.qtable,.pagewrap,.qdiv,.katex-display,.ul-scope'))) { touchX = null; return; }
   touchX = ev.touches[0].clientX;
   touchY = ev.touches[0].clientY;
   swipeAxis = null;
@@ -2516,9 +2542,11 @@ function ultraPick() {
   const out = due.slice(0, ULTRA_N);
   if (out.length < ULTRA_N) {
     // 新题:平时练习里做错过的优先
+    const shc = {};          // getSheet 每次都要遍历整节的答案,按节缓存一下
     const wasBad = function (id) {
-      const i = id.lastIndexOf('#'), sh = sheets[id.slice(0, i)];
-      return sh ? status(getSheet(id.slice(0, i)), id.slice(i + 1)) === 'bad' : false;
+      const i = id.lastIndexOf('#'), k = id.slice(0, i);
+      if (!sheets[k]) return false;
+      return status(shc[k] || (shc[k] = getSheet(k)), id.slice(i + 1)) === 'bad';
     };
     const bad = ultraShuffle(fresh.filter(wasBad)), rest = ultraShuffle(fresh.filter(id => !wasBad(id)));
     bad.concat(rest).slice(0, ULTRA_N - out.length).forEach(id => out.push(id));
