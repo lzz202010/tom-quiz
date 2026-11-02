@@ -7,7 +7,7 @@
 
 /* ── 顶部一行:选题打印 · 科目切换 · 外观,三者垂直居中对齐 ── */
 .hero:has(.subjtabs){display:grid;grid-template-columns:1fr auto 1fr;align-items:center;column-gap:10px;padding:16px 2px 2px}
-.pickdock{position:sticky;top:0;height:0;margin-bottom:-14px;z-index:40}
+.pickdock{position:sticky;top:env(safe-area-inset-top,0px);height:0;margin-bottom:-14px;z-index:40}
 .pickdock .pickentry{position:absolute;top:23px;left:2px;margin:0;height:36px;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
 .hero:has(.subjtabs) .subjtabs{grid-column:2;grid-row:1;margin:0}
 .hero:has(.subjtabs) .themefab{position:static;grid-column:3;grid-row:1;justify-self:end;width:36px;height:36px}
@@ -117,6 +117,14 @@
 }
 @media (max-width:420px){
   .pickdock .pickentry{padding:0 11px;font-size:12.5px}
+}
+/* 窄屏:四个科目放不下一行,科目切换单独占第二行;第一行左「选题打印」右外观 */
+@media (max-width:600px){
+  .hero:has(.subjtabs){grid-template-rows:36px auto auto;row-gap:12px;padding-top:14px}
+  .hero:has(.subjtabs) .subjtabs{grid-column:1/-1;grid-row:2;justify-self:center}
+  .hero:has(.subjtabs) h1{grid-row:3;margin-top:14px}
+  .pickdock .pickentry{top:14px}
+  .subjtab{padding:7px 18px}
 }
 
 
@@ -321,6 +329,21 @@ html,body{touch-action:manipulation}
 .ul-ri.bad b{background:var(--bad,#c0504d)}
 .ul-ri span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ul-ri em{font-style:normal;font-size:12px;color:var(--muted);white-space:nowrap}
+.ul-cap{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.ul-capt b{color:var(--ink);font-variant-numeric:tabular-nums}
+.ul-capbar{flex:1;min-width:60px;height:5px;border-radius:3px;background:var(--track);overflow:hidden}
+.ul-capbar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.ul-capsel{display:flex;align-items:center;gap:4px}
+.ul-capsel>span{margin-right:2px}
+.ul-capb{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:99px;padding:1px 9px;font-size:12px;cursor:pointer}
+.ul-capb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.ul-leechbtn{border-color:var(--bad);color:var(--bad)}
+.ul-unsure{display:block;width:100%;text-align:left;border:1px dashed var(--line-strong,var(--line));background:transparent;color:var(--muted);
+  border-radius:10px;padding:6px 12px;margin:0 0 8px;font-size:13px;cursor:pointer}
+.ul-unsure.on{border-style:solid;border-color:#b7791f;color:#b7791f;background:color-mix(in srgb,#b7791f 9%,transparent);font-weight:600}
+.ul-unsure.done{cursor:default;border-style:solid;border-color:#b7791f;color:#b7791f}
+.ul-tag{display:inline-block;font-size:11px;padding:0 6px;margin-right:6px;border-radius:99px;background:color-mix(in srgb,#b7791f 15%,transparent);color:#b7791f}
+.ul-tag.leech{background:var(--bad-soft);color:var(--bad)}
 @media (max-width:480px){
   .ul-stat b{font-size:20px}
   .ul-ri em{font-size:11px}
@@ -336,4 +359,29 @@ html,body{touch-action:manipulation}
   .pickentry.on,.tbnext.on{background-color:var(--accent)!important}
   .bk-ov{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:rgba(20,22,28,.4)!important}
   .ucell:hover,.ycell:hover{transform:none}
+}
+
+/* ── 手机竖屏打磨:小屏把顶栏、题卡、底部按钮、底部导航都收紧,把高度让给题目 ── */
+@media (max-width:760px) and (orientation:portrait){
+  body.focus .focusbar{margin-bottom:8px;padding:6px 10px 7px;padding-top:max(6px,env(safe-area-inset-top))}
+  body.focus .qcard{border-radius:18px}
+  .qmeta{flex-wrap:wrap;row-gap:2px}
+  .qmeta>span:first-child{min-width:0}
+  .qtools{margin-left:auto}
+}
+@media (max-width:420px) and (orientation:portrait){
+  body.focus .qcard{padding:12px 13px 14px}
+  .qmeta{font-size:12px}
+  .qtools .tool{padding:3px 6px}
+}
+/* 矮屏手机(SE、横幅小的安卓):底部按钮栏、底部导航变薄 */
+@media (max-width:760px) and (max-height:700px){
+  body.focus .qfooter{padding-top:7px;padding-bottom:calc(7px + env(safe-area-inset-bottom))}
+  body.focus .qfooter .btn{padding:9px 0}
+  body.focus #app{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+  body #side{bottom:calc(6px + env(safe-area-inset-bottom));padding:3px 5px}
+  .sitem{padding:4px 2px 3px;font-size:10.5px;gap:1px}
+  .sicon{height:20px}
+  .sicon svg{width:19px;height:19px}
+  #app{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
 }
