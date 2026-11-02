@@ -1551,7 +1551,11 @@ function questionCard(s) {
   bkBtn.onclick = function () { toggleBasket(rk, rn); render(); };
   tools.append(imgBtn);
   if (picking) tools.append(bkBtn);
-  tools.append(starBtn);
+  const uid = src ? src.id : rk + '#' + rn;
+  const skipBtn = el('button', 'tool ul-skipb' + (ultra.skip[uid] ? ' on' : ''), ultra.skip[uid] ? '⊘ 已排除 · 恢复' : '⊘ 不进 Ultra');
+  skipBtn.title = ultra.skip[uid] ? '这题已被排除在 Ultra 循环之外,点击恢复' : '把这题排除在 Ultra 循环之外(已有的复习记录保留,可在 Ultra 页恢复)';
+  skipBtn.onclick = function () { ultraToggleSkip(uid); render(); };
+  tools.append(starBtn, skipBtn);
   meta.append(tools);
   left.append(meta);
   if (src) left.append(el('div', 'qsrc', esc(unitName(src.unit)) + ' · 第 ' + src.n + ' 题'));
@@ -1604,16 +1608,6 @@ function questionCard(s) {
       w.append(optButton(L, o), el('div', 'optnote' + (note.length > 34 ? ' long' : ''), esc(note)));
       grid.append(w);
     });
-  }
-  if (quiz.ultra && ultra.cur) {
-    // 作答前标「不确定」:蒙对只算半对,不升级
-    const on = !!(ultra.cur.unsure && ultra.cur.unsure[n]);
-    if (!chosen) {
-      const tg = el('button', 'ul-unsure' + (on ? ' on' : ''), (on ? '☑' : '☐') + ' 不确定 · 蒙对只算半对');
-      tg.title = '作答前标记(U)';
-      tg.onclick = () => ultraToggleUnsure(n);
-      right.append(tg);
-    } else if (on) right.append(el('div', 'ul-unsure done', '已标记「不确定」'));
   }
   right.append(grid);
 
@@ -2303,7 +2297,6 @@ document.addEventListener('keydown', function (ev) {
   else if (k === 'S') { const sb = document.querySelector('.qtools .star'); if (sb) sb.click(); else { toggleStar(quiz.unit.key, n); render(); } }
   else if (k === 'B' && picking && quiz.unit.qs) { const bb = document.querySelector('.qtools .bk-add'); if (bb) bb.click(); }
   else if (k === 'G') { quiz.showNav = !quiz.showNav; render(); }
-  else if (k === 'U' && quiz.ultra) ultraToggleUnsure(n);
   else if (ev.key === ']') goPage(quiz.page + 1);
   else if (ev.key === '[') goPage(quiz.page - 1);
   else return;
@@ -2536,6 +2529,7 @@ const KEY_ULTRA = 'gzb.ultra.v1';
 const ULTRA_N = 7;
 const ULTRA_IV = [20, 540, 1440, 2880, 8640, 21600, 44640, 86400];   // 分钟:20分 · 9时 · 1天 · 2天 · 6天 · 15天 · 31天 · 60天
 let ultra = load(KEY_ULTRA, null) || { on: {}, cards: {}, cur: null, log: [] };
+if (!ultra.skip) ultra.skip = {};                    // 手动排除的题 {'单元key#题号': 时间}:不进 Ultra 循环(记录保留,可恢复)
 if (!ultra.cap) ultra.cap = 30;                       // 每天新题上限
 const ULTRA_CAPS = [10, 20, 30, 50, 80];
 const ULTRA_EASE0 = { 1: 1.15, 2: 1, 3: 0.88, 4: 0.78 };            // 按难度的初始系数:越难间隔越短
@@ -2569,7 +2563,7 @@ function ultraPool() {
     if (subjectOf(b) === 'writing') return;
     b.units.forEach(function (u) {
       if (!u.qs || !ultra.on[ultraGroupId(u)]) return;
-      u.qnos.forEach(function (n) { if (u.qs[n].ans) ids.push(u.key + '#' + n); });
+      u.qnos.forEach(function (n) { if (u.qs[n].ans && !ultra.skip[u.key + '#' + n]) ids.push(u.key + '#' + n); });
     });
   });
   return ids;
@@ -2682,6 +2676,10 @@ function ultraRecord(n, pick, right) {
   saveUltra();
   recordResult(src.unit.key, src.n, pick, right);          // 原题若已收录进错题本,照常累计
 }
+function ultraToggleSkip(id) {
+  if (ultra.skip[id]) delete ultra.skip[id]; else ultra.skip[id] = Date.now();
+  saveUltra();
+}
 function ultraToggleUnsure(n) {
   if (!ultra.cur || ultra.cur.ans[n]) return;
   if (!ultra.cur.unsure) ultra.cur.unsure = {};
@@ -2781,7 +2779,7 @@ function renderUltra() {
         const gid = ultraGroupId(u);
         let x = groups.find(y => y.id === gid);
         if (!x) { x = { id: gid, name: u.group, n: 0, seen: 0 }; groups.push(x); }
-        u.qnos.forEach(function (n) { if (u.qs[n].ans) { x.n++; if (ultra.cards[u.key + '#' + n]) x.seen++; } });
+        u.qnos.forEach(function (n) { if (u.qs[n].ans && !ultra.skip[u.key + '#' + n]) { x.n++; if (ultra.cards[u.key + '#' + n]) x.seen++; } });
       });
       const gs = groups.filter(x => x.n);
       if (!gs.length) return;
@@ -2813,6 +2811,23 @@ function renderUltra() {
     });
   });
   w.append(sc);
+
+  // 手动排除的题:不进循环,可在这里恢复
+  const sk = Object.keys(ultra.skip).map(id => ({ id: id, r: ultraRef(id) })).filter(x => x.r);
+  if (sk.length) {
+    const dt = el('details', 'card sec ul-skip');
+    dt.append(el('summary', '', '<b>已手动排除的题</b> <span class="catcnt">' + sk.length + ' 题 · 不进循环</span>'));
+    sk.forEach(function (x) {
+      const row = el('div', 'setrow');
+      const txt = String(x.r.q.stem || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').slice(0, 44);
+      row.append(el('span', 'setmeta grow', esc(unitName(x.r.unit)) + ' · 第 ' + x.r.n + ' 题<br><small>' + esc(txt) + '…</small>'));
+      const b = el('button', 'btn ghost small', '恢复');
+      b.onclick = function () { ultraToggleSkip(x.id); render(); };
+      row.append(b);
+      dt.append(row);
+    });
+    w.append(dt);
+  }
 
   // 未来 7 天到期量
   const fc = el('div', 'card sec ul-fore');

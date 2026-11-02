@@ -385,3 +385,8 @@ html,body{touch-action:manipulation}
   .sicon svg{width:19px;height:19px}
   #app{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
 }
+/* Ultra:手动排除的题 */
+.tool.ul-skipb.on{color:var(--bad)}
+.ul-skip summary{cursor:pointer;list-style:none}.ul-skip summary::-webkit-details-marker{display:none}
+.ul-skip .setrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.ul-skip .setrow small{color:var(--muted)}
