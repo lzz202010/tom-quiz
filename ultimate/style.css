@@ -444,3 +444,17 @@ body.kb .nav { display: none; }                            /* 键盘弹出时藏
 }
 .lr, .qlist li, .paper { content-visibility: auto; contain-intrinsic-size: auto 48px; }   /* 长列表只画看得见的 */
 .qhead { border-bottom: 1px solid var(--line); }
+
+/* 小胖鱼 */
+.ai-row { display: flex; align-items: flex-start; gap: 8px; align-self: stretch; }
+.ai-row .mascot, .av-sp { flex: none; width: 32px; margin-top: 2px; }
+.ai-row .ai { align-self: auto; }
+.ai-row .err { align-self: center; text-align: left; }
+.hello { display: flex; flex-direction: column; align-items: center; text-align: center; margin-top: 12px; }
+.hello p { margin: 6px 0 2px; color: var(--soft); font-size: 15px; }
+.hello .chips { justify-content: center; margin-top: 14px; }
+.hello-m { animation: bob 3.2s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.mascot .bub { animation: bub 1.6s ease-in-out infinite; transform-origin: 100px 30px; }
+@keyframes bub { 0% { transform: translateY(2px); opacity: .5; } 50% { opacity: 1; } 100% { transform: translateY(-3px); opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .hello-m, .mascot .bub { animation: none; } }

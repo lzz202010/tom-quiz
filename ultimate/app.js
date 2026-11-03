@@ -954,6 +954,70 @@ function aiSnapshot() {
   return L.join('\n');
 }
 
+/* ───────────── 小胖鱼:AI 教练的 Q 版形象(原创 SVG,蓝发鲸鱼女仆,网友口中「吃白饭的蓝色大肥鱼」的梗) ─────────────
+   mascot(表情, 宽度, 只要头) 表情:idle 平常 / happy 举着白饭碗 / think 思考(冒泡泡)/ sad 委屈 */
+function mascot(ex, size, head) {
+  const INK = '#22203a';
+  const eye = (x, y, sy, o = x < 70 ? -1 : 1) => `<ellipse cx="${x}" cy="${y}" rx="7.8" ry="${9.8 * sy}" fill="${INK}"/>
+    <ellipse cx="${x}" cy="${y + 1.8 * sy}" rx="6.1" ry="${7.3 * sy}" fill="url(#mIris)"/>
+    <path d="M${x - o * 8.5} ${y - 6 * sy} Q${x} ${y - 10.8 * sy} ${x + o * 8.5} ${y - 6.5 * sy} L${x + o * 10.5} ${y - 9 * sy}" stroke="${INK}" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${x + 2.6}" cy="${y - 3.4 * sy}" r="3" fill="#fff"/><circle cx="${x - 2.6}" cy="${y + 4.2 * sy}" r="1.5" fill="#fff" opacity=".9"/>`;
+  const eyes = {
+    idle: eye(57, 74, 1) + eye(83, 74, 1),
+    think: eye(58, 73, .9) + eye(84, 73, .9),
+    happy: `<path d="M48 76 L58 71 L48 66" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M92 76 L82 71 L92 66" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+    sad: eye(57, 76, .85) + eye(83, 76, .85) + `<path d="M48 65 Q55 65 62 61" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M92 65 Q85 65 78 61" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M50 84 Q48.5 90 51.5 91.5 Q54.5 90 53 84 Z" fill="#8fc1f0"/>`,
+  }[ex] || '';
+  const mouth = {
+    idle: `<path d="M65 86 Q67.5 89 70 86 Q72.5 89 75 86" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+    happy: `<path d="M61 83 Q70 98 79 83 Z" fill="#a83846"/><path d="M64.5 89 Q70 94 75.5 89" fill="#f2878f"/><path d="M63.5 83 L65.5 86.5 L67 83 Z" fill="#fff"/>`,
+    think: `<ellipse cx="72" cy="87" rx="2.6" ry="2.2" fill="${INK}"/>`,
+    sad: `<path d="M64 89 Q70 84 76 89" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+  }[ex] || '';
+  const bub = ex === 'think' ? `<g class="bub"><circle cx="112" cy="30" r="4" fill="none" stroke="#6f9fe6" stroke-width="1.8"/><circle cx="121" cy="16" r="6" fill="none" stroke="#6f9fe6" stroke-width="1.8"/><circle cx="105" cy="41" r="2.4" fill="none" stroke="#6f9fe6" stroke-width="1.6"/></g>` : '';
+  const up = !head && ex === 'happy';
+  // 身体:藏青女仆裙 + 白围裙(小鲸鱼图案)+ 白领结;开心时左手举一碗冒尖的白饭,右手拿筷子
+  const body = head ? '' : `
+    <path d="M100 128 Q120 130 124 116 Q130 112 134 118 Q128 120 130 128 Q134 136 128 140 Q122 134 116 138 Q106 140 98 136 Z" fill="#33479a"/>
+    <path d="M54 106 Q48 126 38 150 Q70 158 102 150 Q92 126 86 106 Z" fill="#2f3f86"/>
+    <path d="M38 150 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0" fill="#fff" stroke="#fff" stroke-width="1"/>
+    <path d="M58 114 Q54 132 52 146 Q70 151 88 146 Q86 132 82 114 Z" fill="#fff"/>
+    <path d="M65 136 q5 -4 10 0 q-5 3 -10 0 Z M75 136 l3 -2 l0 4 Z" fill="#4c6fd0"/>
+    <path d="M58 106 L70 114 L82 106 L78 102 L62 102 Z" fill="#fff"/>
+    <path d="M64 109 L70 113 L64 116 Z M76 109 L70 113 L76 116 Z" fill="#2f3f86"/><circle cx="70" cy="113" r="2" fill="#7fb2ea"/>
+    ${up ? ''
+      : `<path d="M54 110 Q44 122 46 132" stroke="#2f3f86" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="46.5" cy="135" r="5" fill="#ffe7d8"/>
+      <path d="M86 110 Q96 122 94 132" stroke="#2f3f86" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="93.5" cy="135" r="5" fill="#ffe7d8"/>`}`;
+  // 举碗的手、碗、筷子画在头发前面,不被长发挡住
+  const front = up ? `<g transform="translate(-16,-8)"><path d="M70 118 Q48 104 32 82" stroke="#2f3f86" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="31" cy="78" r="5.5" fill="#ffe7d8"/>
+      <path d="M12 66 Q31 84 50 66 Z" fill="#fff" stroke="#c9d6ee" stroke-width="1.2"/><path d="M14 67 Q31 73 48 67" stroke="#5b86d8" stroke-width="1.6" fill="none"/>
+      <path d="M13 66 Q14 50 31 48 Q48 50 49 66 Z" fill="#fff"/><path d="M18 58 q3 -3 6 0 M27 54 q3 -3 6 0 M37 58 q3 -3 6 0 M23 63 q3 -2 6 0 M33 62 q3 -2 6 0" stroke="#e6e9f2" stroke-width="1.4" fill="none"/>
+      <path d="M8 44 l2 4 l4 1 l-4 1 l-2 4 l-2 -4 l-4 -1 l4 -1 Z" fill="#f0c04a"/></g>
+      <path d="M86 110 Q100 118 106 104" stroke="#2f3f86" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="107" cy="101" r="5.5" fill="#ffe7d8"/>
+      <path d="M100 108 L118 82 M104 109 L122 84" stroke="#9a6a3a" stroke-width="2.2" stroke-linecap="round"/>` : '';
+  const vb = head ? '24 22 92 92' : '-10 0 150 160';
+  return `<svg class="mascot m-${ex}" viewBox="${vb}" width="${size}" height="${Math.round(size * (head ? 1 : 160 / 150))}" aria-hidden="true">
+    <defs><linearGradient id="mIris" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26357a"/><stop offset="1" stop-color="#5b9ef0"/></linearGradient>
+      <linearGradient id="mHair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c3a9a"/><stop offset=".65" stop-color="#3f63c9"/><stop offset="1" stop-color="#6aa6ec"/></linearGradient></defs>
+    <path d="M34 60 Q24 92 30 120 Q26 132 34 140 Q42 136 44 126 Q40 116 46 104 L94 104 Q100 116 96 126 Q98 136 106 140 Q114 132 110 120 Q116 92 106 60 Z" fill="url(#mHair)"/>
+    ${body}
+    <path d="M28 66 Q26 30 70 26 Q114 30 112 66 Q112 90 104 100 L36 100 Q28 90 28 66 Z" fill="url(#mHair)"/>
+    <ellipse cx="70" cy="76" rx="33" ry="29" fill="#ffe7d8"/>
+    <path d="M36 80 Q34 50 70 44 Q106 50 104 80 Q100 66 95 70 Q94 58 87 63 Q85 52 78 60 Q74 50 70 59 Q65 50 62 60 Q55 52 53 63 Q46 58 45 70 Q40 66 36 80 Z" fill="url(#mHair)"/>
+    <path d="M37 74 Q30 96 36 118 Q30 128 38 134 Q38 120 42 108 Q40 94 44 82 Z" fill="url(#mHair)"/>
+    <path d="M103 74 Q110 96 104 118 Q110 128 102 134 Q102 120 98 108 Q100 94 96 82 Z" fill="url(#mHair)"/>
+    <path d="M70 27 Q66 14 74 10 Q84 8 80 18 Q77 24 71 21" stroke="#2c3a9a" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <path d="M38 46 Q70 22 102 46" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M36 46 q3 -6 7 -3 q2 -7 8 -4 q3 -6 8 -3 q4 -5 9 -2 q4 -4 9 0 q5 -3 8 3 q5 -2 7 4 q5 -1 6 5" stroke="#e3e8f4" stroke-width="1.6" fill="none"/>
+    <path d="M104 60 Q118 50 122 60 Q116 62 116 70 Q110 66 104 70 Z" fill="#2f3f86"/><path d="M98 62 l5 -4 l0 8 Z M108 62 l-5 -4 l0 8 Z" fill="#6aa6ec"/>
+    <path d="M48 52 Q56 48 62 50" stroke="#6f8fe0" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/>
+    ${eyes}
+    <ellipse cx="47" cy="86" rx="6" ry="3.2" fill="#ff9e9e" opacity=".55"/><ellipse cx="93" cy="86" rx="6" ry="3.2" fill="#ff9e9e" opacity=".55"/>
+    ${mouth}${bub}${front}
+  </svg>`;
+}
 const AI_SYS = `你是 Ultimate 管综刷题站里的私人教练,有权直接操作这个网站。学员备考管理类联考(数学 75 分、逻辑 60 分),有基础,追求提分效率。
 每段对话开头会附:学员的长期记忆(你之前记下的)、学情摘要;数据变化后会再附新摘要。字段:考频=平均每套卷考几题;掌握=做对该考点典型难度真题的概率;待攻克=判定为真不会或还在观察的错题;失误=系统根据作答行为判定为会做但手滑的错题;推送×=当前推送倍数(0=暂停)。
 做事方式:学员要求什么就直接用工具做,不要反问确认;要具体分析某块时,先用 get_wrong_questions / get_topic_detail 看真实题目和记录再下结论,不凭空猜。你判断某块该调整时可以直接调整,并说明理由。学员透露的偏好、作息、目标、反复出现的薄弱点,用 remember 记下(简短),过时的用 forget 删掉。
@@ -1169,9 +1233,11 @@ function viewAI() {
   <div class="chat">${v.length ? v.map((m, i) => m.who === 'me' ? `<div class="me">${esc(m.text)}</div>`
       : m.who === 'sep' ? `<div class="sep"><span>新对话</span></div>`
       : m.who === 'act' ? `<div class="act">✓ ${esc(m.text)}${m.act ? ` <a href="#" data-act="${i}">${m.act.kind === 'print' ? '再打开' : '再开始'}</a>` : ''}</div>`
-      : m.who === 'err' ? `<div class="err">${esc(m.text)}</div>` : `<div class="ai">${mdLite(m.text)}</div>`).join('') : ''}
-    ${!v.length || v[v.length - 1].who === 'sep' ? `<div class="chips">${chips.map(c => `<a href="#" data-chip="${esc(c)}">${c}</a>`).join('')}</div>` : ''}
-    ${aiBusy ? '<div class="ai dim">思考中…</div>' : ''}</div>
+      : m.who === 'err' ? `<div class="ai-row">${mascot('sad', 32, true)}<div class="err">${esc(m.text)}</div></div>`
+      : `<div class="ai-row">${v[i - 1] && v[i - 1].who === 'ai' ? '<span class="av-sp"></span>' : mascot('idle', 32, true)}<div class="ai">${mdLite(m.text)}</div></div>`).join('') : ''}
+    ${!v.length || v[v.length - 1].who === 'sep' ? `<div class="hello">${v.length ? '' : `<div class="hello-m">${mascot('happy', 112)}</div><p>我是小胖鱼。今天想练哪块?</p>`}
+      <div class="chips">${chips.map(c => `<a href="#" data-chip="${esc(c)}">${c}</a>`).join('')}</div></div>` : ''}
+    ${aiBusy ? `<div class="ai-row thinking">${mascot('think', 32, true)}<div class="ai dim">小胖鱼思考中…</div></div>` : ''}</div>
   <form class="ask" id="ask"><textarea id="q" rows="1" placeholder="说说你的情况,比如:排列组合老错,多推点"></textarea><button class="go sm" ${aiBusy ? 'disabled' : ''}>发送</button></form>
   <div class="ai-f dim">${MODELS()[AI.model][0]} · 今日 ${kTok(u.in + u.out)} / ${kTok(AI.budget)} token · 约 ${yuan(u.usd)}${CHAT.tok ? ' · 本对话 ' + kTok(CHAT.tok) : ''}</div>`);
   const send = function (t) {
