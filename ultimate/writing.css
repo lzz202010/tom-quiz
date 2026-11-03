@@ -1,0 +1,80 @@
+/* ── 写作板块(原生模块,与主站共用配色/字体变量;内容数据 writing-data.js,逻辑 writing.js) ── */
+.wr{--wr-serif:var(--serif,"Songti SC","Noto Serif SC","Source Han Serif SC","STSong",serif);gap:18px}
+.wr .wr-sub{color:var(--muted);text-align:center;margin:-4px 0 4px;font-size:14px}
+.wr-h{display:flex;align-items:baseline;gap:10px;margin:10px 4px -4px;font-family:var(--wr-serif);font-size:18px;font-weight:700;letter-spacing:.08em}
+.wr-h i{font-style:normal;font-family:inherit;color:var(--accent);font-size:13px;letter-spacing:.2em}
+.wr-h span{margin-left:auto;font-family:-apple-system,"PingFang SC",sans-serif;font-size:12.5px;font-weight:400;color:var(--muted);letter-spacing:0}
+.wr-go{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.wr-go button{display:flex;flex-direction:column;gap:3px;text-align:left;padding:14px;cursor:pointer;font:inherit;color:var(--ink);transition:border-color .2s,transform .15s}
+.wr-go button:hover{border-color:var(--accent)}.wr-go button:active{transform:scale(.99)}
+.wr-go b{font-size:15px;font-family:var(--wr-serif);letter-spacing:.03em}.wr-go span{color:var(--muted);font-size:12.5px;line-height:1.5}
+.wr-resume{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);width:100%}
+.wr-resume .t{flex:1;font-family:var(--wr-serif);font-size:16px}.wr-resume small{display:block;color:var(--muted);font-family:-apple-system,sans-serif;font-size:12.5px;letter-spacing:.04em}
+.wr-resume .btn{flex:0 0 auto}
+.wr-mx{padding:6px 16px 10px}
+.wr-row{display:grid;grid-template-columns:4.6em 1fr 1fr;gap:10px;align-items:center;padding:9px 0}
+.wr-row+.wr-row{border-top:1px solid var(--line)}
+.wr-row .y{font-family:var(--wr-serif);font-weight:700;color:var(--accent);font-size:15px}
+.wr-row.hd{padding:8px 0 4px;color:var(--muted);font-size:12.5px;letter-spacing:.2em;text-align:center}.wr-row.hd .y{color:inherit;font-weight:400;font-family:inherit}
+.wr-cell{display:flex;gap:6px;justify-content:center}
+.wr-pill{position:relative;flex:1;max-width:8.5em;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 6px;font:inherit;font-size:13px;cursor:pointer;
+  transition:border-color .2s,background .2s}
+.wr-pill:hover{border-color:var(--accent);background:var(--accent-soft)}
+.wr-pill.done{color:var(--muted)}.wr-pill.done::after{content:"✓";position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--ok)}
+.wr-mock{display:flex;gap:8px;flex-wrap:wrap;padding:6px 0 4px}
+/* 阅读页 */
+.wr-read{gap:0;padding-bottom:110px}
+.wr-pg{position:fixed;left:0;top:0;height:2px;width:0;background:var(--accent);opacity:.8;z-index:60;pointer-events:none}
+.wr-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;margin:0 -16px;padding:9px 16px;padding-top:max(9px,env(safe-area-inset-top));
+  background:var(--bg);border-bottom:1px solid var(--line)}
+.wr-bar button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;min-width:36px;height:34px;padding:0 13px;font:inherit;font-size:14px;cursor:pointer}
+.wr-bar .sp{flex:1;min-width:0;text-align:center;color:var(--muted);font-size:12.5px;letter-spacing:.14em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wr-art{--fs:1;max-width:35rem;margin:0 auto;padding:30px 4px 30px;font-family:var(--wr-serif);font-size:calc(17.5px*var(--fs));line-height:2.02}
+.wr-eye{font-family:-apple-system,"PingFang SC",sans-serif;font-size:12.5px;letter-spacing:.34em;color:var(--accent);font-weight:700}
+.wr-art h1{font-family:var(--wr-serif);font-size:1.7em;line-height:1.45;letter-spacing:.04em;margin:.35em 0 .5em;font-weight:700;text-align:left}
+.wr-art h1::after{display:none}
+.wr-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.3em}
+.chip{display:inline-block;padding:0 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-family:-apple-system,"PingFang SC",sans-serif;font-size:12px;line-height:22px}
+.wr-sec{display:flex;align-items:center;gap:14px;margin:2.8em 0 1em;font-family:-apple-system,"PingFang SC",sans-serif;font-size:12.5px;letter-spacing:.4em;color:var(--accent);font-weight:700}
+.wr-sec::after{content:"";flex:1;height:1px;background:var(--line)}
+.wr-mat{border-left:2px solid var(--line);padding:.05em 0 .05em 1.1em}.wr-mat p,.wr-ana p{margin:.7em 0}
+.wr-ana h5{font-family:-apple-system,"PingFang SC",sans-serif;font-size:12.5px;letter-spacing:.18em;color:var(--muted);margin:1.8em 0 .1em;font-weight:700}
+.wr-ana p b{font-family:-apple-system,"PingFang SC",sans-serif;font-size:.8em;letter-spacing:.06em;color:var(--accent);margin-right:.25em}
+.wr-pts{list-style:none;counter-reset:p;padding:0;margin:0}
+.wr-pts li{counter-increment:p;position:relative;padding-left:2.5em;margin:1.3em 0}
+.wr-pts li::before{content:counter(p);position:absolute;left:0;top:-.12em;font-size:1.7em;line-height:1.3;color:var(--line);font-weight:700}
+.wr-pts li b{display:inline-block;font-family:-apple-system,"PingFang SC",sans-serif;font-size:.74em;letter-spacing:.08em;color:var(--accent);border:1px solid var(--line);border-radius:6px;padding:0 .55em;margin-right:.55em;line-height:1.75}
+.wr-essay h2{font-family:var(--wr-serif);font-size:1.28em;text-align:center;margin:0 0 1.2em;letter-spacing:.06em;font-weight:700}
+.wr-essay p{margin:0;text-indent:2em;line-height:2.15}.wr-essay .n{text-align:right;margin-top:1.4em;color:var(--muted);font-family:-apple-system,sans-serif;font-size:.7em;letter-spacing:.1em;text-indent:0}
+.wr-gate{margin:2.6em 0 1em;padding:20px 20px 18px;text-align:center;font-family:-apple-system,"PingFang SC",sans-serif;font-size:14.5px;line-height:1.8;border:1px dashed var(--line);border-radius:16px;color:var(--muted)}
+.wr-gate b{display:block;color:var(--ink);font-family:var(--wr-serif);font-size:16px;margin-bottom:4px;letter-spacing:.06em}
+.wr-gate .btn{margin-top:12px}.wr-gate a{display:block;margin-top:10px;font-size:12.5px;color:var(--muted);cursor:pointer;text-decoration:underline}
+.wr-note{width:100%;box-sizing:border-box;min-height:5.5em;margin-top:.4em;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);
+  font:inherit;font-size:.86em;line-height:1.8;resize:vertical}
+.wr-note:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.wr-end{display:flex;justify-content:center;margin-top:2.4em;font-family:-apple-system,sans-serif}
+.wr-foot{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;padding-bottom:max(10px,env(safe-area-inset-bottom));
+  background:var(--bg);border-top:1px solid var(--line)}
+.wr-foot button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;height:40px;padding:0 22px;font:inherit;cursor:pointer}
+.wr-foot button:disabled{opacity:.35;cursor:default}.wr-foot .n{color:var(--muted);font-size:13px;min-width:4.5em;text-align:center}
+/* 指南 / 规律 / 速查 页:正文窄栏 */
+.wr-doc{--fs:1;max-width:44rem;margin:0 auto;padding:26px 0 30px;line-height:1.95;font-size:calc(16px*var(--fs))}
+.wr-doc>h1,.wr-art h1{text-align:left}
+.wr-doc h2{font-family:var(--wr-serif);font-size:1.18em;margin:2.2em 0 .6em;padding-left:11px;border-left:3px solid var(--accent);letter-spacing:.05em}
+.wr-doc h3{font-family:var(--wr-serif);font-size:1.02em;margin:1.4em 0 .3em;color:var(--accent)}
+.wr-doc h4{font-size:.95em;margin:1.2em 0 .3em;color:var(--accent)}
+.wr-doc .card,.wr-doc .tip,.wr-doc .ex{padding:12px 16px;margin:10px 0;line-height:1.9}
+.wr-doc .tip{border-left:3px solid var(--accent);background:var(--card);border-radius:0 12px 12px 0}
+.wr-doc .ex{background:var(--card);border:1px dashed var(--line);border-radius:12px;font-size:.96em}.wr-doc .exl{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:0 7px;margin-right:6px;font-size:.8em}
+.wr-doc .sub{color:var(--muted);font-size:.9em}.wr-doc .big{font-size:1.1em;font-weight:700;letter-spacing:.04em}.wr-doc .mono{font-family:ui-monospace,Menlo,monospace;font-size:.92em}
+.wr-doc .essay{font-family:var(--wr-serif);border-left:3px solid var(--accent);padding:2px 0 2px 16px;margin:12px 0}.wr-doc .essay h4{color:var(--ink);text-align:center;font-size:1.1em}.wr-doc .essay p{text-indent:2em;margin:.3em 0;line-height:2.05}
+.wr-doc .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px -2px}
+.wr-doc table{width:100%;border-collapse:collapse;font-size:.88em;line-height:1.7}.wr-doc th,.wr-doc td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+.wr-doc th{background:var(--accent-soft);color:var(--ink)}
+.wr-doc .bar{display:inline-block;height:9px;border-radius:5px;background:var(--accent);vertical-align:middle;margin-right:6px}
+.wr-doc .chip.hot{background:var(--accent);color:#fff}
+.wr-doc ol.steps,.wr-doc ul{padding-left:1.3em}.wr-doc li{margin:.3em 0}
+.wr-doc figure.pg{margin:14px 0;text-align:center}.wr-doc figure.pg img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fff}.wr-doc figcaption{color:var(--muted);font-size:.82em}
+@media (max-width:560px){.wr-go{grid-template-columns:1fr}.wr-row{grid-template-columns:3.6em 1fr 1fr;gap:6px}.wr-pill{padding:6px 2px;font-size:12.5px}.wr-art{padding-top:22px}
+  .wr-doc .tw table{min-width:560px}}
+@media print{.wr-bar,.wr-foot,.wr-pg,#side{display:none!important}.wr-doc{max-width:none}}
