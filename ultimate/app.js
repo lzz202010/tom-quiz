@@ -532,7 +532,7 @@ function viewSession() {
       ${reveal ? `<div class="verdict ${a.ok ? 'ok' : a.skip ? 'skip' : 'bad'}">${a.ok ? '✓' : a.skip ? '未答 · 答案 ' + q.ans : q.ans}
         <span class="mono${a.t > SUBJ[cur.subj].sec * 1.25 ? ' hot' : ''}">${mmss(a.t)}</span>${q.skip ? '<em>可放弃</em>' : ''}</div>
         <div class="sol">${q.sol || ''}</div>
-        ${!a.ok && !a.skip && a.p && aiKey() ? '<div class="aiex"><a href="#" id="aiex">AI 讲解</a><div id="aiout"></div></div>' : ''}` : ''}
+        ${aiKey() ? `<div class="aiex"><a href="#" id="aiex">${!a.ok && a.p ? 'AI 讲解:我为什么选 ' + a.p : 'AI 深讲这道题'}</a><div id="aiout"></div></div>` : ''}` : ''}
     </article>
     <footer class="qfoot">
       <button class="ghost" id="prev" ${cur.i ? '' : 'disabled'}>‹</button>
@@ -545,8 +545,9 @@ function viewSession() {
     $('#next').onclick = next;
     const ax = $('#aiex');
     if (ax) {
-      if (window.indexedDB) kvGet('ex:' + id + '|' + a.p).then(h => { if (h && $('#aiout')) { ax.remove(); aiExplain(q, a.p, $('#aiout')); } });
-      ax.onclick = ev => { ev.preventDefault(); ax.remove(); aiExplain(q, a.p, $('#aiout')); };
+      const pk = a.ok || !a.p ? q.ans : a.p;            // 做对或没答:深讲;做错:针对选的那项
+      if (window.indexedDB) kvGet('ex:' + id + '|' + pk).then(h => { if (h && $('#aiout')) { ax.remove(); aiExplain(q, pk, $('#aiout')); } });
+      ax.onclick = ev => { ev.preventDefault(); ax.remove(); aiExplain(q, pk, $('#aiout')); };
     }
     $('#quit').onclick = ev => { ev.preventDefault(); leaveSession(cur.mode === 'review' || cur.mode === 'one'); };
     const sub = $('#sub');
@@ -1414,6 +1415,15 @@ function askKey() {
 /* 错题讲解:针对选错的那个选项;按「题|选项」缓存在本机,重复看不花 token */
 const AI_EX_SYS = '你是管综(管理类联考)数学/逻辑辅导老师。学员做错了一道题,请针对他选的那个错误选项讲清:他大概错在哪一步、正确思路的关键一步、下次怎么避免。中文,180 字以内,不复述题目;数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\);可用 Markdown 列表和加粗,不用表格。';
 function plainQ(h) { return String(h || '').replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'); }
+/* 做对/没答时的「深讲」:固定结构,把参考解析没说透的地方补齐 */
+const AI_DEEP_SYS = `你是管综(管理类联考)数学/逻辑名师。给学员把这道题讲透,按下面的结构写,每部分用加粗小标题:
+**题型**:一句话说出这是什么题型、考哪个知识点。
+**突破口**:题干里哪个信息是关键,为什么从这里下手。
+**步骤**:完整推导,不跳步,每步说明依据(公式、性质或推理规则);条件充分性题要分别判断条件(1)、(2),必要时再联合。
+**秒杀**:考场上更快的做法(特值、排除、估算、选项特征等);没有就写「无」。
+**易错**:最容易错在哪、错误选项是怎么设陷阱的。
+**同类题**:以后看到什么特征就用这个方法。
+要求:中文;结论与「正确答案」一致,如发现参考解析有误要指出;数学式一律用 LaTeX(行内 $...$,独立一行 $$...$$,不要用 \\( \\));逻辑题用「前提①②③ → 推出」的符号化写法;总长 350 字以内,不复述题目。`;
 async function aiExplain(q, pick, box) {
   const k = 'ex:' + q.id + '|' + pick, hit = window.indexedDB ? await kvGet(k) : null;
   if (hit) { box.innerHTML = mdLite(hit); typeset(box); return; }
@@ -1421,7 +1431,7 @@ async function aiExplain(q, pick, box) {
   const opts = q.kind === 'cond' ? COND_OPTS : q.opts;
   const msg = `题目:${plainQ(q.stem)}${q.kind === 'cond' ? `\n条件(1):${plainQ(q.c1)}\n条件(2):${plainQ(q.c2)}` : ''}\n选项:${opts.map((o, i) => LET[i] + '. ' + plainQ(o)).join(' ')}\n正确答案:${q.ans}\n学员选了:${pick}\n参考解析:${plainQ(q.sol)}`;
   try {
-    const res = await aiCall({ system: AI_EX_SYS, messages: [{ role: 'user', content: msg }] }, 2500);
+    const res = await aiCall({ system: pick === q.ans ? AI_DEEP_SYS : AI_EX_SYS, messages: [{ role: 'user', content: msg }] }, pick === q.ans ? 3500 : 2500);
     const t = aiText(res) || '(没有得到讲解)';
     if (res.stop_reason !== 'refusal' && window.indexedDB) kvSet(k, t);
     box.innerHTML = mdLite(res.stop_reason === 'refusal' ? '(这条请求被安全策略拒绝了)' : t); typeset(box);
