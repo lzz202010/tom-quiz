@@ -286,8 +286,27 @@ function el(tag, cls, inner) { const n = document.createElement(tag); if (cls) n
 function load(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 隐私模式 */ } }
 function themeToggle() { return document.createTextNode(''); }     // 旧站页头的外观按钮、科目切换,这里不需要
-function subjectTabs() { return document.createTextNode(''); }
+function subjectTabs() { const a = el('a', 'back wr-back', '‹ 学习'); a.href = '#/learn'; return a; }   // 写作首页左上角回「学习」
 function render() { route(); }
+/* 运筹学模块:第一次进 #/or 才加载(marked + 课程数据 + 计算器 + 模块本身) */
+function loadOR(cb) {
+  if (window.renderOR) { cb(); return; }
+  const v = window.UFILES.v ? '?v=' + window.UFILES.v : '';
+  const one = (f, done) => { const t = document.createElement('script'); t.src = f; t.onload = done; t.onerror = () => toast('运筹学内容加载失败'); document.head.append(t); };
+  app.innerHTML = '<div class="or-page"><p class="dim">加载中…</p></div>';
+  (window.marked ? f => f() : f => one('vendor/marked-12.0.2.min.js', f))(() => one('or/or-data.js' + v, () => one('or/or-solvers.js' + v, () => one('or.js' + v, cb))));
+}
+/* 学习:管综写作 + 运筹学(以后的课程也放这里) */
+function viewLearn() {
+  const wr = load('gzb.wr.v1', {}), wRead = Object.keys(wr.read || {}).length;
+  const os = load('ult.or.v1', {}), oDone = (os.done || []).filter(n => +n >= 1 && +n <= 10).length;
+  const oDue = Object.values(os.fc || {}).filter(x => x.due <= Date.now()).length;
+  html(`<section class="slim"></section>
+  <div class="learn">
+    <a class="lcard" href="#/writing"><b>管综写作</b><span>论证有效性 · 论说文 · 真题精读</span><em>已读 ${wRead} / 30</em></a>
+    <a class="lcard" href="#/or"><b>运筹学</b><span>讲义 · 闪卡 · 计算器 · AI 助教</span><em>已学完 ${oDone} / 10 章${oDue ? ' · 闪卡 ' + oDue + ' 张待复习' : ''}</em></a>
+  </div>`);
+}
 function loadWriting(cb) {
   if (window.renderWriting) { cb(); return; }
   const v = (window.UFILES.v ? '?v=' + window.UFILES.v : '');
@@ -367,15 +386,31 @@ function toast(msg) {
 }
 function fmt(n, d) { return n.toFixed(d === undefined ? 1 : d); }
 function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
-function subjSwitch(route) {
+function subjSwitch(route, withOR) {
+  const onOR = withOR !== undefined && route === 'home' && S.homeTab === 'or';
   return '<div class="seg">' + Object.keys(SUBJ).map(k =>
-    `<button class="${S.subj === k ? 'on' : ''}" data-subj="${k}" data-route="${route}">${SUBJ[k].name}</button>`).join('') + '</div>';
+    `<button class="${!onOR && S.subj === k ? 'on' : ''}" data-subj="${k}" data-route="${route}">${SUBJ[k].name}</button>`).join('')
+    + (route === 'home' ? `<button class="${onOR ? 'on' : ''}" data-subj="or" data-route="home">运筹学</button>` : '') + '</div>';
 }
 function bar(m, k) { return `<span class="bar k${k}"><i style="width:${k ? Math.round(m * 100) : 0}%"></i></span>`; }   // 没侦察的不画(先验 50% 会误导)
 
 /* ───────────── 首页:丢分账本 ───────────── */
 /* 首页极简:科目、一个数、一个按钮。推什么题由引擎决定,不用看清单 */
+/* 首页的「运筹学」:不走推题引擎,大数字是已学完章数,主按钮接着读上次那章,闪卡到期就提示 */
+function viewHomeOR() {
+  const os = load('ult.or.v1', {}), done = (os.done || []).filter(n => +n >= 1 && +n <= 10).length;
+  const due = Object.values(os.fc || {}).filter(x => x.due <= Date.now()).length, fresh = os.fc ? 82 - Object.keys(os.fc).length : 82;
+  html(`<section class="home">
+    ${subjSwitch('home', true)}
+    <div class="big"><span class="num">${done}</span><span class="of">/ 10 章</span></div>
+    <div class="cap">运筹学 · 已学完</div>
+    <button class="go" id="go">${os.last ? '继续学习' : '开始学习'}</button>
+    <a href="#/or/cards" class="dim sm">${due ? '闪卡 ' + due + ' 张待复习' : fresh > 0 ? '闪卡 · 学几张新卡' : '闪卡全部完成'}</a>
+  </section>`);
+  $('#go').onclick = () => { location.hash = os.last ? '#/or/c/' + os.last : '#/or/c/00'; };
+}
 function viewHome() {
+  if (S.homeTab === 'or') return viewHomeOR();
   const subj = S.subj, cf = SUBJ[subj];
   const tested = topicsOf(subj).filter(t => stage(subj, t.id).k).length, all = topicsOf(subj).length;
   const resume = S.cur && S.cur.subj === subj, today = S.days[dayKey()] || 0;
@@ -383,7 +418,7 @@ function viewHome() {
   const num = tested < all ? `<span class="num">${tested}</span><span class="of">/ ${all}</span>`
     : `<span class="num">${fmt(est(subj))}</span><span class="of">/ ${cf.per * cf.pts}</span>`;
   html(`<section class="home">
-    ${subjSwitch('home')}
+    ${subjSwitch('home', false)}
     <div class="big">${num}</div>
     <div class="cap">${tested < all ? '摸底' : '预估'}${today ? ' · 今日 ' + today : ''}</div>
     <button class="go" id="go">${resume ? '继续' : '开始'}</button>
@@ -769,7 +804,7 @@ async function bkFolder(ask) {
 }
 async function exportBackup(ev) {
   if (ev) ev.preventDefault();
-  const name = bkName(), json = JSON.stringify({ app: 'ultimate', at: new Date().toISOString(), S: S });
+  const name = bkName(), json = JSON.stringify({ app: 'ultimate', at: new Date().toISOString(), S: S, OR: load('ult.or.v1', null), WR: load('gzb.wr.v1', null) });
   const done = msg => { S.lastBackup = Date.now(); save(); if (msg) toast(msg); if (location.hash === '#/me') viewMe(); };
   try {
     if (window.showDirectoryPicker) {
@@ -809,7 +844,7 @@ function applyBackup(text, name) {
   if (d.app !== 'ultimate' || !d.S) { toast('不是 Ultimate 的备份文件'); return; }
   const n = Object.keys(d.S.cards || {}).length;
   ask('用「' + name + '」恢复?\n备份时间 ' + new Date(d.at).toLocaleString('zh-CN') + ',做过 ' + n + ' 题。\n当前记录会被覆盖。', { ok: '恢复' })
-    .then(y => { if (y) { restoreS(d.S); toast('已恢复'); } });
+    .then(y => { if (y) { if (d.OR) store('ult.or.v1', d.OR); if (d.WR) store('gzb.wr.v1', d.WR); restoreS(d.S); toast('已恢复'); } });
 }
 /* 本机快照:每天一份(当天内后来的覆盖前面的),留最近 7 天 */
 async function autoSnap() {
@@ -879,8 +914,19 @@ const saveAI = () => {
   });
   if (moved) { AI.provider = moved; AI.model = firstModel(moved); saveAI(); setTimeout(() => toast('检测到 ' + PROV()[moved].name + ' 的 Key,已切换服务商'), 800); }
 })();
+/* 对话分「场景」:main = 管综教练(带工具、学情、记忆);其他模块(如运筹学每章)用 CHAT_PROFILES 注册自己的场景,
+   各存各的历史(localStorage ult.aichat.v1 / ult.aichat.v1.<id>),共用 Key、模型、每日额度 */
+const CHAT_PROFILES = {};
+let CHAT_ID = 'main';
+const chatStore = id => id === 'main' ? AICK : AICK + '.' + id;
 let CHAT = load(AICK, null) || { msgs: [], view: [], tok: 0, at: 0, snap: '' };
-const saveChat = () => store(AICK, CHAT);
+const saveChat = () => store(chatStore(CHAT_ID), CHAT);
+function useChat(id) {
+  if (id === CHAT_ID) return;
+  saveChat(); CHAT_ID = id;
+  CHAT = load(chatStore(id), null) || { msgs: [], view: [], tok: 0, at: 0, snap: '' };
+}
+const prof = () => CHAT_PROFILES[CHAT_ID] || CHAT_PROFILES.main;
 let aiBusy = false;
 function aiToday() { return AI.used[dayKey()] || { in: 0, out: 0, usd: 0 }; }
 function kTok(n) { return n >= 10000 ? (n / 10000).toFixed(1) + ' 万' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
@@ -926,10 +972,25 @@ async function aiCall(body, maxTokens) {
 }
 const aiText = res => res.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
 /* AI 回复的轻量排版:**粗体**、- 列表、换行;公式 $...$ 交给 KaTeX */
-function mdLite(t) {
-  return esc(t).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').split('\n').map(l => /^\s*[-•]\s+/.test(l) ? '<li>' + l.replace(/^\s*[-•]\s+/, '') + '</li>' : l)
-    .join('\n').replace(/(<li>[\s\S]*?<\/li>)(?!\n<li>)/g, '$1').replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>').replace(/\n/g, '<br>').replace(/<\/li><br>/g, '</li>').replace(/<ul><br>|<br><\/ul>/g, m => m.replace('<br>', ''));
+/* AI 回复排版:先把公式抠出来交给 KaTeX(认 $…$、$$…$$、\(…\)、\[…\] 四种写法),剩下的交给 marked 排 Markdown
+   (标题、列表、表格、代码块);正文里的 < 全部转义,AI 回复里的 HTML 只当文字显示。运筹学讲义也用它。 */
+function katexStr(src, display) {
+  if (!window.katex) return esc(display ? '$$' + src + '$$' : '$' + src + '$');
+  try { return katex.renderToString(src.trim(), { displayMode: display, throwOnError: false, macros: { '\\frac': '\\dfrac' } }); } catch (e) { return esc(src); }
 }
+function richText(src) {
+  const keep = [], put = o => { keep.push(o); return '@@K' + (keep.length - 1) + '@@'; };
+  let s = String(src || '').replace(/\r\n?/g, '\n');
+  s = s.replace(/```[\s\S]*?```/g, m => put({ raw: m }));                         // 代码块原样(marked 自己会转义)
+  s = s.replace(/\\\[([\s\S]+?)\\\]/g, (_, x) => put({ m: x, d: true })).replace(/\$\$([\s\S]+?)\$\$/g, (_, x) => put({ m: x, d: true }));
+  s = s.replace(/\\\(([\s\S]+?)\\\)/g, (_, x) => put({ m: x, d: false })).replace(/\$([^$\n]+?)\$/g, (_, x) => put({ m: x, d: false }));
+  s = s.replace(/</g, '&lt;');
+  s = s.replace(/@@K(\d+)@@/g, (m, i) => keep[i].raw !== undefined ? keep[i].raw : m);
+  let h = window.marked ? marked.parse(s, { gfm: true, breaks: true }) : '<p>' + s.replace(/\n/g, '<br>') + '</p>';
+  h = h.replace(/@@K(\d+)@@/g, (_, i) => katexStr(keep[i].m, keep[i].d));
+  return h.replace(/<table>/g, '<div class="scroll"><table>').replace(/<\/table>/g, '</table></div>');
+}
+const mdLite = richText;
 
 /* 学情摘要(约 600 token):每个考点一行 */
 function aiSnapshot() {
@@ -949,6 +1010,8 @@ function aiSnapshot() {
   const days = [];
   for (let k = 6; k >= 0; k--) days.push(S.days[dayKey(now - k * DAY)] || 0);
   L.push('近7天题量:' + days.join(','));
+  const os = load('ult.or.v1', {});
+  L.push(`[运筹学] 已学完 ${(os.done || []).filter(n => +n >= 1 && +n <= 10).length}/10 章 · 闪卡待复习 ${Object.values(os.fc || {}).filter(x => x.due <= now).length} 张(学员也要考运筹学,安排时间要兼顾)`);
   const hs = S.hist.slice(0, 5).map(h => SUBJ[h.subj].name + h.title + ' ' + h.ok + '/' + h.n);
   if (hs.length) L.push('最近几组:' + hs.join(';'));
   return L.join('\n');
@@ -1021,8 +1084,10 @@ function mascot(ex, size, head) {
 const AI_SYS = `你是 Ultimate 管综刷题站里的私人教练,有权直接操作这个网站。学员备考管理类联考(数学 75 分、逻辑 60 分),有基础,追求提分效率。
 每段对话开头会附:学员的长期记忆(你之前记下的)、学情摘要;数据变化后会再附新摘要。字段:考频=平均每套卷考几题;掌握=做对该考点典型难度真题的概率;待攻克=判定为真不会或还在观察的错题;失误=系统根据作答行为判定为会做但手滑的错题;推送×=当前推送倍数(0=暂停)。
 做事方式:学员要求什么就直接用工具做,不要反问确认;要具体分析某块时,先用 get_wrong_questions / get_topic_detail 看真实题目和记录再下结论,不凭空猜。你判断某块该调整时可以直接调整,并说明理由。学员透露的偏好、作息、目标、反复出现的薄弱点,用 remember 记下(简短),过时的用 forget 删掉。
-回答:中文,直接、具体,只依据数据,不编造。一般 200 字以内;要报告时不超过 600 字。不用表格,公式用 $...$。操作完一句话说明做了什么。
+回答:中文,直接、具体,只依据数据,不编造。一般 200 字以内;要报告时不超过 600 字。用 Markdown(可用列表、加粗,少用表格);数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\) 或 Unicode 拼凑的上下标。操作完一句话说明做了什么。
 套卷 id:数学 m+年份(m2010–m2025)、全真模拟 mk1–mk8;逻辑 l+年份(l2020–l2026)。考点 id 见学情摘要每行开头;题目 id 从 get_wrong_questions 得到。`;
+CHAT_PROFILES.main = { title: 'AI 教练', sys: () => AI_SYS, tools: true, snap: true, hello: '我是小胖鱼。今天想练哪块?',
+  ph: '说说你的情况,比如:排列组合老错,多推点', chips: () => ['分析一下我现在的学情', '看看我的错题,说说错在哪', '错题里我只要排列组合的', '数列我很稳了,少推点'] };
 const USD_CNY = 7.1;        // 估算用汇率
 const yuan = usd => '¥' + (usd * USD_CNY).toFixed(usd * USD_CNY < 1 ? 3 : 2);
 function aiTools() {
@@ -1166,7 +1231,7 @@ function newChat(keepView) {
 }
 /* 一段对话绑定「服务商+模型+系统提示+工具表」的指纹:网站更新或换了模型后,旧历史和新设置对不上会被接口拒绝,直接换新对话 */
 function ctxSig() {
-  const t = AI.provider + '|' + AI.model + '|' + AI_SYS + JSON.stringify(aiTools());
+  const P = prof(), t = AI.provider + '|' + AI.model + '|' + P.sys() + (P.tools ? JSON.stringify(aiTools()) : '');
   let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0;
   return h.toString(36);
 }
@@ -1182,20 +1247,21 @@ function chatIntact(msgs) {
   return true;
 }
 async function aiSend(text, retried) {
-  const snap = aiSnapshot(), sig = ctxSig();
+  const P = prof(), snap = P.snap ? aiSnapshot() : '', sig = ctxSig();
   // 太长、隔太久、设置变了、历史残缺:换新上下文(带上次要点),而不是让请求失败
   if (CHAT.msgs.length && (CHAT.tok > 12000 || Date.now() - CHAT.at > 6 * 3600e3 || CHAT.sig !== sig || !chatIntact(CHAT.msgs))) newChat(true);
   CHAT.sig = sig;
   let content = text;
-  if (!CHAT.msgs.length) content = `【长期记忆】\n${memText()}\n${CHAT.carry ? '【上次聊到】\n' + CHAT.carry + '\n' : ''}【学情摘要 · ${new Date().toLocaleString('zh-CN')}】\n${snap}\n\n【学员】${text}`;
+  if (!P.snap) { if (!CHAT.msgs.length && CHAT.carry) content = `【上次聊到】\n${CHAT.carry}\n\n${text}`; }
+  else if (!CHAT.msgs.length) content = `【长期记忆】\n${memText()}\n${CHAT.carry ? '【上次聊到】\n' + CHAT.carry + '\n' : ''}【学情摘要 · ${new Date().toLocaleString('zh-CN')}】\n${snap}\n\n【学员】${text}`;
   else if (snap !== CHAT.snap) content = `【最新学情摘要】\n${snap}\n\n【学员】${text}`;
   CHAT.snap = snap; CHAT.after = null;
   CHAT.view.push({ who: 'me', text: text });
   CHAT.msgs.push({ role: 'user', content: content });
-  const tools = aiTools();
+  const tools = P.tools ? aiTools() : null, sys = P.sys();
   try {
     for (let i = 0; i < 6; i++) {
-      const res = await aiCall({ system: AI_SYS, tools: tools, messages: CHAT.msgs }, 4000);
+      const res = await aiCall(Object.assign({ system: sys, messages: CHAT.msgs }, tools ? { tools: tools } : {}), 4000);
       CHAT.msgs.push({ role: 'assistant', content: res.content });       // 原样追加(含思考块),不改写历史
       CHAT.tok = res._tin + (res.usage.output_tokens || 0); CHAT.at = Date.now();
       const t = aiText(res);
@@ -1206,7 +1272,7 @@ async function aiSend(text, retried) {
       const results = [];
       for (const b of res.content.filter(b => b.type === 'tool_use')) results.push({ type: 'tool_result', tool_use_id: b.id, content: await runTool(b.name, b.input || {}) });
       CHAT.msgs.push({ role: 'user', content: results });
-      saveChat(); if (location.hash === '#/ai') viewAI();
+      saveChat(); renderMsgs(true);
     }
   } catch (e) {
     // 请求没成功:撤回刚追加、还没得到回复的那条用户消息(没进入对话,不算改历史)
@@ -1225,34 +1291,65 @@ async function aiSend(text, retried) {
     if (after.act) doAct(after.act); else if (after.nav) location.hash = after.nav;
   }, 900);
 }
-function viewAI() {
-  const u = aiToday(), v = CHAT.view;
-  const chips = ['分析一下我现在的学情', '看看我的错题,说说错在哪', '错题里我只要排列组合的', '数列我很稳了,少推点'];
-  html(`<section class="ai-h"><b>AI 教练</b><span class="links"><a href="#" id="newc">新对话</a><a href="#" id="clrc">清空</a></span></section>
-  ${aiKey() ? '' : `<div class="grp"><a href="#" class="row-i chev" id="setkey"><span>先填 ${PROV()[AI.provider].name} API Key</span><span class="v">只存在本机</span></a></div>`}
-  <div class="chat">${v.length ? v.map((m, i) => m.who === 'me' ? `<div class="me">${esc(m.text)}</div>`
-      : m.who === 'sep' ? `<div class="sep"><span>新对话</span></div>`
-      : m.who === 'act' ? `<div class="act">✓ ${esc(m.text)}${m.act ? ` <a href="#" data-act="${i}">${m.act.kind === 'print' ? '再打开' : '再开始'}</a>` : ''}</div>`
-      : m.who === 'err' ? `<div class="ai-row">${mascot('sad', 32, true)}<div class="err">${esc(m.text)}</div></div>`
-      : `<div class="ai-row">${v[i - 1] && v[i - 1].who === 'ai' ? '<span class="av-sp"></span>' : mascot('idle', 32, true)}<div class="ai">${mdLite(m.text)}</div></div>`).join('') : ''}
-    ${!v.length || v[v.length - 1].who === 'sep' ? `<div class="hello">${v.length ? '' : `<div class="hello-m">${mascot('happy', 112)}</div><p>我是小胖鱼。今天想练哪块?</p>`}
-      <div class="chips">${chips.map(c => `<a href="#" data-chip="${esc(c)}">${c}</a>`).join('')}</div></div>` : ''}
-    ${aiBusy ? `<div class="ai-row thinking">${mascot('think', 32, true)}<div class="ai dim">小胖鱼思考中…</div></div>` : ''}</div>
-  <form class="ask" id="ask"><textarea id="q" rows="1" placeholder="说说你的情况,比如:排列组合老错,多推点"></textarea><button class="go sm" ${aiBusy ? 'disabled' : ''}>发送</button></form>
-  <div class="ai-f dim">${MODELS()[AI.model][0]} · 今日 ${kTok(u.in + u.out)} / ${kTok(AI.budget)} token · 约 ${yuan(u.usd)}${CHAT.tok ? ' · 本对话 ' + kTok(CHAT.tok) : ''}</div>`);
+/* AI 页:聊天应用式布局。外框 .chat-app 固定在「可见区域」里(高度跟着键盘变),页面本身不滚动,
+   只有中间消息列表滚动;发消息/收回复只重画消息列表(renderMsgs),输入框不重建,键盘不收、没打完的字也在。 */
+function viewAI(id) {
+  useChat(id || 'main');
+  const P = prof();
+  window.dispatchEvent(new Event('resize'));          // 量一下顶栏高度、可见区域
+  html(`<div class="chat-app">
+    <section class="ai-h">${P.back ? `<a href="${P.back}" class="aiback">‹</a>` : ''}<b>${esc(P.title)}</b><span class="links"><a href="#" id="newc">新对话</a><a href="#" id="clrc">清空</a></span></section>
+    ${aiKey() ? '' : `<div class="grp ai-key"><a href="#" class="row-i chev" id="setkey"><span>先填 ${PROV()[AI.provider].name} API Key</span><span class="v">只存在本机</span></a></div>`}
+    <div class="msgs" id="msgs"><div class="chat"></div></div>
+    <form class="ask" id="ask"><textarea id="q" rows="1" enterkeyhint="send" placeholder="${esc(P.ph)}"></textarea><button class="go sm" id="sendb" type="submit">发送</button></form>
+    <div class="ai-f dim" id="aif"></div>
+  </div>`);
+  const ta = $('#q');
   const send = function (t) {
     t = (t || '').trim();
     if (!t || aiBusy) return;
-    const p = aiSend(t); viewAI(); p.then(() => { if (location.hash === '#/ai') viewAI(); });
+    if (ta.value.trim() === t) { ta.value = ''; grow(); }
+    const p = aiSend(t); renderMsgs(true); p.then(() => renderMsgs(true));
   };
-  $('#ask').onsubmit = ev => { ev.preventDefault(); send($('#q').value); };
-  $('#q').onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); send($('#q').value); } };
-  app.querySelectorAll('[data-chip]').forEach(a => a.onclick = ev => { ev.preventDefault(); send(a.dataset.chip); });
-  app.querySelectorAll('[data-act]').forEach(a => a.onclick = ev => { ev.preventDefault(); doAct(v[+a.dataset.act].act); });
-  $('#newc').onclick = ev => { ev.preventDefault(); if (!aiBusy) { newChat(true); viewAI(); } };
-  $('#clrc').onclick = ev => { ev.preventDefault(); if (!aiBusy) ask('清空所有对话记录?(长期记忆保留,可在「我的」里清)', { ok: '清空' }).then(y => { if (y) { newChat(false); viewAI(); } }); };
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; };
+  ta.addEventListener('input', grow);
+  ta.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); send(ta.value); } };
+  $('#ask').onsubmit = ev => { ev.preventDefault(); send(ta.value); };
+  // 手机上点「发送」不让输入框失焦(否则键盘先收起、整页跳一下)
+  $('#sendb').addEventListener('touchend', ev => { ev.preventDefault(); send(ta.value); });
+  $('#newc').onclick = ev => { ev.preventDefault(); if (!aiBusy) { newChat(true); renderMsgs(true); } };
+  $('#clrc').onclick = ev => { ev.preventDefault(); if (!aiBusy) ask('清空所有对话记录?(长期记忆保留,可在「我的」里清)', { ok: '清空' }).then(y => { if (y) { newChat(false); renderMsgs(true); } }); };
   const sk = $('#setkey'); if (sk) sk.onclick = ev => { ev.preventDefault(); askKey().then(() => viewAI()); };
-  const c = $('.chat'); if (c && c.lastElementChild) c.lastElementChild.scrollIntoView({ block: 'end' });
+  viewAI.send = send;
+  renderMsgs(true);
+}
+/* 只重画消息列表;原本就在底部(或 stick)才跟到最新,用户往上翻历史时不打扰 */
+function renderMsgs(stick) {
+  const box = $('#msgs');
+  if (!box) return;
+  const v = CHAT.view, u = aiToday();
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const P = prof(), chips = P.chips(), render = P.render || mdLite;
+  box.firstElementChild.innerHTML = (v.length ? v.map((m, i) => m.who === 'me' ? `<div class="me">${esc(m.text)}</div>`
+      : m.who === 'sep' ? `<div class="sep"><span>新对话</span></div>`
+      : m.who === 'act' ? `<div class="act">✓ ${esc(m.text)}${m.act ? ` <a href="#" data-act="${i}">${m.act.kind === 'print' ? '再打开' : '再开始'}</a>` : ''}</div>`
+      : m.who === 'err' ? `<div class="ai-row">${mascot('sad', 32, true)}<div class="err">${esc(m.text)}</div></div>`
+      : `<div class="ai-row">${v[i - 1] && v[i - 1].who === 'ai' ? '<span class="av-sp"></span>' : mascot('idle', 32, true)}<div class="ai">${render(m.text)}</div></div>`).join('') : '')
+    + (!v.length || v[v.length - 1].who === 'sep' ? `<div class="hello">${v.length ? '' : `<div class="hello-m">${mascot('happy', 112)}</div><p>${esc(P.hello)}</p>`}
+      <div class="chips">${chips.map(c => Array.isArray(c) ? `<a href="#" data-chip="${esc(c[1] || '')}" data-fill="${c[1] ? '' : esc(c[2] || '')}">${esc(c[0])}</a>` : `<a href="#" data-chip="${esc(c)}">${esc(c)}</a>`).join('')}</div></div>` : '')
+    + (aiBusy ? `<div class="ai-row thinking">${mascot('think', 32, true)}<div class="ai dim">小胖鱼思考中…</div></div>` : '');
+  typeset(box);
+  box.querySelectorAll('[data-chip]').forEach(a => a.onclick = ev => {
+    ev.preventDefault();
+    if (a.dataset.chip) { viewAI.send(a.dataset.chip); return; }
+    const q = $('#q'); q.value = a.dataset.fill; q.focus(); q.dispatchEvent(new Event('input'));     // 「批改我的解答」这类:先填个开头让人接着写
+  });
+  box.querySelectorAll('[data-act]').forEach(a => a.onclick = ev => { ev.preventDefault(); doAct(v[+a.dataset.act].act); });
+  if (stick || atBottom) box.scrollTop = box.scrollHeight;
+  box.onscroll = () => { box._bottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80; };
+  box._bottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const sb = $('#sendb'); if (sb) sb.disabled = aiBusy;
+  const f = $('#aif'); if (f) f.textContent = `${MODELS()[AI.model][0]} · 今日 ${kTok(u.in + u.out)} / ${kTok(AI.budget)} token · 约 ${yuan(u.usd)}${CHAT.tok ? ' · 本对话 ' + kTok(CHAT.tok) : ''}`;
 }
 /* 服务商选择:列出内置和自定义的,可添加/删除自定义(要求 Anthropic 兼容接口) */
 function pickProvider() {
@@ -1315,7 +1412,7 @@ function askKey() {
   });
 }
 /* 错题讲解:针对选错的那个选项;按「题|选项」缓存在本机,重复看不花 token */
-const AI_EX_SYS = '你是管综(管理类联考)数学/逻辑辅导老师。学员做错了一道题,请针对他选的那个错误选项讲清:他大概错在哪一步、正确思路的关键一步、下次怎么避免。中文,180 字以内,公式用 $...$,不用表格,不复述题目。';
+const AI_EX_SYS = '你是管综(管理类联考)数学/逻辑辅导老师。学员做错了一道题,请针对他选的那个错误选项讲清:他大概错在哪一步、正确思路的关键一步、下次怎么避免。中文,180 字以内,不复述题目;数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\);可用 Markdown 列表和加粗,不用表格。';
 function plainQ(h) { return String(h || '').replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'); }
 async function aiExplain(q, pick, box) {
   const k = 'ex:' + q.id + '|' + pick, hit = window.indexedDB ? await kvGet(k) : null;
@@ -1443,23 +1540,28 @@ function route() {
   document.title = 'Ultimate';
   const h = location.hash.replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
-  const tab = r === 't' || r === 'papers' || r === 'bank' ? 'me' : r === 'sum' ? 'home' : r;     // 题库在「我的」里
+  const tab = r === 't' || r === 'papers' || r === 'bank' ? 'me' : r === 'sum' ? 'home' : r === 'writing' || r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作、运筹学在「学习」里
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
   document.body.classList.toggle('playing', r === 's');
+  document.body.classList.toggle('chatmode', r === 'ai' || (r === 'or' && h[1] === 'ai'));
   document.body.classList.toggle('reading', /^#\/writing\/./.test(location.hash));   // 写作阅读页全屏:它有自己的返回条和上一篇/下一篇
   if (r === 't') viewTopic(h[1], h[2]);
   else if (r === 'bank' || r === 'papers') viewBank();
   else if (r === 'me') viewMe();
   else if (r === 's') viewSession();
   else if (r === 'sum') viewSum();
-  else if (r === 'ai') viewAI();
+  else if (r === 'ai') viewAI('main');
+  else if (r === 'learn') viewLearn();
+  else if (r === 'or') loadOR(() => { if (location.hash.indexOf('#/or') === 0) window.renderOR(h); });
   else if (r === 'writing') loadWriting(() => { if (location.hash.indexOf('#/writing') === 0) window.renderWriting(); });
   else viewHome();
 }
 document.addEventListener('click', function (ev) {
   const b = ev.target.closest('[data-subj]');
   if (!b) return;
-  S.subj = b.dataset.subj; save(); route();
+  if (b.dataset.subj === 'or') S.homeTab = 'or';          // 首页的运筹学只是首页的一个视图,其他页的科目仍是数学/逻辑
+  else { S.subj = b.dataset.subj; S.homeTab = ''; }
+  save(); route();
 });
 document.addEventListener('keydown', function (ev) {
   if (!document.body.classList.contains('playing') || ev.metaKey || ev.ctrlKey || /INPUT|SELECT/.test(ev.target.tagName)) return;
@@ -1491,16 +1593,23 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 setTimeout(autoSnap, 1500);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', route); else route();
 
-/* iPhone 键盘弹出时:把底部输入框顶到键盘上方,临时藏起标签栏(visualViewport 比 innerHeight 小的那截就是键盘) */
-if (window.visualViewport) {
-  const vv = window.visualViewport;
+/* 可见区域(visualViewport):键盘弹出时它变矮、还可能被 Safari 往下平移。把高度和偏移写进 CSS 变量,
+   AI 页的固定外框照着它摆,永远正好占满键盘上方;键盘起来时临时藏起底部标签栏 */
+(function () {
+  const vv = window.visualViewport, rs = document.documentElement.style;
   const onVV = function () {
-    const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-    document.documentElement.style.setProperty('--kb', kb + 'px');
-    document.body.classList.toggle('kb', kb > 80);
+    const h = vv ? vv.height : window.innerHeight, top = vv ? vv.offsetTop : 0;
+    rs.setProperty('--vvh', Math.round(h) + 'px');
+    rs.setProperty('--vvt', Math.round(top) + 'px');
+    const tb = document.querySelector('.top'); if (tb && window.innerWidth > 700) rs.setProperty('--toph', Math.round(tb.getBoundingClientRect().height) + 'px');
+    document.body.classList.toggle('kb', window.innerHeight - h > 120);
+    if (document.body.classList.contains('chatmode') && window.scrollY) window.scrollTo(0, 0);   // 别让页面被 Safari 推着走
+    const mb = document.getElementById('msgs'); if (mb && mb._bottom !== false) requestAnimationFrame(() => { mb.scrollTop = mb.scrollHeight; });   // 键盘弹起时停在最新消息
   };
-  vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV);
-}
+  if (vv) { vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV); }
+  window.addEventListener('resize', onVV);
+  onVV();
+})();
 /* 离线缓存:只在线上启用;本机预览(localhost)注销,免得调试时被旧缓存骗 */
 if ('serviceWorker' in navigator) {
   if (/^(localhost|127\.|\[::1\])/.test(location.hostname)) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
