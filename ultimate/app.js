@@ -511,6 +511,7 @@ function viewSession() {
     if (cur.mode === 'paper' && !cur.done && Date.now() > cur.dl) { submitPaper(); return; }
     const id = cur.ids[cur.i], q = d.byId[id], a = cur.ans[id];
     const reveal = a && (cur.mode !== 'paper' || cur.done);
+    if (cur.away) { if (cur.qt) cur.qt += Date.now() - cur.away; cur.away = 0; }      // 离开做题页/切到后台的时间不算用时
     if (!a && !cur.qt) cur.qt = Date.now();
     const isBoss = cur.boss === id;
     const opts = q.kind === 'cond' ? COND_OPTS : q.opts;
@@ -1091,7 +1092,7 @@ const AI_SYS = `你是 Ultimate 管综刷题站里的私人教练,有权直接�
 回答:中文,直接、具体,只依据数据,不编造。一般 200 字以内;要报告时不超过 600 字。用 Markdown(可用列表、加粗,少用表格);数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\) 或 Unicode 拼凑的上下标。操作完一句话说明做了什么。
 套卷 id:数学 m+年份(m2010–m2025)、全真模拟 mk1–mk8;逻辑 l+年份(l2020–l2026)。考点 id 见学情摘要每行开头;题目 id 从 get_wrong_questions 得到。`;
 CHAT_PROFILES.main = { title: 'AI 教练', sys: () => AI_SYS, tools: true, snap: true, hello: '我是小胖鱼。今天想练哪块?',
-  ph: '说说你的情况,比如:排列组合老错,多推点', chips: () => ['分析一下我现在的学情', '看看我的错题,说说错在哪', '错题里我只要排列组合的', '数列我很稳了,少推点'] };
+  ph: '说说你的情况', chips: () => ['分析一下我现在的学情', '看看我的错题,说说错在哪', '错题里我只要排列组合的', '数列我很稳了,少推点'] };
 const USD_CNY = 7.1;        // 估算用汇率
 const yuan = usd => '¥' + (usd * USD_CNY).toFixed(usd * USD_CNY < 1 ? 3 : 2);
 function aiTools() {
@@ -1547,6 +1548,13 @@ function paginate(bl) {
   });
 }
 
+/* 做题计时暂停:App 切到后台(锁屏、切应用)时记下离开时刻,回来后从用时里扣掉 */
+document.addEventListener('visibilitychange', function () {
+  const c = S.cur; if (!c || !c.qt) return;
+  if (document.hidden) { if (!c.away) c.away = Date.now(); }
+  else if (c.away && /^#\/s\b/.test(location.hash)) { c.qt += Date.now() - c.away; c.away = 0; }
+  save();
+});
 /* ───────────── 路由 ───────────── */
 function route() {
   clearInterval(tick);
@@ -1555,6 +1563,7 @@ function route() {
   const r = h[0] || 'home';
   const tab = r === 't' || r === 'papers' || r === 'bank' ? 'me' : r === 'sum' ? 'home' : r === 'writing' || r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作、运筹学在「学习」里
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
+  if (r !== 's' && S.cur && S.cur.qt && !S.cur.away) { S.cur.away = Date.now(); save(); }
   document.body.classList.toggle('playing', r === 's');
   document.body.classList.toggle('chatmode', r === 'ai' || (r === 'or' && h[1] === 'ai'));
   document.body.classList.toggle('reading', /^#\/writing\/./.test(location.hash));   // 写作阅读页全屏:它有自己的返回条和上一篇/下一篇

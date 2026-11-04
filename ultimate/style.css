@@ -736,3 +736,11 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .or-demos i { font-style: normal; color: var(--acc); font-size: 12px; }
 .or-demos b { font-size: 15px; font-weight: 600; }
 .or-demos span { font-size: 12px; line-height: 1.5; color: var(--mute); }
+/* iOS 终检:任何内容都不许把页面撑宽(撑宽后 iOS 会整页缩小) */
+.wr-read > *, .wr > * { min-width: 0; }
+.wr-read > .wr-doc, .wr-read > .wr-art { width: 100%; }   /* flex 列 + margin:auto 会按内容撑宽,表格一宽就把页面撑大 */
+.md .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; -webkit-overflow-scrolling: touch; }
+.or-read .md :is(p, li):has(.katex) { overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+.katex { position: relative; }   /* KaTeX 隐藏的 MathML 层是绝对定位,不加这句会逃出横向滚动的表格,把整页撑宽 */
+.scroll, .tw { position: relative; }
+.qk-q, .qk-sol, .qc-q, .qc-e { overflow-wrap: anywhere; }

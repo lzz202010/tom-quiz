@@ -61,7 +61,7 @@
     const ctx = c ? c.plain.slice(0, 9000) : '';
     CHAT_PROFILES[key] = {
       title: c ? '运筹学 · ' + c.title : '运筹学助教', back: c ? '#/or/c/' + c.no : id === 'cards' ? '#/or/cards' : id === 'tools' ? '#/or/tools' : '#/or',
-      tools: false, snap: false, render: richText, ph: '问这一章的任何问题,也可以贴上你的解答让它批改',
+      tools: false, snap: false, render: richText, ph: '问这一章,或贴解答让它批改',
       hello: c ? '这一章哪里没懂,直接问我。' : '运筹学的问题都可以问我。',
       sys: () => `你是一位耐心、严谨的运筹学助教,用简体中文回答。学生报考西安工业大学工业工程与管理(MEM),运筹学是复试科目,范围按韩伯棠《管理运筹学》:线性规划(单纯形、大 M / 两阶段、对偶、灵敏度)、运输(含转运、生产-库存)、整数规划与指派、目标规划、图与网络、网络计划(PERT/CPM)、动态规划、决策论;排队论、对策论一般不考。考试题型是选择、填空、简答和建模计算大题,不能用软件。记号:max 问题检验数 σj = cj − CB·B⁻¹·Pj,全部 ≤ 0 为最优。
 要求:
