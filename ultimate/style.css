@@ -716,3 +716,23 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .qk-sol .tab-step h4 { margin: 14px 0 6px; font-size: 15px; }
 .qk-grade { display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 4px; }
 .qg { max-height: 40vh; }
+/* 运筹学首页(第十八轮):标题 + 细进度 → 继续读 → 四宫格 → 路线 → 演示卡 */
+.or-top { display: flex; align-items: center; justify-content: space-between; }
+.or-sbtn { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--soft); }
+.or-sbox { margin-bottom: 8px; } .or-sbox .or-search { margin: 0 0 8px; }
+.or-home .or-prog { gap: 10px; margin-bottom: 18px; } .or-home .or-prog span:last-child { flex: none; font-family: var(--mono); font-size: 12px; }
+.or-next { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; padding: 16px 18px; border-radius: 18px; background: var(--ink); color: var(--bg); }
+.or-next small { grid-column: 1; font-size: 12px; opacity: .6; }
+.or-next b { grid-column: 1; font-size: 17px; font-weight: 600; }
+.or-next i { grid-column: 2; grid-row: 1 / 3; font-style: normal; font-size: 22px; opacity: .6; }
+.or-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 8px; }
+.or-tiles a { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; min-height: 84px; padding: 14px 16px; border-radius: 16px; background: var(--card); color: var(--ink); }
+.or-tiles b { font-size: 17px; font-weight: 600; }
+.or-tiles span { font-size: 13px; color: var(--mute); }
+.or-tiles em { font-style: normal; color: var(--acc); font-weight: 600; }
+.or-tiles a:active, .or-demos a:active, .or-next:active { opacity: .7; }
+.or-demos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.or-demos a { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--card); color: var(--ink); }
+.or-demos i { font-style: normal; color: var(--acc); font-size: 12px; }
+.or-demos b { font-size: 15px; font-weight: 600; }
+.or-demos span { font-size: 12px; line-height: 1.5; color: var(--mute); }

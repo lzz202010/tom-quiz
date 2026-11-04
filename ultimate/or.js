@@ -102,30 +102,32 @@
     const core = CH.filter(c => c.core), doneN = core.filter(c => st.done.indexOf(c.no) >= 0).length;
     const due = dueCount(), fresh = C.flashcards.length - Object.keys(st.fc).length;
     const last = st.last && chOf(st.last);
-    $app.innerHTML = `<div class="or-page">
+    const qs = qcStats(), dd = (n, t) => n ? `<em>${n}</em>${t}` : '';
+    $app.innerHTML = `<div class="or-page or-home">
       <a href="#/learn" class="back" id="orback">‹ 学习</a>
-      <h1 class="or-h1">运筹学</h1>
-      <div class="or-prog"><span>已学完 ${doneN} / ${core.length} 章</span><span class="bar k3"><i style="width:${doneN / core.length * 100}%"></i></span></div>
-      ${last ? `<a class="go or-cont" href="#/or/c/${last.no}">继续读<small>${esc(lab(last))}</small></a>` : ''}
-      <input class="or-search" id="ors" type="search" placeholder="搜讲义" autocomplete="off">
-      <div id="orsr"></div>
-      <div class="grp-h">工具</div>
-      <div class="grp"><a class="row-i chev" href="#/or/q"><span>练题</span><span class="v">${(() => { const q = qcStats(); return q.due ? '待复习 ' + q.due : QB.length + ' 道选择 · ' + GORDER.length + ' 类大题'; })()}</span></a>
-        <a class="row-i chev" href="#/or/cards"><span>记忆闪卡</span><span class="v">${due ? '今日 ' + due + ' 张' : fresh ? fresh + ' 张新卡' : '全部完成'}</span></a>
-        <a class="row-i chev" href="#/or/tools"><span>计算器</span><span class="v">单纯形 · 运输 · 指派 · 排队 · 图解</span></a>
-        <a class="row-i chev" href="#/or/ai/all"><span>问 AI 助教</span><span class="v"></span></a></div>
+      <div class="or-top"><h1 class="or-h1">运筹学</h1><button class="or-sbtn" id="orsb" aria-label="搜讲义"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
+      <div class="or-sbox" id="orsbox" hidden><input class="or-search" id="ors" type="search" placeholder="搜讲义" autocomplete="off"><div id="orsr"></div></div>
+      <div class="or-prog"><span class="bar k3"><i style="width:${doneN / core.length * 100}%"></i></span><span>${doneN} / ${core.length} 章</span></div>
+      <a class="or-next" href="#/or/c/${last ? last.no : '00'}"><small>${last ? '继续读' : '从这里开始'}</small><b>${esc(last ? lab(last) : '导读')}</b><i>›</i></a>
+      <div class="or-tiles">
+        <a href="#/or/q"><b>练题</b><span>${dd(qs.due, ' 道待复习') || '选择 · 大题'}</span></a>
+        <a href="#/or/cards"><b>闪卡</b><span>${due ? dd(due, ' 张待复习') : fresh ? fresh + ' 张新卡' : '都记住了'}</span></a>
+        <a href="#/or/tools"><b>计算器</b><span>逐步出表</span></a>
+        <a href="#/or/ai/all"><b>问 AI</b><span>随时答疑</span></a>
+      </div>
       <div class="grp-h">学习路线</div>
       <ol class="or-path">${groups.map(g => `<li class="or-stage">${esc(g.name)}</li>${g.list.map(c => {
         const p = st.pos[c.no] || 0, dn = st.done.indexOf(c.no) >= 0, cur = last && last.no === c.no;
         return `<li class="or-step${dn ? ' done' : ''}${cur ? ' cur' : ''}"><a href="#/or/c/${c.no}"><i class="nd">${dn ? '✓' : c.d ? +c.d : c.n === 0 ? '·' : '✎'}</i>
           <span><b>${esc(c.title)}</b>${c.tag ? `<em>${c.tag}</em>` : ''}${CH_DEMOS[c.no] ? '<em class="hasd">▶ 动画</em>' : ''}${!dn && p > 0.05 ? `<em>读到 ${Math.round(p * 100)}%</em>` : ''}</span></a></li>`; }).join('')}`).join('')}</ol>
       <div class="grp-h">动画演示</div>
-      <div class="grp">${Object.keys(DEMOS).map(d => `<a class="row-i chev" href="#" data-demo="${d}"><span>▶ ${esc(DEMOS[d].title)}</span><span class="v"></span></a>`).join('')}</div>
+      <div class="or-demos">${Object.keys(DEMOS).map(d => { const t = DEMOS[d].title.split(':'); return `<a href="#" data-demo="${d}"><i>▶</i><b>${esc(t[0])}</b><span>${esc(t[1] || '')}</span></a>`; }).join('')}</div>
     </div>`;
     window.scrollTo(0, 0);
     $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
     $$('[data-demo]').forEach(a => a.onclick = ev => { ev.preventDefault(); openDemo(a.dataset.demo); });
     const inp = $('#ors'), out = $('#orsr');
+    $('#orsb').onclick = () => { const bx = $('#orsbox'); bx.hidden = !bx.hidden; if (!bx.hidden) inp.focus(); };
     inp.oninput = function () {
       const q = inp.value.trim();
       if (!q) { out.innerHTML = ''; return; }

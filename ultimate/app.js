@@ -307,7 +307,7 @@ function viewLearn() {
   html(`<section class="slim"></section>
   <div class="learn">
     <a class="lcard" href="#/writing"><b>管综写作</b><span>论证有效性 · 论说文 · 真题精读</span><em>已读 ${wRead} / 30</em></a>
-    <a class="lcard" href="#/or"><b>运筹学</b><span>讲义 · 闪卡 · 计算器 · AI 助教</span><em>已学完 ${oDone} / ${OR_CORE.length} 章${oDue ? ' · 闪卡 ' + oDue + ' 张待复习' : ''}</em></a>
+    <a class="lcard" href="#/or"><b>运筹学</b><span>讲义 · 练题 · 动画 · 闪卡</span><em>已学完 ${oDone} / ${OR_CORE.length} 章${oDue ? ' · 闪卡 ' + oDue + ' 张待复习' : ''}</em></a>
   </div>`);
 }
 function loadWriting(cb) {
