@@ -492,8 +492,13 @@ body.chatmode { overflow: hidden; }
 .or-hits .row-i { padding-top: 8px; padding-bottom: 8px; }
 .or-hits mark { background: color-mix(in srgb, var(--acc) 22%, transparent); color: inherit; border-radius: 3px; }
 .or-no { font-style: normal; font-family: var(--mono); color: var(--mute); font-size: 13px; margin-right: 10px; }
-.or-bar { position: sticky; top: 0; z-index: 6; display: flex; justify-content: space-between; align-items: center; padding: 8px 0; background: var(--bg); }
-@media (max-width: 700px) { .or-bar { top: 0; padding-top: max(8px, env(safe-area-inset-top)); } }
+.or-bar { position: sticky; top: var(--toph, 57px); z-index: 11; display: flex; justify-content: space-between; align-items: center; padding: 8px 0; background: var(--bg); }
+@media (max-width: 700px) {                       /* 手机读讲义:站名让位,返回栏一直钉在顶部 */
+  body:has(.or-page) .top { position: fixed; height: 0; padding: 0; }   /* 只藏站名,底部标签栏(在 .top 里)照常 */
+  body:has(.or-page) .top .logo { display: none; }
+  .or-page > #orback { position: sticky; top: 0; z-index: 11; display: block; margin: 0 -16px 6px; padding: max(10px, env(safe-area-inset-top)) 16px 10px; background: var(--bg); box-shadow: 0 1px 0 var(--line); font-size: 15px; }
+  .or-bar { top: 0; padding-top: max(8px, env(safe-area-inset-top)); box-shadow: 0 1px 0 var(--line); }
+}
 .or-bar .back { margin: 0; }
 .or-ask { font-size: 14px; padding: 5px 12px; border-radius: 99px; background: var(--ink); color: var(--bg); }
 .or-eyebrow { font-size: 12px; color: var(--acc); letter-spacing: .08em; margin-top: 4px; }
@@ -501,9 +506,13 @@ body.chatmode { overflow: hidden; }
 .or-acts a, .or-acts label { font-size: 13px; padding: 5px 12px; border-radius: 99px; background: var(--card); color: var(--soft); }
 .or-acts a.on { color: var(--ok); }
 .or-acts select { border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; }
-.or-vids { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; margin-bottom: 12px; border-radius: 12px; background: var(--card); font-size: 14px; }
-.or-vids span { display: block; margin-top: 2px; }
-.or-vids span a { display: inline-block; margin: 2px 6px 0 0; padding: 1px 8px; border-radius: 6px; background: var(--bg2); font-family: var(--mono); font-size: 12px; }
+.or-vids { display: flex; flex-direction: column; padding: 2px 14px; margin-bottom: 12px; border-radius: 12px; background: var(--card); font-size: 15px; }
+.or-vids .vrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 6px 0; color: var(--ink); }
+.or-vids .vrow + .vrow { border-top: 1px solid var(--line); }
+.or-vids .vrow i { font-style: normal; color: var(--acc); font-size: 12px; }
+.or-vids .vrow:has(.vp) { flex-direction: column; align-items: flex-start; gap: 6px; }
+.or-vids .vp { display: flex; flex-wrap: wrap; gap: 6px; }
+.or-vids .vp a { min-width: 36px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--bg2); font: 13px var(--mono); color: var(--soft); }
 .or-timer { position: sticky; top: 46px; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0 12px; padding: 8px 14px; border-radius: 12px; background: var(--card); font-size: 13px; color: var(--soft); }
 .or-timer b { font-family: var(--mono); font-size: 18px; color: var(--ink); }
 .or-timer b.hot { color: var(--acc); }
@@ -649,3 +658,41 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .dj-n { fill: var(--card); stroke: var(--soft); stroke-width: 2; } .dj-n.done { fill: var(--ink); stroke: var(--ink); } .dj-n.cur { stroke: var(--acc); stroke-width: 4; }
 .dj-l { fill: var(--ink); font-size: 14px; font-weight: 600; } .dj-l.done { fill: var(--bg); }
 .dj-d { fill: var(--acc); font-size: 13px; font-family: var(--mono); font-weight: 600; }
+/* 运筹学演示 · 运输 / 分支定界 / 动态规划 / 决策树 */
+.tp-c { fill: var(--card); stroke: var(--line); stroke-width: 1; }
+.tp-c.dim { fill: var(--bg2); }
+.tp-c.hit { fill: color-mix(in srgb, var(--acc) 14%, var(--card)); stroke: var(--acc); stroke-width: 2; }
+.tp-c.neg { stroke: var(--acc); stroke-width: 2; }
+.tp-cost { fill: var(--mute); font-size: 11px; font-family: var(--mono); }
+.tp-x { fill: var(--ink); font-size: 19px; font-weight: 600; font-family: var(--mono); paint-order: stroke; stroke: var(--card); stroke-width: 5px; }
+.tp-sig { paint-order: stroke; stroke: var(--card); stroke-width: 4px; }
+.tp-sig { fill: var(--mute); font-size: 12px; font-family: var(--mono); } .tp-sig.neg { fill: var(--acc); font-weight: 700; }
+.tp-h { fill: var(--soft); font-size: 12px; font-weight: 600; }
+.tp-pv { fill: var(--acc); font-size: 13px; font-family: var(--mono); font-weight: 600; }
+.tp-loop { fill: none; stroke: var(--acc); stroke-width: 2.5; stroke-dasharray: 6 4; }
+.tp-th { fill: var(--acc); font-size: 11px; font-weight: 700; font-family: var(--mono); }
+.dg-lab.sm { font-size: 11px; }
+.bb-reg { fill: var(--acc); fill-opacity: .2; stroke: var(--acc); stroke-width: 3; stroke-linejoin: round; }
+.bb-pt { fill: var(--mute); opacity: .55; } .bb-pt.in { fill: var(--ink); opacity: 1; }
+.bb-x { fill: var(--acc); font-size: 16px; font-weight: 700; }
+.bb-k { fill: var(--mute); font-size: 11px; } .bb-v { fill: var(--ink); font-size: 18px; font-family: var(--mono); font-weight: 600; } .bb-v.acc { fill: var(--acc); }
+.bb-e { stroke: var(--soft); stroke-width: 1.5; }
+.bb-n { fill: var(--card); stroke: var(--soft); stroke-width: 1.5; } .bb-n.cut { stroke-dasharray: 4 3; fill: var(--bg2); stroke: var(--mute); }
+.bb-n.best { fill: var(--acc); stroke: var(--acc); } .bb-n.cur { stroke: var(--acc); stroke-width: 3; }
+.bb-t { fill: var(--ink); font-size: 11px; font-family: var(--mono); } .bb-t.best { fill: #fff; font-weight: 600; }
+.dp-greedy { stroke: var(--soft); stroke-width: 4; stroke-dasharray: 8 6; fill: none; }
+.dt-e { stroke: var(--soft); stroke-width: 1.8; fill: none; } .dt-e.cut { stroke: var(--line); }
+.dt-sq { fill: var(--card); stroke: var(--ink); stroke-width: 2; } .dt-ci { fill: var(--card); stroke: var(--soft); stroke-width: 2; }
+.dt-v { fill: var(--acc); font-size: 14px; font-weight: 700; font-family: var(--mono); }
+.dt-l { fill: var(--soft); font-size: 11px; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.dt-pay { fill: var(--ink); font-size: 13px; font-family: var(--mono); } .dt-pay.hl { fill: var(--acc); font-weight: 700; }
+.dt-cut { fill: var(--acc); font-size: 16px; font-weight: 700; }
+.demo-pic.two .demo-svg { max-height: 34vh; }
+.demo-pic.two .demo-svg + .demo-svg { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.cp-a { stroke: var(--soft); stroke-width: 1.8; } .cp-a.dum { stroke-dasharray: 5 4; }
+.cp-a.crit { stroke: var(--acc); stroke-width: 3.2; } .cp-a.hot { stroke: var(--acc); stroke-width: 2.4; }
+.cp-h { fill: var(--soft); } .cp-h.c { fill: var(--acc); }
+.cp-l { fill: var(--ink); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--card); stroke-width: 3px; } .cp-l.chg { fill: var(--acc); }
+.cp-t { fill: var(--ink); font-size: 11px; font-family: var(--mono); font-weight: 600; } .cp-tl { fill: var(--acc); } .cp-sep { fill: var(--mute); }
+.gp-l { stroke: var(--acc); stroke-width: 1.6; stroke-dasharray: 6 4; } .gp-l.far { stroke: var(--mute); }
+.gp-old { fill: var(--ink); } .gp-old.out { fill: none; stroke: var(--mute); stroke-width: 1.5; }

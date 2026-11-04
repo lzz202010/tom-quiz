@@ -296,15 +296,18 @@ function loadOR(cb) {
   app.innerHTML = '<div class="or-page"><p class="dim">加载中…</p></div>';
   (window.marked ? f => f() : f => one('vendor/marked-12.0.2.min.js', f))(() => one('or/or-data.js' + v, () => one('or/or-solvers.js' + v, () => one('or.js' + v, cb))));
 }
+/* 运筹学计入进度的章(按西安工业大学 IE 复试大纲;09 排队论一般不考,不计入) */
+const OR_CORE = ['01', '02', '03', '04', '05', '06', '07', '08', '10', '15', '16'];
+const orDone = os => (os.done || []).filter(n => OR_CORE.indexOf(n) >= 0).length;
 /* 学习:管综写作 + 运筹学(以后的课程也放这里) */
 function viewLearn() {
   const wr = load('gzb.wr.v1', {}), wRead = Object.keys(wr.read || {}).length;
-  const os = load('ult.or.v1', {}), oDone = (os.done || []).filter(n => +n >= 1 && +n <= 10).length;
+  const os = load('ult.or.v1', {}), oDone = orDone(os);
   const oDue = Object.values(os.fc || {}).filter(x => x.due <= Date.now()).length;
   html(`<section class="slim"></section>
   <div class="learn">
     <a class="lcard" href="#/writing"><b>管综写作</b><span>论证有效性 · 论说文 · 真题精读</span><em>已读 ${wRead} / 30</em></a>
-    <a class="lcard" href="#/or"><b>运筹学</b><span>讲义 · 闪卡 · 计算器 · AI 助教</span><em>已学完 ${oDone} / 10 章${oDue ? ' · 闪卡 ' + oDue + ' 张待复习' : ''}</em></a>
+    <a class="lcard" href="#/or"><b>运筹学</b><span>讲义 · 闪卡 · 计算器 · AI 助教</span><em>已学完 ${oDone} / ${OR_CORE.length} 章${oDue ? ' · 闪卡 ' + oDue + ' 张待复习' : ''}</em></a>
   </div>`);
 }
 function loadWriting(cb) {
@@ -398,11 +401,11 @@ function bar(m, k) { return `<span class="bar k${k}"><i style="width:${k ? Math.
 /* 首页极简:科目、一个数、一个按钮。推什么题由引擎决定,不用看清单 */
 /* 首页的「运筹学」:不走推题引擎,大数字是已学完章数,主按钮接着读上次那章,闪卡到期就提示 */
 function viewHomeOR() {
-  const os = load('ult.or.v1', {}), done = (os.done || []).filter(n => +n >= 1 && +n <= 10).length;
-  const due = Object.values(os.fc || {}).filter(x => x.due <= Date.now()).length, fresh = os.fc ? 82 - Object.keys(os.fc).length : 82;
+  const os = load('ult.or.v1', {}), done = orDone(os), nCards = (window.UFILES || {}).orCards || 82;
+  const due = Object.values(os.fc || {}).filter(x => x.due <= Date.now()).length, fresh = nCards - Object.keys(os.fc || {}).length;
   html(`<section class="home">
     ${subjSwitch('home', true)}
-    <div class="big"><span class="num">${done}</span><span class="of">/ 10 章</span></div>
+    <div class="big"><span class="num">${done}</span><span class="of">/ ${OR_CORE.length} 章</span></div>
     <div class="cap">运筹学 · 已学完</div>
     <button class="go" id="go">${os.last ? '继续学习' : '开始学习'}</button>
     <a href="#/or/cards" class="dim sm">${due ? '闪卡 ' + due + ' 张待复习' : fresh > 0 ? '闪卡 · 学几张新卡' : '闪卡全部完成'}</a>
@@ -1012,7 +1015,7 @@ function aiSnapshot() {
   for (let k = 6; k >= 0; k--) days.push(S.days[dayKey(now - k * DAY)] || 0);
   L.push('近7天题量:' + days.join(','));
   const os = load('ult.or.v1', {});
-  L.push(`[运筹学] 已学完 ${(os.done || []).filter(n => +n >= 1 && +n <= 10).length}/10 章 · 闪卡待复习 ${Object.values(os.fc || {}).filter(x => x.due <= now).length} 张(学员也要考运筹学,安排时间要兼顾)`);
+  L.push(`[运筹学] 已学完 ${orDone(os)}/${OR_CORE.length} 章 · 闪卡待复习 ${Object.values(os.fc || {}).filter(x => x.due <= now).length} 张(学员也要考运筹学,安排时间要兼顾)`);
   const hs = S.hist.slice(0, 5).map(h => SUBJ[h.subj].name + h.title + ' ' + h.ok + '/' + h.n);
   if (hs.length) L.push('最近几组:' + hs.join(';'));
   return L.join('\n');

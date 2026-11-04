@@ -16,13 +16,20 @@
   const DAY_MS = 86400000, INTERVAL = [0, 1, 3, 7, 14, 30, 60];
   const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
-  /* ── 章节 ── */
-  const CH = C.chapters.map(function (c) {
-    const no = c.id.slice(0, 2), m = c.md.match(/^#\s+(.+)$/m), n = +no;
-    return { no: no, n: n, title: (m ? m[1].trim() : c.id).replace(/^\d+\s*/, ''), md: c.md,
-      group: n === 0 ? '开始' : n <= 4 ? '主干:线性规划' : n <= 10 ? '专题' : '考试冲刺',
-      plain: c.md.replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/<[^>]+>/g, '') };
+  /* ── 章节:文件编号 no 是固定 ID(进度、闪卡、对话都按它存);阅读顺序和显示编号按西安工业大学 IE(MEM)复试大纲排 ── */
+  const ORDER = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '16', '15', '10', '09', '11', '12', '13', '14'];
+  const TAG = { '07': '选考', '10': '决策论选考', '09': '一般不考' };
+  const isCore = no => { const n = +no; return (n >= 1 && n <= 10 && n !== 9) || n === 15 || n === 16; };
+  const DISP = {}; let dk = 0;
+  ORDER.forEach(no => { if (isCore(no) || no === '09') DISP[no] = String(++dk).padStart(2, '0'); });
+  const relink = s => s.replace(/第 *(\d\d) *章/g, (m, x) => DISP[x] ? '第 ' + DISP[x] + ' 章' : m);
+  const CH = C.chapters.slice().sort((a, b) => { const i = ORDER.indexOf(a.id.slice(0, 2)), j = ORDER.indexOf(b.id.slice(0, 2)); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j); }).map(function (c) {
+    const no = c.id.slice(0, 2), m = c.md.match(/^#\s+(.+)$/m), n = +no, body = relink(c.md.replace(/\n## 配套视频[\s\S]*?(?=\n## |$)/, '\n'));
+    return { no: no, n: n, d: DISP[no] || '', core: isCore(no), tag: TAG[no] || '', title: (m ? m[1].trim() : c.id).replace(/^\d+\s*/, ''), md: body,
+      group: n === 0 ? '开始' : n <= 4 ? '主干:线性规划' : no === '09' ? '选读' : isCore(no) ? '专题' : '考试冲刺',
+      plain: body.replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/<[^>]+>/g, '') };
   });
+  const lab = c => (c.d ? c.d + ' ' : '') + c.title;
   const chOf = no => CH.find(c => c.no === no);
 
   /* ── Markdown + 公式:公式先抠出来交给 KaTeX,其余交给 marked;图片路径指到 or/images ── */
@@ -50,13 +57,13 @@
     const key = 'or:' + id;
     if (CHAT_PROFILES[key]) return key;
     const c = chOf(id);
-    const where = c ? c.no + ' ' + c.title : id === 'cards' ? '记忆闪卡' : id === 'tools' ? '计算器' : '整门课';
+    const where = c ? lab(c) : id === 'cards' ? '记忆闪卡' : id === 'tools' ? '计算器' : '整门课';
     const ctx = c ? c.plain.slice(0, 9000) : '';
     CHAT_PROFILES[key] = {
       title: c ? '运筹学 · ' + c.title : '运筹学助教', back: c ? '#/or/c/' + c.no : id === 'cards' ? '#/or/cards' : id === 'tools' ? '#/or/tools' : '#/or',
       tools: false, snap: false, render: richText, ph: '问这一章的任何问题,也可以贴上你的解答让它批改',
       hello: c ? '这一章哪里没懂,直接问我。' : '运筹学的问题都可以问我。',
-      sys: () => `你是一位耐心、严谨的运筹学助教,用简体中文回答。学生正在为运筹学考试做准备(课程记号与国内清华版《运筹学》一致:max 问题检验数 σj = cj − CB·B⁻¹·Pj,全部 ≤ 0 为最优)。
+      sys: () => `你是一位耐心、严谨的运筹学助教,用简体中文回答。学生报考西安工业大学工业工程与管理(MEM),运筹学是复试科目,范围按韩伯棠《管理运筹学》:线性规划(单纯形、大 M / 两阶段、对偶、灵敏度)、运输(含转运、生产-库存)、整数规划与指派、目标规划、图与网络、网络计划(PERT/CPM)、动态规划、决策论;排队论、对策论一般不考。考试题型是选择、填空、简答和建模计算大题,不能用软件。记号:max 问题检验数 σj = cj − CB·B⁻¹·Pj,全部 ≤ 0 为最优。
 要求:
 1. 先给直觉,再给严格步骤;能举例就用课程里的例子。
 2. 数学公式用 LaTeX:行内 $...$,独立公式 $$...$$;单纯形表、运输表用 Markdown 表格。
@@ -92,14 +99,14 @@
   function viewHome() {
     const groups = [];
     CH.forEach(c => { let g = groups.find(x => x.name === c.group); if (!g) groups.push(g = { name: c.group, list: [] }); g.list.push(c); });
-    const core = CH.filter(c => c.n >= 1 && c.n <= 10), doneN = core.filter(c => st.done.indexOf(c.no) >= 0).length;
+    const core = CH.filter(c => c.core), doneN = core.filter(c => st.done.indexOf(c.no) >= 0).length;
     const due = dueCount(), fresh = C.flashcards.length - Object.keys(st.fc).length;
     const last = st.last && chOf(st.last);
     $app.innerHTML = `<div class="or-page">
       <a href="#/learn" class="back" id="orback">‹ 学习</a>
       <h1 class="or-h1">运筹学</h1>
       <div class="or-prog"><span>已学完 ${doneN} / ${core.length} 章</span><span class="bar k3"><i style="width:${doneN / core.length * 100}%"></i></span></div>
-      ${last ? `<a class="go or-cont" href="#/or/c/${last.no}">继续读<small>${esc(last.no + ' ' + last.title)}</small></a>` : ''}
+      ${last ? `<a class="go or-cont" href="#/or/c/${last.no}">继续读<small>${esc(lab(last))}</small></a>` : ''}
       <input class="or-search" id="ors" type="search" placeholder="搜讲义" autocomplete="off">
       <div id="orsr"></div>
       <div class="grp-h">工具</div>
@@ -109,8 +116,8 @@
       <div class="grp-h">学习路线</div>
       <ol class="or-path">${groups.map(g => `<li class="or-stage">${esc(g.name)}</li>${g.list.map(c => {
         const p = st.pos[c.no] || 0, dn = st.done.indexOf(c.no) >= 0, cur = last && last.no === c.no;
-        return `<li class="or-step${dn ? ' done' : ''}${cur ? ' cur' : ''}"><a href="#/or/c/${c.no}"><i class="nd">${dn ? '✓' : c.no}</i>
-          <span><b>${esc(c.title)}</b>${CH_DEMOS[c.no] ? '<em class="hasd">▶ 动画</em>' : ''}${!dn && p > 0.05 ? `<em>读到 ${Math.round(p * 100)}%</em>` : ''}</span></a></li>`; }).join('')}`).join('')}</ol>
+        return `<li class="or-step${dn ? ' done' : ''}${cur ? ' cur' : ''}"><a href="#/or/c/${c.no}"><i class="nd">${dn ? '✓' : c.d ? +c.d : c.n === 0 ? '·' : '✎'}</i>
+          <span><b>${esc(c.title)}</b>${c.tag ? `<em>${c.tag}</em>` : ''}${CH_DEMOS[c.no] ? '<em class="hasd">▶ 动画</em>' : ''}${!dn && p > 0.05 ? `<em>读到 ${Math.round(p * 100)}%</em>` : ''}</span></a></li>`; }).join('')}`).join('')}</ol>
       <div class="grp-h">动画演示</div>
       <div class="grp">${Object.keys(DEMOS).map(d => `<a class="row-i chev" href="#" data-demo="${d}"><span>▶ ${esc(DEMOS[d].title)}</span><span class="v"></span></a>`).join('')}</div>
     </div>`;
@@ -123,7 +130,7 @@
       if (!q) { out.innerHTML = ''; return; }
       const hits = [];
       CH.forEach(c => { let i = c.plain.indexOf(q), k = 0; while (i >= 0 && k < 3) { hits.push({ c: c, snip: c.plain.slice(Math.max(0, i - 16), i + q.length + 22).replace(/\s+/g, ' ') }); i = c.plain.indexOf(q, i + q.length); k++; } });
-      out.innerHTML = `<div class="grp or-hits">${hits.slice(0, 20).map(h => `<a class="row-i" href="#/or/c/${h.c.no}" data-q="${esc(q)}"><span><b>${h.c.no} ${esc(h.c.title)}</b><br><small class="dim">…${esc(h.snip).replace(esc(q), '<mark>' + esc(q) + '</mark>')}…</small></span></a>`).join('') || '<div class="row-i off"><span>没有找到</span></div>'}</div>`;
+      out.innerHTML = `<div class="grp or-hits">${hits.slice(0, 20).map(h => `<a class="row-i" href="#/or/c/${h.c.no}" data-q="${esc(q)}"><span><b>${esc(lab(h.c))}</b><br><small class="dim">…${esc(h.snip).replace(esc(q), '<mark>' + esc(q) + '</mark>')}…</small></span></a>`).join('') || '<div class="row-i off"><span>没有找到</span></div>'}</div>`;
       $$('[data-q]', out).forEach(a => a.onclick = () => { findQ = a.dataset.q; });
     };
   }
@@ -133,22 +140,20 @@
   function viewChapter(no) {
     const c = chOf(no) || CH[0];
     st.last = c.no; saveOR();
-    const i = CH.indexOf(c), prev = CH[i - 1], next = CH[i + 1], vids = C.videos[c.no], exam = c.no === '12' || c.no === '13';
-    const dn = st.done.indexOf(c.no) >= 0, core = c.n >= 1 && c.n <= 10;
+    const i = CH.indexOf(c), prev = CH[i - 1], next = CH[i + 1], exam = c.no === '12' || c.no === '13';
+    const dn = st.done.indexOf(c.no) >= 0, core = c.core || c.no === '09';
     $app.innerHTML = `<div class="or-page or-read">
       <div class="or-bar"><a href="#/or" class="back" id="orback">‹ 运筹学</a><a href="#" id="orai" class="or-ask">问 AI</a></div>
       ${exam ? timerHTML(c.no) : ''}
-      <div class="or-eyebrow">${c.n === 0 ? '导读' : c.n <= 10 ? '第 ' + c.no + ' 章' : '考试冲刺'}</div>
+      <div class="or-eyebrow">${c.n === 0 ? '导读' : c.d ? '第 ' + c.d + ' 章' + (c.tag ? ' · ' + c.tag : '') : '考试冲刺'}</div>
       <h1 class="or-h1">${esc(c.title)}</h1>
-      <div class="or-acts">${vids ? '<a href="#" id="vbtn">配套视频</a>' : ''}${core ? `<a href="#" id="mark" class="${dn ? 'on' : ''}">${dn ? '✓ 已学完' : '标记学完'}</a><a href="#" id="tocards">练本章闪卡</a>` : ''}</div>
+      <div class="or-acts">${core ? `<a href="#" id="mark" class="${dn ? 'on' : ''}">${dn ? '✓ 已学完' : '标记学完'}</a><a href="#" id="tocards">练本章闪卡</a>` : ''}</div>
       ${(CH_DEMOS[c.no] || []).map(d => `<a href="#" class="or-demo" data-demo="${d}"><span class="pl">▶</span><span><b>先看动画</b><small>${esc(DEMOS[d].title)}</small></span></a>`).join('')}
-      ${vids ? `<div class="or-vids" id="vlist" hidden>${vids.map(v => `<div><b>${esc(v.kind)}</b> ${esc(v.title)}<span>${v.parts.map(p => `<a href="${v.base}${p}" target="_blank" rel="noopener">P${p}</a>`).join('')}</span></div>`).join('')}<small class="dim">链接打开 B 站对应集数</small></div>` : ''}
       <article class="md">${md(c.md.replace(/^#\s+.+$/m, ''))}</article>
-      <div class="or-foot">${prev ? `<a href="#/or/c/${prev.no}">‹ ${esc(prev.no + ' ' + prev.title)}</a>` : '<span></span>'}${next ? `<a href="#/or/c/${next.no}" class="nx">${esc(next.no + ' ' + next.title)} ›</a>` : ''}</div>
+      <div class="or-foot">${prev ? `<a href="#/or/c/${prev.no}">‹ ${esc(lab(prev))}</a>` : '<span></span>'}${next ? `<a href="#/or/c/${next.no}" class="nx">${esc(lab(next))} ›</a>` : ''}</div>
     </div>`;
     $$('.md a').forEach(a => { if (/^https?:/.test(a.getAttribute('href') || '')) { a.target = '_blank'; a.rel = 'noopener'; } });
     $('#orai').onclick = ev => { ev.preventDefault(); askAI('', c.no); };
-    const vb = $('#vbtn'); if (vb) vb.onclick = ev => { ev.preventDefault(); $('#vlist').hidden = !$('#vlist').hidden; };
     const mk = $('#mark'); if (mk) mk.onclick = ev => { ev.preventDefault(); const k = st.done.indexOf(c.no); if (k >= 0) st.done.splice(k, 1); else st.done.push(c.no); saveOR(); mk.classList.toggle('on', k < 0); mk.textContent = k < 0 ? '✓ 已学完' : '标记学完'; };
     const tc = $('#tocards'); if (tc) tc.onclick = ev => { ev.preventDefault(); st.cardFilter = c.no; saveOR(); location.hash = '#/or/cards'; };
     $$('[data-demo]').forEach(a => a.onclick = ev => { ev.preventDefault(); openDemo(a.dataset.demo); });
@@ -219,13 +224,13 @@
     const f = st.cardFilter || 'all';
     if (!queue.length || queue._f !== f) { queue = cardsDue(f); queue._f = f; showA = false; }
     const learned = Object.keys(st.fc).length, mastered = Object.values(st.fc).filter(s => s.box >= 4).length;
-    const chs = [...new Set(C.flashcards.map(c => c.ch))], card = queue[0];
+    const chs = [...new Set(C.flashcards.map(c => c.ch))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b)), card = queue[0];
     $app.innerHTML = `<div class="or-page or-cards">
       <a href="#/or" class="back" id="orback">‹ 运筹学</a>
       <h1 class="or-h1">记忆闪卡</h1>
       <section class="stats"><div><b>${queue.length}</b><span>本轮</span></div><div><b>${learned}<small>/${C.flashcards.length}</small></b><span>学过 · 牢固 ${mastered}</span></div></section>
-      <div class="or-acts"><label>范围 <select id="cf">${['all'].concat(chs).map(x => `<option value="${x}"${x === f ? ' selected' : ''}>${x === 'all' ? '全部章节' : '第 ' + x + ' 章'}</option>`).join('')}</select></label></div>
-      ${card ? `<div class="or-card" id="ocard"><div class="meta"><span>第 ${card.ch} 章 · ${esc((chOf(card.ch) || {}).title || '')}</span><span>${st.fc[card.id] ? '复习' : '新卡'}</span></div>
+      <div class="or-acts"><label>范围 <select id="cf">${['all'].concat(chs).map(x => `<option value="${x}"${x === f ? ' selected' : ''}>${x === 'all' ? '全部章节' : (DISP[x] ? '第 ' + DISP[x] + ' 章 ' : '') + ((chOf(x) || {}).title || '')}</option>`).join('')}</select></label></div>
+      ${card ? `<div class="or-card" id="ocard"><div class="meta"><span>${DISP[card.ch] ? '第 ' + DISP[card.ch] + ' 章 · ' : ''}${esc((chOf(card.ch) || {}).title || '')}</span><span>${st.fc[card.id] ? '复习' : '新卡'}</span></div>
           <div class="q">${mdInline(card.q)}</div>${showA ? `<div class="a">${mdInline(card.a)}</div>` : '<div class="tap dim">先在心里答,再点卡片看答案</div>'}</div>
         ${showA ? `<div class="or-rate"><button data-r="0">忘了</button><button data-r="1">模糊</button><button data-r="2" class="ok">记得</button></div>` : ''}
         <div class="links"><a href="#" id="askcard">这张没懂,问 AI</a></div>`
@@ -626,13 +631,311 @@
       cap.innerHTML = caps[i];
     } };
   }
+  function demoTransport() {                                    // 讲义第 05 章的例题:3 个仓库 → 4 个客户
+    const C = [[3, 11, 3, 10], [1, 9, 2, 8], [7, 4, 10, 5]], SUP = [7, 4, 9], DEM = [3, 6, 5, 6];
+    const R = ['A₁', 'A₂', 'A₃'], K = ['B₁', 'B₂', 'B₃', 'B₄'], cell = (i, j) => `(${R[i]},${K[j]})`;
+    const ORDER = [[1, 0], [1, 2], [0, 2], [2, 1], [2, 3], [0, 3]];        // 最小元素法依次选中的格子
+    const LOOP = [[1, 3], [0, 3], [0, 2], [1, 2]];                          // 从入基格 (A₂,B₄) 出发的闭回路
+    const cp = X => X.map(r => r.slice());
+    const cost = X => X.reduce((s, r, i) => s + r.reduce((t, x, j) => t + (x == null ? 0 : x * C[i][j]), 0), 0);
+    function pot(X) {                                           // 位势:数字格上 u + v = 运费,令 u₁ = 0
+      const u = [0, null, null], v = [null, null, null, null];
+      for (let k = 0; k < 6; k++) X.forEach((r, i) => r.forEach((x, j) => {
+        if (x == null) return;
+        if (u[i] != null && v[j] == null) v[j] = C[i][j] - u[i]; else if (v[j] != null && u[i] == null) u[i] = C[i][j] - v[j];
+      }));
+      return { u: u, v: v };
+    }
+    const frames = [];
+    let X = C.map(r => r.map(() => null)); const s = SUP.slice(), d = DEM.slice();
+    frames.push({ X: cp(X), s: s.slice(), d: d.slice(), cap: '三个仓库 A 的库存是 7、4、9 批,四个客户 B 要 3、6、5、6 批。格子右上角的小数字是每批的运费(千元)。怎么调货总运费最低?<b>第一步先找一个能用的方案</b>:最小元素法——<b>哪条线路最便宜,就先尽量往那儿运</b>。' });
+    ORDER.forEach(([i, j], k) => {
+      const q = Math.min(s[i], d[j]); X[i][j] = q; s[i] -= q; d[j] -= q;
+      const gone = s[i] === 0 && d[j] === 0 ? `${R[i]} 发完、${K[j]} 也满足了` : s[i] === 0 ? `${R[i]} 发完,整行划掉` : `${K[j]} 满足,整列划掉`;
+      frames.push({ X: cp(X), s: s.slice(), d: d.slice(), hit: [i, j],
+        cap: k === ORDER.length - 1 ? `最后只剩 ${cell(i, j)},填 <b>${q}</b>。初始方案完成:总运费 <b>${cost(X)}</b> 千元,数字格正好 6 个(= 行数 + 列数 − 1)。`
+          : `${k ? '剩下的' : '全表'}格子里运费最小的是 ${cell(i, j)} 的 <b>${C[i][j]}</b>,能运多少运多少:min(还剩 ${s[i] + q},还要 ${d[j] + q}) = <b>${q}</b>。${gone}。` });
+    });
+    const P1 = pot(X), X2 = cp(X);
+    X2[1][3] = 1; X2[0][3] = 2; X2[0][2] = 5; X2[1][2] = null;
+    const fin = { s: s.slice(), d: d.slice() };
+    frames.push(Object.assign({ X: cp(X), pot: P1, cap: '方案有了,是不是最便宜?用<b>位势法</b>检验:给每行配一个 u、每列配一个 v,让<b>每个数字格</b>都满足 u + v = 运费。先令 u₁ = 0,再顺着数字格一个个解出来(右边一列和最下一行)。' }, fin));
+    frames.push(Object.assign({ X: cp(X), pot: P1, sig: true, cap: '再给每个<b>空格</b>算检验数 σ = 运费 − (u + v):意思是「改走这条线路运 1 批,总运费会变多少」。(A₂,B₄) 是 <b>−1</b>——每改运 1 批能省 1 千元!有负数,就还不是最优。' }, fin));
+    frames.push(Object.assign({ X: cp(X), pot: P1, sig: true, loop: true, cap: '从 (A₂,B₄) 出发,只横着、竖着走,<b>每个拐角都落在数字格上</b>,绕一圈回来——这就是<b>闭回路</b>。拐角依次标 +θ、−θ、+θ、−θ:一处多运,相邻一处就得少运,库存和需求才保持平衡。−θ 格里最小的是 <b>1</b>,所以 θ = 1。' }, fin));
+    frames.push(Object.assign({ X: X2, pot: pot(X2), sig: true, cap: `按 θ = 1 调整:+θ 的格子加 1,−θ 的格子减 1,(A₂,B₃) 减到 0 离开。总运费 86 − 1 = <b>${cost(X2)}</b>。重新算检验数,<b>全都 ≥ 0</b>——最优了。(A₁,B₁) 的检验数是 0,说明还有另一个同样便宜的方案。` }, fin));
+    const LW = 36, CW = 54, H0 = 26, RH = 46, SX = LW + 4 * CW, UX = SX + 40;
+    return { steps: frames.length, render: function (n, stage, cap) {
+      const f = frames[n], cx = j => LW + j * CW, cy = i => H0 + i * RH;
+      let out = svgOpen(UX + 36, H0 + 3 * RH + 56);
+      K.forEach((k, j) => { out += `<text x="${cx(j) + CW / 2}" y="18" class="tp-h" text-anchor="middle">${k}</text>`; });
+      out += `<text x="${SX + 18}" y="18" class="tp-h" text-anchor="middle">库存</text>`;
+      R.forEach((r, i) => {
+        out += `<text x="${LW / 2}" y="${cy(i) + RH / 2 + 5}" class="tp-h" text-anchor="middle">${r}</text>`;
+        K.forEach((_, j) => {
+          const x = f.X[i][j], done = f.s[i] === 0 || f.d[j] === 0;
+          const sg = f.sig && x == null ? C[i][j] - f.pot.u[i] - f.pot.v[j] : null;
+          const hit = f.hit && f.hit[0] === i && f.hit[1] === j;
+          out += `<rect x="${cx(j) + 1}" y="${cy(i) + 1}" width="${CW - 2}" height="${RH - 2}" rx="6" class="tp-c${hit ? ' hit' : sg < 0 ? ' neg' : x == null && done && !f.pot ? ' dim' : ''}"/>
+            <text x="${cx(j) + CW - 6}" y="${cy(i) + 14}" class="tp-cost" text-anchor="end">${C[i][j]}</text>`;
+          if (x != null) out += `<text x="${cx(j) + CW / 2}" y="${cy(i) + RH / 2 + 8}" class="tp-x" text-anchor="middle">${x}</text>`;
+          else if (sg != null) out += `<text x="${cx(j) + CW / 2}" y="${cy(i) + RH / 2 + 8}" class="tp-sig${sg < 0 ? ' neg' : ''}" text-anchor="middle">σ=${sg}</text>`;
+        });
+        out += `<text x="${SX + 18}" y="${cy(i) + RH / 2 + 5}" class="tp-h" text-anchor="middle">${f.s[i] === 0 ? '✓' : f.s[i]}</text>`;
+        if (f.pot) out += `<text x="${UX + 16}" y="${cy(i) + RH / 2 + 5}" class="tp-pv" text-anchor="middle">${f.pot.u[i]}</text>`;
+      });
+      const dy = cy(3) + 20;
+      out += `<text x="${LW / 2}" y="${dy}" class="tp-h" text-anchor="middle">需求</text>`;
+      K.forEach((_, j) => { out += `<text x="${cx(j) + CW / 2}" y="${dy}" class="tp-h" text-anchor="middle">${f.d[j] === 0 ? '✓' : f.d[j]}</text>`; });
+      if (f.pot) {
+        out += `<text x="${UX + 16}" y="18" class="tp-pv" text-anchor="middle">u</text><text x="${LW / 2}" y="${dy + 26}" class="tp-pv" text-anchor="middle">v</text>`;
+        K.forEach((_, j) => { out += `<text x="${cx(j) + CW / 2}" y="${dy + 26}" class="tp-pv" text-anchor="middle">${f.pot.v[j]}</text>`; });
+      }
+      if (f.loop) {
+        const ctr = ([i, j]) => [cx(j) + CW / 2, cy(i) + RH / 2];
+        out += `<polygon points="${LOOP.map(p => ctr(p).join(',')).join(' ')}" class="tp-loop"/>`;
+        LOOP.forEach((p, k) => { out += `<text x="${cx(p[1]) + 5}" y="${cy(p[0]) + 14}" class="tp-th">${k % 2 ? '−θ' : '+θ'}</text>`; });
+      }
+      stage.innerHTML = `<div class="demo-pic">${out}</svg></div>`;
+      cap.innerHTML = f.cap;
+    } };
+  }
+
+  function demoBnB() {                                          // 讲义第 06 章:max 5x₁ + 8x₂,x₁ + x₂ ≤ 6,5x₁ + 9x₂ ≤ 45,整数
+    const ox = 30, oy = 212, k = 32, bx = x => ox + x * k, by = y => oy - y * k;
+    const FR = [[0, 0], [6, 0], [2.25, 3.75], [0, 5]];
+    function clip(P, a, b, c) {                                 // 多边形只保留 a·x₁ + b·x₂ ≤ c 的部分
+      const out = [], g = p => a * p[0] + b * p[1] - c;
+      P.forEach((p, i) => { const q = P[(i + 1) % P.length], gp = g(p), gq = g(q);
+        if (gp <= 1e-9) out.push(p);
+        if ((gp < -1e-9 && gq > 1e-9) || (gp > 1e-9 && gq < -1e-9)) { const t = gp / (gp - gq); out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]); } });
+      return out;
+    }
+    const U3 = [0, 1, 3], L4 = [0, -1, -4], G2 = [-1, 0, -2], X1 = [1, 0, 1], U4 = [0, 1, 4], L5 = [0, -1, -5];
+    const N = [
+      { at: [170, 22], cons: [], sol: [2.25, 3.75], z: 41.25 },
+      { par: 0, at: [290, 84], lab: 'x₂≤3', cons: [U3], sol: [3, 3], z: 39, kind: 'int' },
+      { par: 0, at: [110, 84], lab: 'x₂≥4', cons: [L4], sol: [1.8, 4], z: 41 },
+      { par: 2, at: [44, 146], lab: 'x₁≥2', cons: [L4, G2], kind: 'none' },
+      { par: 2, at: [176, 146], lab: 'x₁≤1', cons: [L4, X1], sol: [1, 40 / 9], z: 5 + 320 / 9 },
+      { par: 4, at: [116, 208], lab: 'x₂≤4', cons: [L4, X1, U4], sol: [1, 4], z: 37, kind: 'cut' },
+      { par: 4, at: [240, 208], lab: 'x₂≥5', cons: [L4, X1, L5], sol: [0, 5], z: 40, kind: 'int' },
+    ];
+    const reg = n => N[n].cons.reduce((P, c) => clip(P, c[0], c[1], c[2]), FR);
+    const r2 = v => Math.round(v * 100) / 100;
+    const F = [
+      { show: 1, cur: 0, regs: [0], round: true, cap: '老板要买设备:甲每台赚 5、乙每台赚 8,机位最多 6 个、预算 45 万。先<b>不管整数</b>,解出来是 (2.25, 3.75),z = 41.25(红点)。可设备不能买 0.25 台。四舍五入成 (2, 4)?预算 46 万,<b>超了</b>(✕)。灰点是所有买得起的整数方案。' },
+      { show: 1, cur: 0, regs: [1, 2], cap: '<b>分支</b>:x₂ = 3.75 不是整数,那最优整数解要么 x₂ ≤ 3,要么 x₂ ≥ 4——把中间那条不含整数点的带子<b>切掉</b>,分成两个子问题(两块红区)。一个整数点都没丢。根节点的 41.25 是<b>上界</b>:整数解不可能比它好。' },
+      { show: 2, cur: 1, regs: [1], best: 1, cap: '左边那块(x₂ ≤ 3):解得 (3, 3),z = 39,<b>正好是整数</b>!记下来:目前最好的整数解是 39,叫<b>下界</b>。这一支不用再分了。' },
+      { show: 3, cur: 2, regs: [2], best: 1, cap: '另一块(x₂ ≥ 4):解得 (1.8, 4),z = 41。41 > 39,这里面<b>可能还藏着更好的整数解</b>,得继续。x₁ = 1.8 不是整数,对 x₁ 分支。' },
+      { show: 4, cur: 3, regs: [], best: 1, cap: '再加 x₁ ≥ 2:要 x₁ ≥ 2 又要 x₂ ≥ 4,预算至少 5×2 + 9×4 = 46 > 45,<b>无解</b>,剪掉(虚线框)。' },
+      { show: 5, cur: 4, regs: [4], best: 1, cap: '加 x₁ ≤ 1:解得 (1, 4.44),z ≈ 40.56。还是比 39 大,继续对 x₂ 分支。' },
+      { show: 6, cur: 5, regs: [5], best: 1, cap: '加 x₂ ≤ 4:只剩 (1, 4) 一小段,z = 37 < 39。<b>上界都不如手里的 39</b>,下面不可能更好,剪掉。这就是「定界」省下的功夫。' },
+      { show: 7, cur: 6, regs: [6], best: 6, cap: '加 x₂ ≥ 5:只剩 (0, 5) 一个点,z = 40,整数,而且比 39 好——<b>下界更新为 40</b>。' },
+      { show: 7, cur: null, regs: [0], best: 6, done: true, cap: '所有分支都处理完了:<b>买 5 台乙,每月 40 万</b>。它离「不管整数」的最优点很远,四舍五入根本找不到。剪枝只有三种情况:<b>无解</b>、<b>已是整数</b>、<b>上界 ≤ 当前下界</b>。' },
+    ];
+    return { steps: F.length, render: function (n, stage, cap) {
+      const f = F[n];
+      let p = svgOpen(340, 236);
+      for (let i = 0; i <= 6; i++) p += `<line x1="${bx(i)}" y1="${by(0)}" x2="${bx(i)}" y2="${by(6.3)}" class="dg-grid"/><text x="${bx(i)}" y="${by(0) + 15}" class="dg-t" text-anchor="middle">${i}</text>
+        <line x1="${bx(0)}" y1="${by(i)}" x2="${bx(6.6)}" y2="${by(i)}" class="dg-grid"/>${i ? `<text x="${bx(0) - 7}" y="${by(i) + 4}" class="dg-t" text-anchor="end">${i}</text>` : ''}`;
+      p += `<line x1="${bx(0)}" y1="${by(6)}" x2="${bx(6)}" y2="${by(0)}" class="dg-line"/><line x1="${bx(0)}" y1="${by(5)}" x2="${bx(6.6)}" y2="${by((45 - 33) / 9)}" class="dg-line"/>`;
+      p += `<polygon points="${FR.map(q => bx(q[0]) + ',' + by(q[1])).join(' ')}" class="dg-half"/>`;
+      f.regs.forEach(r => { const P = reg(r); if (P.length) p += `<polygon points="${P.map(q => bx(q[0]) + ',' + by(q[1])).join(' ')}" class="bb-reg"/>`; });
+      const inReg = (x, y) => f.regs.some(r => N[r].cons.every(c => c[0] * x + c[1] * y <= c[2] + 1e-9));
+      for (let x = 0; x <= 6; x++) for (let y = 0; y <= 6; y++) if (x + y <= 6 && 5 * x + 9 * y <= 45) p += `<circle cx="${bx(x)}" cy="${by(y)}" r="3.2" class="bb-pt${inReg(x, y) ? ' in' : ''}"/>`;
+      if (f.round) p += `<text x="${bx(2)}" y="${by(4) + 5}" class="bb-x" text-anchor="middle">✕</text>`;
+      const sn = f.cur != null ? N[f.cur] : f.done ? N[6] : null;
+      if (sn && sn.sol) p += dotAt(bx(sn.sol[0]), by(sn.sol[1]));
+      else if (f.cur == null || n < 2) p += dotAt(bx(2.25), by(3.75));
+      const bst = f.best != null ? N[f.best].z : null;
+      p += `<text x="254" y="40" class="bb-k">上界</text><text x="254" y="62" class="bb-v">${r2(f.cur != null && N[f.cur].z != null ? N[f.cur].z : 41.25)}</text>
+        <text x="254" y="98" class="bb-k">下界(最好整数解)</text><text x="254" y="120" class="bb-v acc">${bst == null ? '—' : bst}</text>`;
+      let t = svgOpen(340, 232);
+      N.slice(0, f.show).forEach((nd, i) => { if (nd.par == null) return; const a = N[nd.par].at, b = nd.at;
+        t += `<line x1="${a[0]}" y1="${a[1] + 17}" x2="${b[0]}" y2="${b[1] - 17}" class="bb-e"/><text x="${(a[0] + b[0]) / 2 + (b[0] > a[0] ? 6 : -6)}" y="${(a[1] + b[1]) / 2 + 4}" class="dg-lab sm" text-anchor="${b[0] > a[0] ? 'start' : 'end'}">${nd.lab}</text>`; });
+      N.slice(0, f.show).forEach((nd, i) => {
+        const cls = (f.best === i ? ' best' : nd.kind === 'none' || nd.kind === 'cut' ? ' cut' : '') + (f.cur === i ? ' cur' : '');
+        t += `<rect x="${nd.at[0] - 38}" y="${nd.at[1] - 17}" width="76" height="34" rx="8" class="bb-n${cls}"/>`;
+        if (nd.kind === 'none') t += `<text x="${nd.at[0]}" y="${nd.at[1] + 4}" class="bb-t" text-anchor="middle">无解 ✕</text>`;
+        else t += `<text x="${nd.at[0]}" y="${nd.at[1] - 3}" class="bb-t${f.best === i ? ' best' : ''}" text-anchor="middle">(${r2(nd.sol[0])}, ${r2(nd.sol[1])})</text>
+          <text x="${nd.at[0]}" y="${nd.at[1] + 11}" class="bb-t${f.best === i ? ' best' : ''}" text-anchor="middle">z=${r2(nd.z)}${nd.kind === 'cut' ? ' ✕' : ''}</text>`;
+      });
+      stage.innerHTML = `<div class="demo-pic two">${p}</svg>${t}</svg></div>`;
+      cap.innerHTML = f.cap;
+    } };
+    function dotAt(x, y) { return `<circle cx="${x}" cy="${y}" r="7" class="dg-best"/>`; }
+  }
+
+  function demoDP() {                                           // 讲义第 07 章开头:A 经 B、C、D 到 E
+    const P = { A: [22, 125], B1: [102, 62], B2: [102, 190], C1: [184, 34], C2: [184, 125], C3: [184, 216], D1: [264, 72], D2: [264, 180], E: [322, 125] };
+    const E = { A: { B1: 2, B2: 4 }, B1: { C1: 7, C2: 3, C3: 4 }, B2: { C1: 3, C2: 2, C3: 4 }, C1: { D1: 1, D2: 4 }, C2: { D1: 6, D2: 3 }, C3: { D1: 3, D2: 3 }, D1: { E: 3 }, D2: { E: 4 } };
+    const nm = v => v.length > 1 ? v[0] + '₀₁₂₃'[+v[1]] : v;
+    const LAY = [['D1', 'D2'], ['C1', 'C2', 'C3'], ['B1', 'B2'], ['A']];
+    const f = { E: 0 }, nx = {}, frames = [];
+    const GREEDY = ['A', 'B1', 'C2', 'D2', 'E'];
+    frames.push({ f: {}, nx: {}, greedy: true, cap: '从 A 走到 E,要依次经过 B、C、D 三站,线上的数字是距离。<b>贪心</b>的走法是每一步都挑最近的:A→B₁(2)→C₂(3)→D₂(3)→E(4),总长 <b>12</b>(虚线)。能不能更短?' });
+    const intro = ['动态规划反过来想:<b>从终点往回算</b>。记 f(X) = 从 X 走到 E 的最短距离。最后一站最简单:', '再往前一站。站在 C 的每个点上,下一步去哪个 D 都行,而 D 以后怎么走<b>已经算好了</b>,直接拿来加:', '同样算 B 这一站,每个点只记住「从这儿出发的最好结果」(加粗的线就是它选的下一步):', '最后回到起点:'];
+    LAY.forEach((lay, li) => {
+      const eq = lay.map(v => { const ops = Object.keys(E[v]).map(w => ({ w: w, s: E[v][w] + f[w], txt: E[v][w] + '+' + f[w] }));
+        const best = ops.reduce((a, b) => (b.s < a.s ? b : a)); f[v] = best.s; nx[v] = best.w;
+        return ops.length > 1 ? `f(${nm(v)}) = min{${ops.map(o => o.txt).join(', ')}} = <b>${best.s}</b>` : `f(${nm(v)}) = <b>${best.s}</b>`; });
+      frames.push({ f: Object.assign({}, f), nx: Object.assign({}, nx), cur: lay, cap: intro[li] + '<br>' + eq.join('<br>') });
+    });
+    const route = ['A']; while (route[route.length - 1] !== 'E') route.push(nx[route[route.length - 1]]);
+    frames.push({ f: Object.assign({}, f), nx: Object.assign({}, nx), route: route, cap: `f(A) = 11。顺着加粗的线从 A 走:<b>${route.map(nm).join('→')}</b>,总长 11,比贪心少 1。第一步故意走了远一点的 B₂(4 > 2),后面反而省得多。<br>这就是<b>最优性原理</b>:最优路线的后半段,本身也是最优的。讲义里「5 台设备分给 3 个车间」是同一个套路,只是把「点」换成「还剩几台设备」。` });
+    return { steps: frames.length, render: function (n, stage, cap) {
+      const fr = frames[n], on = (path, a, b) => path && path.some((v, k) => k && path[k - 1] === a && v === b);
+      let s = svgOpen(344, 252);
+      Object.keys(E).forEach(a => Object.keys(E[a]).forEach(b => {
+        const t = a === 'A' || b === 'E' ? 0.5 : 0.3, x = P[a][0] + (P[b][0] - P[a][0]) * t, y = P[a][1] + (P[b][1] - P[a][1]) * t;
+        const cls = on(fr.route, a, b) ? ' route' : fr.nx[a] === b ? ' tree' : '';
+        s += `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}" class="dj-e${cls}"/>`;
+        if (fr.greedy && on(GREEDY, a, b)) s += `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}" class="dp-greedy"/>`;
+        s += `<text x="${x}" y="${y - 3}" class="dg-lab sm" text-anchor="middle">${E[a][b]}</text>`;
+      }));
+      Object.keys(P).forEach(v => { const done = fr.f[v] != null, cur = fr.cur && fr.cur.indexOf(v) >= 0;
+        s += `<circle cx="${P[v][0]}" cy="${P[v][1]}" r="16" class="dj-n${done ? ' done' : ''}${cur ? ' cur' : ''}"/><text x="${P[v][0]}" y="${P[v][1] + 5}" class="dj-l${done ? ' done' : ''}" text-anchor="middle">${nm(v)}</text>`;
+        if (done && v !== 'E') s += `<text x="${P[v][0]}" y="${P[v][1] + (P[v][1] >= 125 ? 34 : -23)}" class="dj-d" text-anchor="middle">${fr.f[v]}</text>`; });
+      stage.innerHTML = `<div class="demo-pic">${s}</svg></div>`;
+      cap.innerHTML = fr.cap;
+    } };
+  }
+
+  function demoDTree() {                                        // 讲义第 10 章:扩产三方案
+    const ACT = [['大规模', [200, 50, -120]], ['中等', [120, 80, -30]], ['小规模', [60, 40, 10]]], PR = [0.3, 0.5, 0.2], ST = ['高', '中', '低'];
+    const EV = ACT.map(a => Math.round(a[1].reduce((s, v, k) => s + v * PR[k], 0) * 10) / 10);
+    const D = [22, 150], CY = [52, 150, 248], CX = 132, LX = 258;
+    const caps = [
+      '董事会要定明年扩产多大。需求高、中、低的概率是 0.3、0.5、0.2,右边是每种情况的年收益(万元)。<b>方框</b>是你做选择的地方,<b>圆圈</b>是「看天意」的地方。决策树<b>从右往左</b>算。',
+      `先算圆圈:圆圈的值 = 各种结果按概率加权平均(期望值)。大规模:0.3×200 + 0.5×50 + 0.2×(−120) = <b>${EV[0]}</b>。`,
+      `同样,中等:0.3×120 + 0.5×80 + 0.2×(−30) = <b>${EV[1]}</b>;小规模:0.3×60 + 0.5×40 + 0.2×10 = <b>${EV[2]}</b>。`,
+      `再算方框:方框是你自己选,当然选<b>最大的</b> ${Math.max(...EV)}——<b>中等扩产</b>。没选的两支画上「∥」剪掉。大规模好的时候赚得多,但亏起来也狠,平均下来不如中等。`,
+      '如果有人能<b>提前告诉你</b>明年需求:高时选大(200),中时选中(80),低时选小(10),标红的三个数。期望 = 0.3×200 + 0.5×80 + 0.2×10 = <b>102</b>,比 70 多 <b>32</b> 万——这就是<b>完全信息价值 EVPI</b>:任何预测、调研最多只值这么多钱。',
+      '再进一步:花 <b>8 万</b>请咨询公司调研,结论「看好 / 不看好」不一定准。用贝叶斯公式修正概率后:看好时选大规模,期望 113.9;不看好时选中等,期望 44.5。调研这一支 = 0.51×113.9 + 0.49×44.5 ≈ <b>79.9</b>,扣掉 8 万是 71.9 > 70,<b>值得调研</b>。多级决策只能这样画树,从右往左一层层算。',
+    ];
+    const BEST = [0, 1, 2];                                     // 完全信息时各需求下的最优方案:高→大,中→中,低→小
+    return { steps: caps.length, render: function (n, stage, cap) {
+      let s;
+      if (n < 5) {
+        s = svgOpen(340, 300);
+        const pick = EV.indexOf(Math.max(...EV));
+        ACT.forEach(([name, pay], a) => {
+          const cut = n >= 3 && a !== pick, y = CY[a];
+          s += `<path d="M${D[0] + 11} ${D[1]} L${CX - 14} ${y}" class="dt-e${cut ? ' cut' : ''}"/><text x="${(D[0] + CX) / 2 + 4}" y="${(D[1] + y) / 2 - 6}" class="dg-lab sm" text-anchor="middle">${name}</text>`;
+          if (cut) { const mx = (D[0] + CX) / 2 + 14, my = D[1] + (y - D[1]) * ((mx - D[0]) / (CX - D[0])); s += `<text x="${mx}" y="${my + 5}" class="dt-cut" text-anchor="middle">∥</text>`; }
+          pay.forEach((v, k) => { const ly = y + (k - 1) * 30;
+            s += `<path d="M${CX + 14} ${y} L${LX - 54} ${ly}" class="dt-e${cut ? ' cut' : ''}"/><text x="${LX - 8}" y="${ly + 4}" class="dt-l" text-anchor="end">${ST[k]} ${PR[k]}</text>
+              <text x="${LX}" y="${ly + 5}" class="dt-pay${n === 4 && BEST[k] === a ? ' hl' : ''}">${v}</text>`; });
+          s += `<circle cx="${CX}" cy="${y}" r="13" class="dt-ci"/>`;
+          if (n >= 2 || (n === 1 && a === 0)) s += `<text x="${CX}" y="${y - 20}" class="dt-v" text-anchor="middle">${EV[a]}</text>`;
+        });
+        s += `<rect x="${D[0] - 11}" y="${D[1] - 11}" width="22" height="22" class="dt-sq"/>`;
+        if (n >= 3) s += `<text x="${D[0] - 11}" y="${D[1] - 20}" class="dt-v">${n === 4 ? '70 → 102' : '70'}</text>`;
+      } else {
+        s = svgOpen(340, 250);
+        const R0 = [22, 130], CH = [120, 82], NO = [120, 212], G = [208, 40], B = [208, 124];
+        s += `<path d="M${R0[0] + 11} ${R0[1]} L${CH[0] - 13} ${CH[1]}" class="dt-e"/><text x="${(R0[0] + CH[0]) / 2 - 2}" y="${(R0[1] + CH[1]) / 2 - 8}" class="dg-lab sm" text-anchor="middle">调研 −8</text>
+          <path d="M${R0[0] + 11} ${R0[1]} L${NO[0] - 6} ${NO[1]}" class="dt-e cut"/><text x="${(R0[0] + NO[0]) / 2 - 2}" y="${(R0[1] + NO[1]) / 2 + 20}" class="dg-lab sm" text-anchor="middle">不调研</text>
+          <text x="${(R0[0] + NO[0]) / 2 + 12}" y="${(R0[1] + NO[1]) / 2 + 6}" class="dt-cut" text-anchor="middle">∥</text>
+          <text x="${NO[0]}" y="${NO[1] + 5}" class="dt-pay">按上一页:70</text>
+          <path d="M${CH[0] + 13} ${CH[1]} L${G[0] - 11} ${G[1]}" class="dt-e"/><text x="${(CH[0] + G[0]) / 2}" y="${(CH[1] + G[1]) / 2 - 8}" class="dt-l" text-anchor="middle">看好 0.51</text>
+          <path d="M${CH[0] + 13} ${CH[1]} L${B[0] - 11} ${B[1]}" class="dt-e"/><text x="${(CH[0] + B[0]) / 2}" y="${(CH[1] + B[1]) / 2 + 20}" class="dt-l" text-anchor="middle">不看好 0.49</text>
+          <circle cx="${CH[0]}" cy="${CH[1]}" r="13" class="dt-ci"/><text x="${CH[0]}" y="${CH[1] - 20}" class="dt-v" text-anchor="middle">79.9</text>
+          <rect x="${G[0] - 10}" y="${G[1] - 10}" width="20" height="20" class="dt-sq"/><text x="${G[0] + 18}" y="${G[1] + 5}" class="dt-pay">选大规模 <tspan class="dt-v">113.9</tspan></text>
+          <rect x="${B[0] - 10}" y="${B[1] - 10}" width="20" height="20" class="dt-sq"/><text x="${B[0] + 18}" y="${B[1] + 5}" class="dt-pay">选中等 <tspan class="dt-v">44.5</tspan></text>
+          <rect x="${R0[0] - 11}" y="${R0[1] - 11}" width="22" height="22" class="dt-sq"/><text x="${R0[0] + 2}" y="${R0[1] + 34}" class="dt-v" text-anchor="middle">71.9</text>`;
+      }
+      stage.innerHTML = `<div class="demo-pic">${s}</svg></div>`;
+      cap.innerHTML = caps[n];
+    } };
+  }
+  function demoCPM() {                                          // 第 16 章:新产线 8 项工作的双代号网络图
+    const N = { 1: [18, 130], 2: [76, 130], 3: [138, 46], 4: [198, 130], 6: [138, 214], 5: [258, 130], 7: [310, 130], 8: [354, 130] };
+    const A0 = [['A', 1, 2, 3], ['B', 2, 3, 5], ['C', 2, 4, 7], ['D', 2, 6, 4], ['虚', 3, 4, 0], ['E', 4, 5, 4], ['F', 6, 5, 3], ['G', 5, 7, 2], ['H', 7, 8, 1]];
+    const ORDN = [1, 2, 3, 6, 4, 5, 7, 8];
+    function times(arcs) {
+      const TE = {}, TL = {};
+      ORDN.forEach(j => { TE[j] = Math.max(0, ...arcs.filter(a => a[2] === j).map(a => TE[a[1]] + a[3])); });
+      ORDN.slice().reverse().forEach(i => { const out = arcs.filter(a => a[1] === i); TL[i] = out.length ? Math.min(...out.map(a => TL[a[2]] - a[3])) : TE[8]; });
+      return { TE: TE, TL: TL, tf: a => TL[a[2]] - TE[a[1]] - a[3] };
+    }
+    const T0 = times(A0), A1 = A0.map(a => a[0] === 'E' ? ['E', 4, 5, 3] : a[0] === 'C' ? ['C', 2, 4, 6] : a), T1 = times(A1);
+    const F = [
+      { cap: '新产线拆成 8 项工作。<b>双代号网络图</b>里,每条<b>箭线</b>是一项工作(字母 + 周数),<b>圆圈</b>是「前面做完、后面能开始」的时刻。E 要等 B 和 C 都做完,所以 B 先到 ③,再用一条<b>虚线</b>(虚工作,0 周)接到 ④。' },
+      { te: [1, 2, 3, 6], cur: [2, 3, 6], cap: '<b>顺推</b>最早时间 T<sub>E</sub>(圆圈旁的黑色数字):起点是 0,沿箭线往后加。② = 0 + 3 = 3,③ = 3 + 5 = 8,⑥ = 3 + 4 = 7。' },
+      { te: [1, 2, 3, 6, 4], cur: [4], hot: ['C', '虚'], cap: '④ 有两条箭线进来:C 走过来是 3 + 7 = <b>10</b>,虚工作走过来是 8 + 0 = 8。E 要等两边<b>都</b>做完,所以取<b>大</b>的:T<sub>E</sub>(④) = 10。<b>顺推取大。</b>' },
+      { te: ORDN, cur: [5, 7, 8], cap: '⑤ = max{10 + 4, 7 + 3} = 14,⑦ = 16,⑧ = <b>17</b>。终点的最早时间就是<b>总工期:17 周</b>。' },
+      { te: ORDN, tl: [8, 7, 5, 4, 6], cur: [4, 6], cap: '再从终点<b>逆推</b>最迟时间 T<sub>L</sub>(红色数字):⑧ 是 17,往前减。⑤ = 14,④ = 14 − 4 = 10,⑥ = 14 − 3 = 11。' },
+      { te: ORDN, tl: ORDN, cur: [2], hot: ['B', 'C', 'D'], cap: '② 有三条箭线出去:B 要求 10 − 5 = 5,C 要求 10 − 7 = 3,D 要求 11 − 4 = 7。要照顾最急的那个,取<b>小</b>的:T<sub>L</sub>(②) = 3。<b>逆推取小。</b>' },
+      { te: ORDN, tl: ORDN, tf: true, crit: true, cap: '每项工作的<b>总时差</b> TF = 终点 T<sub>L</sub> − 起点 T<sub>E</sub> − 工期。TF = 0 的就是<b>关键工作</b>,连起来是关键路线 <b>A → C → E → G → H</b>(红线),一天都不能拖。B 能拖 2 周,D、F 能拖 4 周。' },
+      { te: ORDN, tl: ORDN, tf: true, crit: true, crash: true, cap: '客户要 15 周投产。只压<b>关键工作</b>,先压最便宜的:E 少 1 周(+1.5 万),C 少 1 周(+2 万),工期 17 → <b>15</b>,共多花 3.5 万。压 B、D、F 没用——它们不在最长的那条路上。' },
+    ];
+    return { steps: F.length, render: function (n, stage, cap) {
+      const f = F[n], arcs = f.crash ? A1 : A0, T = f.crash ? T1 : T0;
+      const isCrit = a => f.crit && T.tf(a) === 0 && a[0] !== '虚';
+      let s = svgOpen(372, 262) + '<defs><marker id="cpa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="cp-h"/></marker><marker id="cpc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="cp-h c"/></marker></defs>';
+      arcs.forEach(a => {
+        const p = N[a[1]], q = N[a[2]], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+        const x1 = p[0] + ux * 15, y1 = p[1] + uy * 15, x2 = q[0] - ux * 16, y2 = q[1] - uy * 16, cr = isCrit(a), hot = f.hot && f.hot.indexOf(a[0]) >= 0;
+        s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="cp-a${cr ? ' crit' : ''}${hot ? ' hot' : ''}${a[0] === '虚' ? ' dum' : ''}" marker-end="url(#${cr || hot ? 'cpc' : 'cpa'})"/>`;
+        const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, horiz = Math.abs(dy) < 1, side = dx > 0 && dy !== 0 ? (a[1] === 2 ? -1 : 1) : 0;
+        const txt = (a[0] === '虚' ? '虚' : a[0] + ' ' + a[3]) + (f.tf && a[0] !== '虚' && T.tf(a) > 0 ? ' · 差' + T.tf(a) : '');
+        const chg = f.crash && (a[0] === 'E' || a[0] === 'C');
+        s += horiz ? `<text x="${mx}" y="${my + 18}" class="cp-l${chg ? ' chg' : ''}" text-anchor="middle">${txt}</text>`
+          : `<text x="${p[0] + dx * (side < 0 ? 0.62 : 0.4) + (side < 0 ? -8 : 8)}" y="${p[1] + dy * (side < 0 ? 0.62 : 0.4) + 4}" class="cp-l" text-anchor="${side < 0 ? 'end' : 'start'}">${txt}</text>`;
+      });
+      Object.keys(N).forEach(k => {
+        const p = N[k], j = +k, cur = f.cur && f.cur.indexOf(j) >= 0, below = j === 6;
+        const te = f.te && f.te.indexOf(j) >= 0 ? T.TE[j] : '', tl = f.tl && f.tl.indexOf(j) >= 0 ? T.TL[j] : '';
+        s += `<circle cx="${p[0]}" cy="${p[1]}" r="14" class="dj-n${cur ? ' cur' : ''}"/><text x="${p[0]}" y="${p[1] + 5}" class="dj-l" text-anchor="middle">${k}</text>`;
+        if (te !== '') s += `<text x="${p[0]}" y="${p[1] + (below ? 30 : -33)}" class="cp-t" text-anchor="middle">${te}</text>`;
+        if (tl !== '') s += `<text x="${p[0]}" y="${p[1] + (below ? 43 : -20)}" class="cp-t cp-tl" text-anchor="middle">${tl}</text>`;
+      });
+      stage.innerHTML = `<div class="demo-pic">${s}</svg></div>${f.crash ? '' : ''}`;
+      cap.innerHTML = f.cap;
+    } };
+  }
+
+  function demoGoal() {                                         // 第 15 章:三个目标按优先级逐级缩小区域
+    const ox = 30, oy = 224, kx = 42, ky = 22, X = x => ox + x * kx, Y = y => oy - y * ky;
+    const pts = P => P.map(p => X(p[0]) + ',' + Y(p[1])).join(' ');
+    const HARD = [[0, 0], [6, 0], [0, 9]], R1 = [[0, 5.4], [0, 9], [4, 3]], R2 = [[2 / 3, 5], [8 / 3, 5], [4, 3]];
+    const F = [
+      { reg: HARD, cap: '还是那两种芯片(每件赚 3 千、5 千元)。设备 C 每周最多 18 小时是<b>硬约束</b>:3x₁ + 2x₂ ≤ 18,得到灰色三角形。第 02 章的最优解 (2, 6) 利润 36 最高,可老周现在有<b>三个目标</b>,按重要性排了序。' },
+      { reg: R1, line: 1, cap: '<b>P₁:利润不低于 27</b>。写成 3x₁ + 5x₂ + d₁⁻ − d₁⁺ = 27,要让「差额」d₁⁻ 最小。在利润线右上方就能做到 d₁⁻ = 0,区域缩成红色小三角形。' },
+      { reg: R2, line: 2, cap: '<b>P₂:设备 B 尽量不加班</b>(正常 10 小时,2x₂ ≤ 10,即 x₂ ≤ 5),压 d₂⁺。<b>只能在上一步剩下的区域里挑</b>:砍掉 x₂ > 5 的一块。(2, 6) 被排除了——它要加班 2 小时。' },
+      { reg: R2, line: 3, best: true, cap: '<b>P₃:产品 1 交够 5 件</b>(x₁ ≥ 5),压 d₃⁻。可剩下的区域里 x₁ 最多到 4。做不到,就<b>尽量靠近</b>:取点 <b>(4, 3)</b>,d₃⁻ = 1。为了 P₃ 去牺牲 P₁、P₂?不允许。' },
+      { reg: R2, line: 3, best: true, done: true, cap: '满意解 <b>(4, 3)</b>:利润 27 刚好守住底线(d₁⁻ = 0),设备 B 只用 6 小时不加班(d₂⁺ = 0),产品 1 差 1 件(d₃⁻ = 1)。比 (2, 6) 少赚 9 千元,但更合老周的心意。<b>目标规划不求「最优」,求按优先级的「满意」。</b>' },
+    ];
+    return { steps: F.length, render: function (n, stage, cap) {
+      const f = F[n];
+      let s = svgOpen(320, 246);
+      for (let i = 0; i <= 6; i++) s += `<line x1="${X(i)}" y1="${Y(0)}" x2="${X(i)}" y2="${Y(9.6)}" class="dg-grid"/><text x="${X(i)}" y="${Y(0) + 15}" class="dg-t" text-anchor="middle">${i}</text>`;
+      for (let j = 0; j <= 9; j += 3) s += `<line x1="${X(0)}" y1="${Y(j)}" x2="${X(6.6)}" y2="${Y(j)}" class="dg-grid"/>${j ? `<text x="${X(0) - 7}" y="${Y(j) + 4}" class="dg-t" text-anchor="end">${j}</text>` : ''}`;
+      s += `<polygon points="${pts(HARD)}" class="dg-half"/><line x1="${X(0)}" y1="${Y(9)}" x2="${X(6)}" y2="${Y(0)}" class="dg-line"/>`;
+      if (f.reg !== HARD) s += `<polygon points="${pts(f.reg)}" class="bb-reg"/>`;
+      if (f.line >= 1) s += `<line x1="${X(0)}" y1="${Y(5.4)}" x2="${X(6.5)}" y2="${Y(1.5)}" class="gp-l"/><text x="${X(5.2)}" y="${Y(2.3) - 4}" class="dg-lab sm">利润 = 27</text>`;
+      if (f.line >= 2) s += `<line x1="${X(0)}" y1="${Y(5)}" x2="${X(6.6)}" y2="${Y(5)}" class="gp-l"/><text x="${X(4.4)}" y="${Y(5) - 6}" class="dg-lab sm">x₂ = 5(B 不加班)</text>`;
+      if (f.line >= 3) s += `<line x1="${X(5)}" y1="${Y(0)}" x2="${X(5)}" y2="${Y(9.6)}" class="gp-l far"/><text x="${X(5) + 4}" y="${Y(8.6)}" class="dg-lab sm">x₁ = 5(订单)</text>`;
+      s += `<circle cx="${X(2)}" cy="${Y(6)}" r="4.5" class="${n >= 2 ? 'gp-old out' : 'gp-old'}"/><text x="${X(2) + 8}" y="${Y(6) - 6}" class="dg-t">(2, 6)</text>`;
+      if (f.best) s += `<circle cx="${X(4)}" cy="${Y(3)}" r="7" class="dg-best"/><text x="${X(4) + 10}" y="${Y(3) + 16}" class="dg-lab">(4, 3)</text>`;
+      stage.innerHTML = `<div class="demo-pic">${s}</svg></div>`;
+      cap.innerHTML = f.cap;
+    } };
+  }
   const DEMOS = {
     graph: { title: '图解法:把利润线推到最远的顶点', make: demoGraph },
     simplex: { title: '单纯形法:从一个顶点走到更好的顶点', make: demoSimplex },
     dijkstra: { title: '最短路:每次定下一个最近的点', make: demoDijkstra },
     queue: { title: '排队:为什么只多来两个人,队伍就长了好几倍', make: demoQueue },
+    transport: { title: '运输问题:先找方案,再用闭回路省运费', make: demoTransport },
+    bnb: { title: '分支定界:为什么四舍五入找不到整数最优', make: demoBnB },
+    dp: { title: '动态规划:从终点往回算,比贪心更短', make: demoDP },
+    dtree: { title: '决策树:从右往左算,圆圈求平均、方框挑最大', make: demoDTree },
+    cpm: { title: '网络计划:顺推取大、逆推取小,找出关键路线', make: demoCPM },
+    goal: { title: '目标规划:按优先级一级一级缩小区域', make: demoGoal },
   };
-  const CH_DEMOS = { '01': ['graph'], '02': ['graph'], '03': ['simplex'], '04': ['simplex'], '08': ['dijkstra'], '09': ['queue'] };
+  const CH_DEMOS = { '01': ['graph'], '02': ['graph'], '03': ['simplex'], '04': ['simplex'], '05': ['transport'], '06': ['bnb'], '07': ['dp'], '08': ['dijkstra'], '09': ['queue'], '10': ['dtree'], '15': ['goal'], '16': ['cpm'] };
   function openDemo(id) {
     const D = DEMOS[id]; if (!D) return;
     const inst = D.make(), m = el('div', 'demo');
@@ -675,7 +978,7 @@
     return viewHome();
   };
   window.orSummary = function () {
-    const core = CH.filter(c => c.n >= 1 && c.n <= 10);
+    const core = CH.filter(c => c.core);
     return { done: core.filter(c => st.done.indexOf(c.no) >= 0).length, total: core.length, due: dueCount(), last: st.last && chOf(st.last) };
   };
 })();
