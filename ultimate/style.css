@@ -583,3 +583,69 @@ body.chatmode { overflow: hidden; }
 .or-tools .result b { color: var(--acc); }
 .or-tools .errbox { color: var(--bad); font-size: 13.5px; }
 .or-tools canvas { width: 100%; max-width: 520px; height: auto; display: block; margin: 0 auto; }
+
+/* ───── 运筹学:学习路线 ───── */
+.or-path { list-style: none; margin: 0; padding: 0 0 0 4px; }
+.or-stage { font-size: 12px; color: var(--mute); margin: 14px 0 4px 44px; }
+.or-step a { position: relative; display: flex; align-items: center; gap: 14px; padding: 9px 0; min-height: 50px; }
+.or-step a::before { content: ""; position: absolute; left: 16px; top: -10px; bottom: -10px; width: 2px; background: var(--line); z-index: 0; }
+.or-step:first-of-type a::before { top: 50%; }
+.or-step .nd { position: relative; z-index: 1; flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  font-style: normal; font-family: var(--mono); font-size: 13px; background: var(--bg); border: 2px solid var(--line); color: var(--mute); }
+.or-step.done .nd { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.or-step.cur .nd { border-color: var(--acc); color: var(--acc); box-shadow: 0 0 0 4px color-mix(in srgb, var(--acc) 15%, transparent); }
+.or-step b { display: block; font-weight: 500; font-size: 15px; }
+.or-step.done b { color: var(--soft); }
+.or-step em { font-style: normal; font-size: 12px; color: var(--mute); margin-right: 8px; }
+.or-step em.hasd { color: var(--acc); }
+.or-step a:active { opacity: .6; }
+
+/* 章节里的「先看动画」卡片 */
+.or-demo { display: flex; align-items: center; gap: 12px; margin: 6px 0 12px; padding: 12px 14px; border-radius: 14px; background: var(--ink); color: var(--bg); }
+.or-demo .pl { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--acc); color: #fff; font-size: 14px; padding-left: 2px; }
+.or-demo b { display: block; font-weight: 600; font-size: 15px; }
+.or-demo small { display: block; font-size: 13px; opacity: .75; }
+.or-demo:active { opacity: .85; }
+
+/* ───── 动画演示播放器(全屏浮层;按钮在底部拇指区,避开安全区) ───── */
+.demo { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--bg);
+  padding: max(10px, env(safe-area-inset-top)) 0 max(10px, env(safe-area-inset-bottom)); }
+.demo-h { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 16px 8px; }
+.demo-h b { font-size: 16px; font-weight: 600; line-height: 1.4; }
+.demo-x { flex: none; color: var(--mute); font-size: 16px; padding: 8px 2px 8px 12px; }
+.demo-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 16px; max-width: 640px; width: 100%; margin: 0 auto; }
+.demo-pic { background: var(--card); border-radius: 16px; padding: 8px; }
+.demo-svg, .demo-pic canvas { display: block; width: 100%; height: auto; max-height: 46vh; margin: 0 auto; }
+.demo-cap { margin: 14px 2px 16px; font-size: 16px; line-height: 1.8; }
+.demo-cap b { font-weight: 600; }
+.demo-slider { display: flex; flex-direction: column; gap: 6px; margin: 12px 2px 0; font-size: 14px; color: var(--soft); }
+.demo-slider input[type=range] { width: 100%; height: 36px; accent-color: var(--acc); touch-action: pan-x; }
+.demo-ok { color: var(--ok); font-weight: 600; } .demo-bad { color: var(--bad); }
+.demo-st { margin: 10px 2px 0; font-size: 14px; line-height: 1.7; color: var(--soft); }
+.demo-ctl { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px 0; max-width: 640px; width: 100%; margin: 0 auto; border-top: 1px solid var(--line); }
+.demo-ctl .ghost { min-width: 52px; height: 48px; font-size: 20px; }
+.demo-ctl .go.sm { margin-left: auto; height: 48px; padding: 0 28px; font-size: 16px; border-radius: 99px; }
+.demo-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+.demo-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.demo-dots i.past { background: var(--soft); } .demo-dots i.on { background: var(--acc); width: 18px; border-radius: 99px; }
+.dtb { margin-top: 10px; } .dtb tr.lv td { background: color-mix(in srgb, var(--acc) 7%, transparent); }
+.dtb td.piv { background: color-mix(in srgb, var(--acc) 22%, transparent) !important; color: var(--acc); font-weight: 700; }
+.dtb td.hl, .dtb th.hl { background: var(--bg2); }
+table.tb.dtb { border-collapse: collapse; font: 13px var(--mono); min-width: max-content; }
+table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; }
+/* SVG 图形(颜色走主题变量,深浅色都能看) */
+.dg-grid { stroke: var(--line); stroke-width: .6; }
+.dg-ax { stroke: var(--soft); stroke-width: 1.4; }
+.dg-t { fill: var(--mute); font-size: 11px; font-family: var(--mono); }
+.dg-lab { fill: var(--ink); font-size: 12px; font-weight: 600; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.dg-half { fill: var(--soft); opacity: .1; }
+.dg-line { stroke: var(--soft); stroke-width: 1.8; }
+.dg-feas { fill: var(--acc); opacity: .2; stroke: var(--acc); stroke-width: 2; }
+.dg-v { fill: var(--ink); }
+.dg-z { stroke: var(--acc); stroke-width: 2.5; stroke-dasharray: 7 5; } .dg-z.out { stroke: var(--mute); }
+.dg-best { fill: var(--acc); stroke: var(--card); stroke-width: 2.5; }
+.dg-path { stroke: var(--acc); stroke-width: 3; marker-end: none; }
+.dj-e { stroke: var(--line); stroke-width: 2.5; } .dj-e.tree { stroke: var(--soft); } .dj-e.route { stroke: var(--acc); stroke-width: 4.5; }
+.dj-n { fill: var(--card); stroke: var(--soft); stroke-width: 2; } .dj-n.done { fill: var(--ink); stroke: var(--ink); } .dj-n.cur { stroke: var(--acc); stroke-width: 4; }
+.dj-l { fill: var(--ink); font-size: 14px; font-weight: 600; } .dj-l.done { fill: var(--bg); }
+.dj-d { fill: var(--acc); font-size: 13px; font-family: var(--mono); font-weight: 600; }

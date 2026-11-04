@@ -106,12 +106,17 @@
       <div class="grp"><a class="row-i chev" href="#/or/cards"><span>记忆闪卡</span><span class="v">${due ? '今日 ' + due + ' 张' : fresh ? fresh + ' 张新卡' : '全部完成'}</span></a>
         <a class="row-i chev" href="#/or/tools"><span>计算器</span><span class="v">单纯形 · 运输 · 指派 · 排队 · 图解</span></a>
         <a class="row-i chev" href="#/or/ai/all"><span>问 AI 助教</span><span class="v"></span></a></div>
-      ${groups.map(g => `<div class="grp-h">${esc(g.name)}</div><div class="grp">${g.list.map(c => {
-        const p = st.pos[c.no], dn = st.done.indexOf(c.no) >= 0;
-        return `<a class="row-i chev" href="#/or/c/${c.no}"><span><i class="or-no">${c.no}</i>${esc(c.title)}</span><span class="v">${dn ? '✓' : p > 0.05 ? Math.round(p * 100) + '%' : ''}</span></a>`; }).join('')}</div>`).join('')}
+      <div class="grp-h">学习路线</div>
+      <ol class="or-path">${groups.map(g => `<li class="or-stage">${esc(g.name)}</li>${g.list.map(c => {
+        const p = st.pos[c.no] || 0, dn = st.done.indexOf(c.no) >= 0, cur = last && last.no === c.no;
+        return `<li class="or-step${dn ? ' done' : ''}${cur ? ' cur' : ''}"><a href="#/or/c/${c.no}"><i class="nd">${dn ? '✓' : c.no}</i>
+          <span><b>${esc(c.title)}</b>${CH_DEMOS[c.no] ? '<em class="hasd">▶ 动画</em>' : ''}${!dn && p > 0.05 ? `<em>读到 ${Math.round(p * 100)}%</em>` : ''}</span></a></li>`; }).join('')}`).join('')}</ol>
+      <div class="grp-h">动画演示</div>
+      <div class="grp">${Object.keys(DEMOS).map(d => `<a class="row-i chev" href="#" data-demo="${d}"><span>▶ ${esc(DEMOS[d].title)}</span><span class="v"></span></a>`).join('')}</div>
     </div>`;
     window.scrollTo(0, 0);
     $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
+    $$('[data-demo]').forEach(a => a.onclick = ev => { ev.preventDefault(); openDemo(a.dataset.demo); });
     const inp = $('#ors'), out = $('#orsr');
     inp.oninput = function () {
       const q = inp.value.trim();
@@ -136,6 +141,7 @@
       <div class="or-eyebrow">${c.n === 0 ? '导读' : c.n <= 10 ? '第 ' + c.no + ' 章' : '考试冲刺'}</div>
       <h1 class="or-h1">${esc(c.title)}</h1>
       <div class="or-acts">${vids ? '<a href="#" id="vbtn">配套视频</a>' : ''}${core ? `<a href="#" id="mark" class="${dn ? 'on' : ''}">${dn ? '✓ 已学完' : '标记学完'}</a><a href="#" id="tocards">练本章闪卡</a>` : ''}</div>
+      ${(CH_DEMOS[c.no] || []).map(d => `<a href="#" class="or-demo" data-demo="${d}"><span class="pl">▶</span><span><b>先看动画</b><small>${esc(DEMOS[d].title)}</small></span></a>`).join('')}
       ${vids ? `<div class="or-vids" id="vlist" hidden>${vids.map(v => `<div><b>${esc(v.kind)}</b> ${esc(v.title)}<span>${v.parts.map(p => `<a href="${v.base}${p}" target="_blank" rel="noopener">P${p}</a>`).join('')}</span></div>`).join('')}<small class="dim">链接打开 B 站对应集数</small></div>` : ''}
       <article class="md">${md(c.md.replace(/^#\s+.+$/m, ''))}</article>
       <div class="or-foot">${prev ? `<a href="#/or/c/${prev.no}">‹ ${esc(prev.no + ' ' + prev.title)}</a>` : '<span></span>'}${next ? `<a href="#/or/c/${next.no}" class="nx">${esc(next.no + ' ' + next.title)} ›</a>` : ''}</div>
@@ -145,6 +151,7 @@
     const vb = $('#vbtn'); if (vb) vb.onclick = ev => { ev.preventDefault(); $('#vlist').hidden = !$('#vlist').hidden; };
     const mk = $('#mark'); if (mk) mk.onclick = ev => { ev.preventDefault(); const k = st.done.indexOf(c.no); if (k >= 0) st.done.splice(k, 1); else st.done.push(c.no); saveOR(); mk.classList.toggle('on', k < 0); mk.textContent = k < 0 ? '✓ 已学完' : '标记学完'; };
     const tc = $('#tocards'); if (tc) tc.onclick = ev => { ev.preventDefault(); st.cardFilter = c.no; saveOR(); location.hash = '#/or/cards'; };
+    $$('[data-demo]').forEach(a => a.onclick = ev => { ev.preventDefault(); openDemo(a.dataset.demo); });
     if (exam) bindTimer(c.no);
     // 回到上次读到的位置(或搜索命中处)
     requestAnimationFrame(function () {
@@ -444,6 +451,217 @@
     }
   }
 
+
+
+  /* ───────────── 动画演示:分步播放,每步一句大白话;iOS 上左右滑动换步、按钮在拇指区、边缘返回只关演示 ───────────── */
+  const qn = q => Number(q.n) / Number(q.d);                    // 计算器里的精确分数 → 小数
+  const svgOpen = (w, h) => `<svg viewBox="0 0 ${w} ${h}" class="demo-svg" role="img">`;
+  // 图解法与单纯形共用的封测厂模型:max z = 3x1 + 5x2;x1 ≤ 4,2x2 ≤ 12,3x1 + 2x2 ≤ 18
+  const G = { W: 320, H: 320, ox: 36, oy: 292, kx: 38, ky: 27 };
+  const gx = x => G.ox + x * G.kx, gy = y => G.oy - y * G.ky;
+  const FEAS = [[0, 0], [4, 0], [4, 3], [2, 6], [0, 6]];
+  function axes() {
+    let s = '';
+    for (let i = 0; i <= 7; i++) s += `<line x1="${gx(i)}" y1="${gy(0)}" x2="${gx(i)}" y2="${gy(10)}" class="dg-grid"/><text x="${gx(i)}" y="${gy(0) + 16}" class="dg-t" text-anchor="middle">${i}</text>`;
+    for (let j = 0; j <= 10; j += 2) s += `<line x1="${gx(0)}" y1="${gy(j)}" x2="${gx(7)}" y2="${gy(j)}" class="dg-grid"/><text x="${gx(0) - 8}" y="${gy(j) + 4}" class="dg-t" text-anchor="end">${j}</text>`;
+    return s + `<line x1="${gx(0)}" y1="${gy(0)}" x2="${gx(7.2)}" y2="${gy(0)}" class="dg-ax"/><line x1="${gx(0)}" y1="${gy(0)}" x2="${gx(0)}" y2="${gy(10.4)}" class="dg-ax"/>
+      <text x="${gx(7.1)}" y="${gy(0) - 6}" class="dg-t" text-anchor="end">x₁</text><text x="${gx(0) + 6}" y="${gy(10.2)}" class="dg-t">x₂</text>`;
+  }
+  const poly = (pts, cls) => `<polygon points="${pts.map(p => gx(p[0]) + ',' + gy(p[1])).join(' ')}" class="${cls}"/>`;
+  const seg = (a, b, cls) => `<line x1="${gx(a[0])}" y1="${gy(a[1])}" x2="${gx(b[0])}" y2="${gy(b[1])}" class="${cls}"/>`;
+  const dot = (p, r, cls, label) => `<circle cx="${gx(p[0])}" cy="${gy(p[1])}" r="${r}" class="${cls}"/>${label ? `<text x="${gx(p[0]) + 8}" y="${gy(p[1]) - 8}" class="dg-lab">${label}</text>` : ''}`;
+  function constraints(n) {                                     // 依次加上前 n 个约束(涂色 = 满足这个约束的一侧)
+    let s = '';
+    if (n >= 1) s += poly([[0, 0], [4, 0], [4, 10], [0, 10]], 'dg-half') + seg([4, 0], [4, 10], 'dg-line') + `<text x="${gx(4) + 4}" y="${gy(9.6)}" class="dg-lab">x₁ ≤ 4</text>`;
+    if (n >= 2) s += poly([[0, 0], [7, 0], [7, 6], [0, 6]], 'dg-half') + seg([0, 6], [7, 6], 'dg-line') + `<text x="${gx(5.2)}" y="${gy(6) - 6}" class="dg-lab">x₂ ≤ 6</text>`;
+    if (n >= 3) s += poly([[0, 0], [6, 0], [0, 9]], 'dg-half') + seg([0, 9], [6, 0], 'dg-line') + `<text x="${gx(4.5)}" y="${gy(2.6)}" class="dg-lab">3x₁+2x₂ ≤ 18</text>`;
+    return s;
+  }
+  function profitLine(z, cls) {                                 // 3x1 + 5x2 = z 在画框里的那一段
+    const pts = [[0, z / 5], [z / 3, 0], [7, (z - 21) / 5], [(z - 50) / 3, 10]].filter(p => p[0] >= -1e-9 && p[0] <= 7 + 1e-9 && p[1] >= -1e-9 && p[1] <= 10 + 1e-9);
+    return pts.length >= 2 ? seg(pts[0], pts[1], cls) : '';
+  }
+  function demoGraph() {
+    const caps = [
+      '老周的封测厂要安排两种芯片的产量:产品 1 每件赚 3 千元,产品 2 每件赚 5 千元。设产量为 x₁、x₂,目标是让利润 <b>z = 3x₁ + 5x₂</b> 最大。图上每个点就是一种生产方案。',
+      '设备 A 每周最多 4 小时,产品 1 每件占 1 小时:<b>x₁ ≤ 4</b>。涂色那一侧的方案都满足。',
+      '设备 B:产品 2 每件占 2 小时,最多 12 小时:2x₂ ≤ 12,也就是 <b>x₂ ≤ 6</b>。',
+      '设备 C 两种产品都要用:<b>3x₁ + 2x₂ ≤ 18</b>,只有这条斜线下方才行。',
+      '三个条件<b>同时</b>满足的区域叫<b>可行域</b>,是个五边形。所有能执行的方案都在里面,最优方案也只能在这里挑。',
+      '利润 z = 3x₁ + 5x₂ 在图上是一条斜线,线上的方案利润都一样。<b>拖动下面的滑块</b>把 z 调大,看这条线往哪走、什么时候离开可行域。',
+      '线一直往右上平移,最后一个还碰着可行域的点是 <b>(2, 6)</b>:做 2 件产品 1、6 件产品 2,利润 <b>36</b> 千元。结论:<b>最优解一定出现在可行域的顶点上</b>——单纯形法就是从这里出发的。',
+    ];
+    let z = 15;
+    return { steps: caps.length, render: function (i, stage, cap) {
+      const draw = function () {
+        let s = svgOpen(G.W, G.H) + axes() + constraints(Math.min(i, 3));
+        if (i >= 4) s += poly(FEAS, 'dg-feas') + FEAS.map(p => dot(p, 3.5, 'dg-v')).join('');
+        if (i === 5) {
+          const best = Math.max(...FEAS.map(p => 3 * p[0] + 5 * p[1]));
+          s += profitLine(z, z > best ? 'dg-z out' : 'dg-z');
+          if (z === best) s += dot([2, 6], 7, 'dg-best', '(2, 6)');
+        }
+        if (i === 6) s += profitLine(36, 'dg-z') + dot([2, 6], 7, 'dg-best', '最优 (2, 6),z = 36');
+        stage.firstElementChild.innerHTML = s + '</svg>';
+        if (i === 5) {
+          const best = 36;
+          $('#dzv', stage).textContent = 'z = ' + z;
+          $('#dzs', stage).textContent = z < best ? '线还穿过可行域,还能再往外推' : z === best ? '刚好只碰到一个顶点 (2, 6)——这就是最优!' : '整条线都在可行域外面了,做不到';
+          $('#dzs', stage).className = z === best ? 'demo-ok' : z > best ? 'demo-bad' : 'dim';
+        }
+      };
+      stage.innerHTML = '<div class="demo-pic"></div>' + (i === 5 ? `<div class="demo-slider"><span id="dzv"></span><input type="range" min="0" max="45" step="1" value="${z}" id="dz"><span id="dzs"></span></div>` : '');
+      cap.innerHTML = caps[i];
+      if (i === 5) $('#dz', stage).oninput = e => { z = +e.target.value; draw(); };
+      draw();
+    } };
+  }
+  function demoSimplex() {
+    const res = SV.simplex(SV.parseLP('max 3 5\n1 0 <= 4\n0 2 <= 12\n3 2 <= 18'));
+    const T = res.tables, names = res.names, meaning = { x3: '设备 A 剩余工时', x4: '设备 B 剩余工时', x5: '设备 C 剩余工时' };
+    const vert = t => { const x = [0, 0]; t.basis.forEach((bj, i) => { if (bj < 2) x[bj] = qn(t.b[i]); }); return x; };
+    const path = T.map(vert);
+    const steps = 1 + T.length;
+    return { steps: steps, render: function (i, stage, cap) {
+      let s = svgOpen(G.W, G.H) + axes() + poly(FEAS, 'dg-feas') + FEAS.map(p => dot(p, 3.5, 'dg-v')).join('');
+      const k = Math.min(Math.max(i - 1, 0), T.length - 1);
+      for (let j = 1; j <= k; j++) s += `<line x1="${gx(path[j - 1][0])}" y1="${gy(path[j - 1][1])}" x2="${gx(path[j][0])}" y2="${gy(path[j][1])}" class="dg-path"/>`;
+      if (i >= 1) s += dot(path[k], 7, 'dg-best', `(${path[k].join(', ')}) z = ${SV.fmtQ(T[k].z)}`);
+      let tb = '';
+      if (i >= 1) {
+        const t = T[k];
+        tb = `<div class="scroll"><table class="tb dtb"><tr><th>基</th><th>b</th>${names.map((n, j) => `<th class="${j === t.enter ? 'hl' : ''}">${n}</th>`).join('')}<th>θ</th></tr>
+          ${t.A.map((row, r) => `<tr class="${r === t.leave ? 'lv' : ''}"><td>${names[t.basis[r]]}</td><td>${SV.fmtQ(t.b[r])}</td>${row.map((x, j) => `<td class="${r === t.leave && j === t.enter ? 'piv' : j === t.enter ? 'hl' : ''}">${SV.fmtQ(x)}</td>`).join('')}<td>${t.theta[r] ? SV.fmtQ(t.theta[r]) : '—'}</td></tr>`).join('')}
+          <tr><th>σ</th><td></td>${t.sig.map((x, j) => `<td class="${j === t.enter ? 'hl' : ''}">${SV.fmtQ(x)}</td>`).join('')}<td></td></tr></table></div>`;
+      }
+      stage.innerHTML = `<div class="demo-pic">${s}</svg></div>${tb}`;
+      if (i === 0) { cap.innerHTML = '图解法画不出 8 个变量,单纯形法换个办法:<b>从一个顶点出发,每次走到相邻的、利润更高的顶点</b>,走不动了就是最优。还是封测厂这道题,看它怎么走。下面的表格就是每一步的「单纯形表」。'; return; }
+      const t = T[k], x = path[k];
+      if (t.enter < 0) { cap.innerHTML = `现在在顶点 <b>(${x.join(', ')})</b>,利润 ${SV.fmtQ(t.z)}。最下面一行检验数 σ <b>全都 ≤ 0</b>:不管再增加哪个变量,利润都不会涨了——<b>这就是最优解</b>。和图解法的结果一样:(2, 6),z = 36。`; return; }
+      const en = names[t.enter], lvn = names[t.basis[t.leave]];
+      cap.innerHTML = `${k === 0 ? '从原点出发:什么都不生产,三台设备的工时全剩着(基变量是松弛变量 x₃、x₄、x₅)。' : `走到了顶点 <b>(${x.join(', ')})</b>,利润 ${SV.fmtQ(t.z)}。`}
+        <br>① <b>谁入基?</b>看最下面的检验数 σ,<b>${en}</b> 最大(${SV.fmtQ(t.sig[t.enter])}):每多做一件它,利润涨得最多。
+        <br>② <b>谁出基?</b>算比值 θ = b ÷ 这一列的正数,最小的在 <b>${lvn}</b> 那行(${SV.fmtQ(t.theta[t.leave])})——${meaning[lvn] ? meaning[lvn] + '最先用完' : lvn + ' 最先降到 0'},所以 ${lvn} 出基。
+        <br>③ 以红格 <b>${SV.fmtQ(t.A[t.leave][t.enter])}</b> 为主元做一次变换,图上的点就沿可行域的边走到下一个顶点。`;
+    } };
+  }
+  function demoDijkstra() {
+    const P = { S: [28, 150], A: [112, 62], B: [112, 238], C: [208, 62], D: [208, 238], T: [292, 150] };
+    const E = [['S', 'A', 4], ['S', 'B', 2], ['A', 'B', 1], ['A', 'C', 5], ['B', 'D', 7], ['C', 'D', 2], ['C', 'T', 3], ['D', 'T', 6]];
+    const nodes = Object.keys(P), frames = [];
+    const dist = {}, prev = {}, done = new Set();
+    nodes.forEach(n => { dist[n] = Infinity; }); dist.S = 0;
+    frames.push({ dist: Object.assign({}, dist), prev: Object.assign({}, prev), done: new Set(), cur: null, cap: '求从 <b>S</b> 到 <b>T</b> 的最短路。先给 S 标上 0,其他点暂时标 ∞。规则只有一条:<b>每次把「临时标号最小」的点定下来</b>,再用它去更新邻居。' });
+    while (done.size < nodes.length) {
+      const u = nodes.filter(n => !done.has(n)).sort((a, b) => dist[a] - dist[b])[0];
+      done.add(u);
+      const upd = [];
+      E.forEach(([a, b, w]) => { [[a, b], [b, a]].forEach(([x, y]) => { if (x === u && !done.has(y) && dist[u] + w < dist[y]) { dist[y] = dist[u] + w; prev[y] = u; upd.push(y + ' → ' + dist[y]); } }); });
+      frames.push({ dist: Object.assign({}, dist), prev: Object.assign({}, prev), done: new Set(done), cur: u,
+        cap: `没定下来的点里,<b>${u}</b> 的标号最小(${dist[u]}),把它<b>定下来</b>(涂黑):从 S 到 ${u} 不可能更短了。${upd.length ? '再从 ' + u + ' 出发更新邻居:' + upd.join(',') + '。' : '它没有能更新的邻居。'}` });
+    }
+    const route = []; for (let v = 'T'; v; v = prev[v]) route.unshift(v);
+    frames.push(Object.assign({}, frames[frames.length - 1], { cur: null, route: route, cap: `全部定完。顺着「从哪来」往回找:<b>${route.join(' → ')}</b>,总长 <b>${dist.T}</b>。注意 S→A 直接走是 4,绕 B 走 S→B→A 只要 3——这就是为什么要一步步更新,而不是看着近就走。` }));
+    return { steps: frames.length, render: function (i, stage, cap) {
+      const f = frames[i], onRoute = (a, b) => f.route && f.route.some((v, k) => k && ((f.route[k - 1] === a && v === b) || (f.route[k - 1] === b && v === a)));
+      let s = svgOpen(320, 300);
+      E.forEach(([a, b, w]) => { const tree = f.prev[b] === a || f.prev[a] === b;
+        s += `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}" class="dj-e${onRoute(a, b) ? ' route' : tree ? ' tree' : ''}"/><text x="${(P[a][0] + P[b][0]) / 2 + 6}" y="${(P[a][1] + P[b][1]) / 2 - 6}" class="dg-t">${w}</text>`; });
+      nodes.forEach(n => { const d = f.dist[n];
+        s += `<circle cx="${P[n][0]}" cy="${P[n][1]}" r="17" class="dj-n${f.done.has(n) ? ' done' : ''}${f.cur === n ? ' cur' : ''}"/><text x="${P[n][0]}" y="${P[n][1] + 5}" class="dj-l${f.done.has(n) ? ' done' : ''}" text-anchor="middle">${n}</text>
+          <text x="${P[n][0]}" y="${P[n][1] + (P[n][1] > 150 ? 36 : -24)}" class="dj-d" text-anchor="middle">${d === Infinity ? '∞' : d}</text>`; });
+      stage.innerHTML = `<div class="demo-pic">${s}</svg></div>`;
+      cap.innerHTML = f.cap;
+    } };
+  }
+  function demoQueue() {
+    let lam = 12, mu = 15, raf = 0, last = 0, t = 0, q = [], busy = null, nextA = 0, area = 0, areaL = 0, served = 0;
+    const exp = r => -Math.log(1 - Math.random()) / r, SPEED = 1 / 1.5;   // 现实 1.5 秒 = 模拟 1 小时,一分钟左右实测就接近理论值
+    const reset = () => { t = 0; q = []; busy = null; nextA = exp(lam); area = 0; areaL = 0; served = 0; };
+    const caps = [
+      '银行只有一个窗口。顾客平均每小时来 <b>λ = 12</b> 个,窗口每小时能办 <b>μ = 15</b> 个。服务能力比来客多 25%,应该不怎么排队吧?看左边的队伍和下面的实测数字。',
+      '理论上的平均排队人数 <b>L<sub>q</sub> = ρ²/(1−ρ) = 3.2</b>(ρ = λ/μ = 0.8)。顾客是<b>随机</b>来的,有时一下来好几个,队就排起来了——比直觉多得多。',
+      '把 λ 调到 <b>14</b>:ρ = 0.93,理论 L<sub>q</sub> ≈ 12.6。只多来了 2 个人,队伍却长了将近 4 倍!<b>服务强度 ρ 越接近 1,队伍涨得越快</b>——这是排队论最重要的一句话。',
+      '自己拖两个滑块试试。λ ≥ μ(ρ ≥ 1)时队伍会无限变长,公式也不成立了。考试常问的 L、L<sub>q</sub>、W、W<sub>q</sub>,在「计算器 → 排队论」里能直接算。',
+    ];
+    function frame(ts) {
+      const dt = last ? Math.min(0.1, (ts - last) / 1000) * SPEED : 0; last = ts;
+      let left = dt;
+      while (left > 0) {
+        const tNext = Math.min(nextA, busy ? busy.end : Infinity), step = Math.min(left, tNext - t);
+        area += q.length * step; areaL += (q.length + (busy ? 1 : 0)) * step; t += step; left -= step;
+        if (Math.abs(t - nextA) < 1e-9 || t >= nextA) { q.push({ born: t }); nextA = t + exp(lam); }
+        if (busy && t >= busy.end) { busy = null; served++; }
+        if (!busy && q.length) { q.shift(); busy = { end: t + exp(mu) }; }
+        if (step <= 0) break;
+      }
+      paint();
+      raf = requestAnimationFrame(frame);
+    }
+    function paint() {
+      const c = $('#qcv'); if (!c) { cancelAnimationFrame(raf); return; }
+      const g = c.getContext('2d'), W = c.width, H = c.height, cs = getComputedStyle(document.documentElement), col = n => cs.getPropertyValue(n).trim();
+      g.clearRect(0, 0, W, H);
+      const cy = 92, n = Math.floor((W - 190) / 40);
+      g.fillStyle = col('--bg'); g.fillRect(W - 112, 44, 92, 96); g.strokeStyle = col('--ink'); g.lineWidth = 3; g.strokeRect(W - 112, 44, 92, 96);
+      g.fillStyle = col('--soft'); g.font = '600 26px -apple-system, "PingFang SC", sans-serif'; g.textAlign = 'center'; g.fillText('窗口', W - 66, 178);
+      if (busy) { g.fillStyle = col('--acc'); g.beginPath(); g.arc(W - 66, cy, 22, 0, 7); g.fill(); }
+      g.fillText('排队', (W - 150) / 2, 178);
+      q.slice(0, n).forEach((_, k) => { g.fillStyle = col('--ink'); g.beginPath(); g.arc(W - 150 - k * 40, cy, 16, 0, 7); g.fill(); });
+      if (q.length > n) { g.fillStyle = col('--acc'); g.textAlign = 'left'; g.fillText('+' + (q.length - n), 8, cy + 9); }
+      const rho = lam / mu, th = rho < 1 ? (rho * rho / (1 - rho)).toFixed(2) : '∞';
+      const st = $('#qst'); if (st) st.innerHTML = `ρ = ${rho.toFixed(2)} · 模拟了 ${t.toFixed(1)} 小时 · 排队 <b>${q.length}</b> 人<br>实测平均排队 L<sub>q</sub> = <b>${t > 0 ? (area / t).toFixed(2) : '—'}</b> · 理论 L<sub>q</sub> = <b>${th}</b><br><small class="dim">模拟越久,实测越接近理论值</small>`;
+    }
+    return { steps: caps.length, stop: () => cancelAnimationFrame(raf), render: function (i, stage, cap) {
+      if (i === 2 && lam !== 14) { lam = 14; reset(); }
+      if (!$('#qcv', stage)) {
+        stage.innerHTML = `<div class="demo-pic"><canvas id="qcv" width="600" height="200"></canvas></div><div class="demo-st" id="qst"></div>
+          <div class="demo-slider"><span>到达率 λ = <b id="ql">${lam}</b>/小时</span><input type="range" id="qlam" min="2" max="20" value="${lam}"></div>
+          <div class="demo-slider"><span>服务率 μ = <b id="qm">${mu}</b>/小时</span><input type="range" id="qmu" min="5" max="20" value="${mu}"></div>`;
+        $('#qlam', stage).oninput = e => { lam = +e.target.value; $('#ql').textContent = lam; reset(); };
+        $('#qmu', stage).oninput = e => { mu = +e.target.value; $('#qm').textContent = mu; reset(); };
+        reset(); last = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+      }
+      $('#qlam', stage).value = lam; $('#ql').textContent = lam;
+      cap.innerHTML = caps[i];
+    } };
+  }
+  const DEMOS = {
+    graph: { title: '图解法:把利润线推到最远的顶点', make: demoGraph },
+    simplex: { title: '单纯形法:从一个顶点走到更好的顶点', make: demoSimplex },
+    dijkstra: { title: '最短路:每次定下一个最近的点', make: demoDijkstra },
+    queue: { title: '排队:为什么只多来两个人,队伍就长了好几倍', make: demoQueue },
+  };
+  const CH_DEMOS = { '01': ['graph'], '02': ['graph'], '03': ['simplex'], '04': ['simplex'], '08': ['dijkstra'], '09': ['queue'] };
+  function openDemo(id) {
+    const D = DEMOS[id]; if (!D) return;
+    const inst = D.make(), m = el('div', 'demo');
+    m.innerHTML = `<div class="demo-h"><b>${esc(D.title)}</b><a href="#" class="demo-x" aria-label="关闭">✕</a></div>
+      <div class="demo-body"><div class="demo-stage"></div><div class="demo-cap"></div></div>
+      <div class="demo-ctl"><button class="ghost" id="dprev">‹</button><span class="demo-dots"></span><button class="go sm" id="dnext">下一步</button></div>`;
+    const close = layer(m, () => { if (inst.stop) inst.stop(); document.removeEventListener('keydown', key); });
+    let i = 0;
+    const stage = $('.demo-stage', m), cap = $('.demo-cap', m);
+    const show = function () {
+      inst.render(i, stage, cap);
+      $('.demo-dots', m).innerHTML = Array.from({ length: inst.steps }, (_, k) => `<i class="${k === i ? 'on' : k < i ? 'past' : ''}"></i>`).join('');
+      $('#dprev', m).disabled = i === 0;
+      $('#dnext', m).textContent = i === inst.steps - 1 ? '学会了' : '下一步';
+      $('.demo-body', m).scrollTop = 0;
+    };
+    const go = d => { const n = i + d; if (n < 0) return; if (n >= inst.steps) { close(); return; } i = n; show(); };
+    $('#dprev', m).onclick = () => go(-1);
+    $('#dnext', m).onclick = () => go(1);
+    $('.demo-x', m).onclick = ev => { ev.preventDefault(); close(); };
+    const key = e => { if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1); };
+    document.addEventListener('keydown', key);
+    // 手机:在图和文字上左右滑动换步(滑块上不算)
+    let sx = null;
+    m.addEventListener('touchstart', e => { const t = e.touches[0]; sx = e.target.closest('input') || t.clientX < 24 ? null : { x: t.clientX, y: t.clientY }; }, { passive: true });
+    m.addEventListener('touchend', e => { if (!sx) return; const t = e.changedTouches[0], dx = t.clientX - sx.x, dy = t.clientY - sx.y; sx = null; if (Math.abs(dx) > 60 && Math.abs(dy) < Math.abs(dx) * 0.6) go(dx < 0 ? 1 : -1); }, { passive: true });
+    show();
+  }
+  window.orOpenDemo = openDemo;
 
   /* ── 路由入口(app.js 调用):parts = ['or', 子页, 参数] ── */
   window.renderOR = function (parts) {
