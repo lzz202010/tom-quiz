@@ -696,3 +696,23 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .cp-t { fill: var(--ink); font-size: 11px; font-family: var(--mono); font-weight: 600; } .cp-tl { fill: var(--acc); } .cp-sep { fill: var(--mute); }
 .gp-l { stroke: var(--acc); stroke-width: 1.6; stroke-dasharray: 6 4; } .gp-l.far { stroke: var(--mute); }
 .gp-old { fill: var(--ink); } .gp-old.out { fill: none; stroke: var(--mute); stroke-width: 1.5; }
+/* 运筹学 · 练题 */
+.qc-meta { display: flex; justify-content: space-between; color: var(--mute); font-size: 13px; margin: 6px 0 10px; }
+.qc-q { font-size: 17px; line-height: 1.75; margin-bottom: 14px; }
+.qc-opts { display: flex; flex-direction: column; gap: 10px; }
+.qc-o { display: flex; gap: 12px; align-items: flex-start; width: 100%; min-height: 52px; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); font: inherit; font-size: 16px; line-height: 1.6; text-align: left; }
+.qc-o b { flex: none; width: 22px; color: var(--mute); font-family: var(--mono); }
+.qc-o.ok { border-color: var(--ok); } .qc-o.ok b { color: var(--ok); }
+.qc-o.bad { border-color: var(--bad); } .qc-o.bad b { color: var(--bad); }
+.qc-o.dim { opacity: .55; }
+.qc-e { margin: 14px 2px 0; font-size: 15px; line-height: 1.8; }
+.qc-bar, .qk-bar { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); background: var(--bg); }
+@media (max-width: 700px) { .qc-bar, .qk-bar { bottom: calc(50px + env(safe-area-inset-bottom)); padding-bottom: 10px; } }
+.qc-bar .go.sm, .qk-bar .go.sm, .qk-grade .go.sm { width: auto; margin: 0; height: 46px; padding: 0 26px; border-radius: 99px; font-size: 16px; justify-content: center; align-items: center; }
+.qk-bar .ghost, .qk-grade .ghost { height: 46px; padding: 0 20px; border-radius: 99px; }
+.qk-q { font-size: 16px; line-height: 1.8; }
+.qm { margin: 10px 0; padding: 10px 14px; border-radius: 12px; background: var(--card); font-family: var(--mono); font-size: 15px; line-height: 1.9; }
+.qk-sol { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 15px; line-height: 1.8; }
+.qk-sol .tab-step h4 { margin: 14px 0 6px; font-size: 15px; }
+.qk-grade { display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 4px; }
+.qg { max-height: 40vh; }

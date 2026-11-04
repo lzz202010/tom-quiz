@@ -110,7 +110,8 @@
       <input class="or-search" id="ors" type="search" placeholder="搜讲义" autocomplete="off">
       <div id="orsr"></div>
       <div class="grp-h">工具</div>
-      <div class="grp"><a class="row-i chev" href="#/or/cards"><span>记忆闪卡</span><span class="v">${due ? '今日 ' + due + ' 张' : fresh ? fresh + ' 张新卡' : '全部完成'}</span></a>
+      <div class="grp"><a class="row-i chev" href="#/or/q"><span>练题</span><span class="v">${(() => { const q = qcStats(); return q.due ? '待复习 ' + q.due : QB.length + ' 道选择 · ' + GORDER.length + ' 类大题'; })()}</span></a>
+        <a class="row-i chev" href="#/or/cards"><span>记忆闪卡</span><span class="v">${due ? '今日 ' + due + ' 张' : fresh ? fresh + ' 张新卡' : '全部完成'}</span></a>
         <a class="row-i chev" href="#/or/tools"><span>计算器</span><span class="v">单纯形 · 运输 · 指派 · 排队 · 图解</span></a>
         <a class="row-i chev" href="#/or/ai/all"><span>问 AI 助教</span><span class="v"></span></a></div>
       <div class="grp-h">学习路线</div>
@@ -147,7 +148,7 @@
       ${exam ? timerHTML(c.no) : ''}
       <div class="or-eyebrow">${c.n === 0 ? '导读' : c.d ? '第 ' + c.d + ' 章' + (c.tag ? ' · ' + c.tag : '') : '考试冲刺'}</div>
       <h1 class="or-h1">${esc(c.title)}</h1>
-      <div class="or-acts">${core ? `<a href="#" id="mark" class="${dn ? 'on' : ''}">${dn ? '✓ 已学完' : '标记学完'}</a><a href="#" id="tocards">练本章闪卡</a>` : ''}</div>
+      <div class="or-acts">${core ? `${QB.some(q => q.ch === c.no) || GORDER.some(k => GEN[k].ch === c.no) ? `<a href="#/or/q/ch/${c.no}">练本章题</a>` : ''}<a href="#" id="mark" class="${dn ? 'on' : ''}">${dn ? '✓ 已学完' : '标记学完'}</a><a href="#" id="tocards">闪卡</a>` : ''}</div>
       ${(CH_DEMOS[c.no] || []).map(d => `<a href="#" class="or-demo" data-demo="${d}"><span class="pl">▶</span><span><b>先看动画</b><small>${esc(DEMOS[d].title)}</small></span></a>`).join('')}
       <article class="md">${md(c.md.replace(/^#\s+.+$/m, ''))}</article>
       <div class="or-foot">${prev ? `<a href="#/or/c/${prev.no}">‹ ${esc(lab(prev))}</a>` : '<span></span>'}${next ? `<a href="#/or/c/${next.no}" class="nx">${esc(lab(next))} ›</a>` : ''}</div>
@@ -265,6 +266,27 @@
   }
   const f = (q) => SV.fmtQ(q);
 
+  function lpSolHTML(res) {
+    const { names, kind, cost, tables, status } = res;
+    const N = names.length;
+    const typeName = { s: '松弛', e: '剩余', a: '人工' };
+    let html = `<div class="note-line">变量说明：${names.slice(res.n).map((nm, k) => `${nm} 为${typeName[kind[res.n + k]]}变量`).join('，') || '无'}。${res.sense === 'min' ? '原问题求 min，表中按 max z′ = −z 计算。' : ''}${res.rows.some((r) => r.flipped) ? '右端为负的约束已两边乘 −1。' : ''}</div>`;
+    tables.forEach((t, k) => {
+      html += `<div class="tab-step"><h4>第 ${k + 1} 张表　z = ${esc(String(t.z))}${res.sense === 'min' ? '（即 z′）' : ''}</h4><div class="scroll"><table class="tb">
+        <tr><th colspan="3">c<sub>j</sub></th>${cost.map((c) => `<th>${esc(String(c))}</th>`).join('')}<th></th></tr>
+        <tr><th>C<sub>B</sub></th><th>基</th><th>b</th>${names.map((n) => `<th>${n}</th>`).join('')}<th>θ</th></tr>
+        ${t.A.map((row, i) => `<tr><td>${esc(String(cost[t.basis[i]]))}</td><td>${names[t.basis[i]]}</td><td>${f(t.b[i])}</td>${row.map((x, j) => `<td class="${i === t.leave && j === t.enter ? 'piv' : j === t.enter ? 'hl' : ''}">${f(x)}</td>`).join('')}<td>${t.theta[i] ? f(t.theta[i]) : '—'}</td></tr>`).join('')}
+        <tr><th colspan="3">σ<sub>j</sub></th>${t.sig.map((s, j) => `<td class="${j === t.enter ? 'hl' : ''}">${esc(String(s))}</td>`).join('')}<td></td></tr>
+      </table></div>
+      <div class="note-line">${t.enter >= 0 ? (t.leave >= 0 ? `σ 最大的是 ${names[t.enter]}，入基；最小比值在 ${names[t.basis[t.leave]]} 行，出基；主元为 ${f(t.A[t.leave][t.enter])}。` : `${names[t.enter]} 的检验数为正，但这一列没有正元素：<b>无界解</b>。`) : '所有检验数 ≤ 0，达到最优。'}</div></div>`;
+    });
+    const xs = res.x.map((v, j) => `x${j + 1} = ${f(v)}`).join('，');
+    if (status === 'optimal') html += `<div class="result">最优解：${xs}；最优值 <b>z* = ${f(res.z)}</b>。${res.multiple ? '有非基变量的检验数为 0：<b>存在无穷多最优解</b>。' : ''}${res.duals && !res.rows.some((r) => r.flipped) ? `<br>对偶最优解（影子价格）y = (${res.duals.map(f).join(', ')})。` : ''}</div>`;
+    else if (status === 'unbounded') html += `<div class="result"><b>无界解</b>：目标函数可以无限改善。</div>`;
+    else if (status === 'infeasible') html += `<div class="result"><b>无可行解</b>：最优表中仍有取正值的人工变量。</div>`;
+    else html += `<div class="result">迭代次数过多，已停止。请检查模型。</div>`;
+    return html;
+  }
   function toolSimplex(el) {
     const def = S.get('t_lp', 'max 3 5\n1 0 <= 4\n0 2 <= 12\n3 2 <= 18');
     el.innerHTML = `<div class="card form">
@@ -273,7 +295,7 @@
       <div class="row"><button class="btn primary" id="lpgo">逐步求解</button>
       <button class="btn small" data-ex="max 3 5\n1 0 <= 4\n0 2 <= 12\n3 2 <= 18">例：封测厂</button>
       <button class="btn small" data-ex="min 2 3\n1 1 >= 4\n1 3 >= 6">例：大 M 法</button>
-      <button class="btn small" data-ex="max 3 -1 -1\n1 -2 1 <= 11\n-4 1 2 >= 3\n-2 0 1 = 1">例：清华版经典</button></div></div>
+      <button class="btn small" data-ex="max 3 -1 -1\n1 -2 1 <= 11\n-4 1 2 >= 3\n-2 0 1 = 1">例：混合约束</button></div></div>
       <div class="out" id="lpout"></div>`;
     $$('[data-ex]', el).forEach((b) => (b.onclick = () => { $('#lpt').value = b.dataset.ex.replace(/\\n/g, '\n'); run(); }));
     $('#lpgo').onclick = run;
@@ -281,25 +303,7 @@
       const out = $('#lpout'); const txt = $('#lpt').value; S.set('t_lp', txt);
       let res;
       try { res = SV.simplex(SV.parseLP(txt)); } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
-      const { names, kind, cost, tables, status } = res;
-      const N = names.length;
-      const typeName = { s: '松弛', e: '剩余', a: '人工' };
-      let html = `<div class="note-line">变量说明：${names.slice(res.n).map((nm, k) => `${nm} 为${typeName[kind[res.n + k]]}变量`).join('，') || '无'}。${res.sense === 'min' ? '原问题求 min，表中按 max z′ = −z 计算。' : ''}${res.rows.some((r) => r.flipped) ? '右端为负的约束已两边乘 −1。' : ''}</div>`;
-      tables.forEach((t, k) => {
-        html += `<div class="tab-step"><h4>第 ${k + 1} 张表　z = ${esc(String(t.z))}${res.sense === 'min' ? '（即 z′）' : ''}</h4><div class="scroll"><table class="tb">
-          <tr><th colspan="3">c<sub>j</sub></th>${cost.map((c) => `<th>${esc(String(c))}</th>`).join('')}<th></th></tr>
-          <tr><th>C<sub>B</sub></th><th>基</th><th>b</th>${names.map((n) => `<th>${n}</th>`).join('')}<th>θ</th></tr>
-          ${t.A.map((row, i) => `<tr><td>${esc(String(cost[t.basis[i]]))}</td><td>${names[t.basis[i]]}</td><td>${f(t.b[i])}</td>${row.map((x, j) => `<td class="${i === t.leave && j === t.enter ? 'piv' : j === t.enter ? 'hl' : ''}">${f(x)}</td>`).join('')}<td>${t.theta[i] ? f(t.theta[i]) : '—'}</td></tr>`).join('')}
-          <tr><th colspan="3">σ<sub>j</sub></th>${t.sig.map((s, j) => `<td class="${j === t.enter ? 'hl' : ''}">${esc(String(s))}</td>`).join('')}<td></td></tr>
-        </table></div>
-        <div class="note-line">${t.enter >= 0 ? (t.leave >= 0 ? `σ 最大的是 ${names[t.enter]}，入基；最小比值在 ${names[t.basis[t.leave]]} 行，出基；主元为 ${f(t.A[t.leave][t.enter])}。` : `${names[t.enter]} 的检验数为正，但这一列没有正元素：<b>无界解</b>。`) : '所有检验数 ≤ 0，达到最优。'}</div></div>`;
-      });
-      const xs = res.x.map((v, j) => `x${j + 1} = ${f(v)}`).join('，');
-      if (status === 'optimal') html += `<div class="result">最优解：${xs}；最优值 <b>z* = ${f(res.z)}</b>。${res.multiple ? '有非基变量的检验数为 0：<b>存在无穷多最优解</b>。' : ''}${res.duals && !res.rows.some((r) => r.flipped) ? `<br>对偶最优解（影子价格）y = (${res.duals.map(f).join(', ')})。` : ''}</div>`;
-      else if (status === 'unbounded') html += `<div class="result"><b>无界解</b>：目标函数可以无限改善。</div>`;
-      else if (status === 'infeasible') html += `<div class="result"><b>无可行解</b>：最优表中仍有取正值的人工变量。</div>`;
-      else html += `<div class="result">迭代次数过多，已停止。请检查模型。</div>`;
-      out.innerHTML = html;
+      out.innerHTML = lpSolHTML(res);
     }
     run();
   }
@@ -307,6 +311,20 @@
   function parseMatrix(t) { return t.trim().split(/\n/).map((l) => l.trim().split(/[\s,，]+/).filter(Boolean).map(Number)).filter((r) => r.length); }
   function parseList(t) { return t.trim().split(/[\s,，]+/).filter(Boolean).map(Number); }
 
+  function trTable(R, X, hl, extra) {
+    return `<div class="scroll"><table class="tb"><tr><th></th>${R.b.map((_, j) => `<th>B${j + 1}${R.dummy === 'col' && j === R.n - 1 ? '（虚）' : ''}</th>`).join('')}<th>产量</th></tr>
+        ${X.map((r, i) => `<tr><th>A${i + 1}${R.dummy === 'row' && i === R.m - 1 ? '（虚）' : ''}</th>${r.map((x, j) => `<td class="${hl && hl.some((c) => c[0] === i && c[1] === j) ? 'hl' : ''}"><span class="hint">${R.C[i][j]}</span> ${x === null ? (extra ? `<span class="hint">σ=${+extra[i][j].toFixed(4)}</span>` : '') : `<b>${+x.toFixed(4)}</b>`}</td>`).join('')}<td>${R.a[i]}</td></tr>`).join('')}
+        <tr><th>销量</th>${R.b.map((x) => `<td>${x}</td>`).join('')}<td></td></tr></table></div>`;
+  }
+  function trSolHTML(R) {
+    let html = R.dummy ? `<div class="note-line">产销不平衡，已加入虚拟${R.dummy === 'col' ? '销地' : '产地'}（运价为 0）。</div>` : '';
+    html += `<div class="tab-step"><h4>伏格尔法初始方案　总运费 ${+R.initialCost.toFixed(4)}</h4>${trTable(R, R.initial)}<div class="note-line">分配顺序：${R.vogel.map((v) => `${v.by}（罚数 ${v.pen}）→ (A${v.cell[0] + 1}, B${v.cell[1] + 1}) = ${+v.q.toFixed(4)}`).join('；')}${R.zeros.length ? `。退化，补 0 于 ${R.zeros.map((z) => `(A${z[0] + 1}, B${z[1] + 1})`).join('、')}` : ''}。</div></div>`;
+    R.iters.forEach((it, k) => {
+      html += `<div class="tab-step"><h4>第 ${k + 1} 次调整</h4>${trTable(R, it.X, it.loop, it.sig)}<div class="note-line">位势 u = (${it.u.map((x) => +x.toFixed(4)).join(', ')})，v = (${it.v.map((x) => +x.toFixed(4)).join(', ')})。(A${it.enter[0] + 1}, B${it.enter[1] + 1}) 检验数 ${+it.sigma.toFixed(4)} 最小，入基。闭回路 ${it.loop.map((c, i) => `(A${c[0] + 1},B${c[1] + 1})${it.signs[i] > 0 ? '+' : '−'}`).join(' → ')}，θ = ${+it.theta.toFixed(4)}，(A${it.leave[0] + 1}, B${it.leave[1] + 1}) 出基。总运费变为 ${+it.newCost.toFixed(4)}。</div></div>`;
+    });
+    if (R.final) html += `<div class="tab-step"><h4>最优方案</h4>${trTable(R, R.final.X, null, R.final.sig)}<div class="note-line">位势 u = (${R.final.u.map((x) => +x.toFixed(4)).join(', ')})，v = (${R.final.v.map((x) => +x.toFixed(4)).join(', ')})，空格检验数全部 ≥ 0。</div></div><div class="result">最小总运费 <b>${+R.final.cost.toFixed(4)}</b>。${R.multiple ? '有空格检验数为 0：<b>存在其他最优方案</b>。' : ''}</div>`;
+    return html;
+  }
   function toolTransport(el) {
     const d = S.get('t_tr', { c: '3 11 3 10\n1 9 2 8\n7 4 10 5', a: '7 4 9', b: '3 6 5 6' });
     el.innerHTML = `<div class="card form">
@@ -315,11 +333,6 @@
       <div class="hint">用伏格尔法求初始方案，再用位势法检验、闭回路调整，直到最优。产销不平衡时自动加虚拟产地或销地。</div>
       <div class="row"><button class="btn primary" id="trgo">求解</button></div></div><div class="out" id="trout"></div>`;
     $('#trgo').onclick = run;
-    function table(R, X, hl, extra) {
-      return `<div class="scroll"><table class="tb"><tr><th></th>${R.b.map((_, j) => `<th>B${j + 1}${R.dummy === 'col' && j === R.n - 1 ? '（虚）' : ''}</th>`).join('')}<th>产量</th></tr>
-        ${X.map((r, i) => `<tr><th>A${i + 1}${R.dummy === 'row' && i === R.m - 1 ? '（虚）' : ''}</th>${r.map((x, j) => `<td class="${hl && hl.some((c) => c[0] === i && c[1] === j) ? 'hl' : ''}"><span class="hint">${R.C[i][j]}</span> ${x === null ? (extra ? `<span class="hint">σ=${+extra[i][j].toFixed(4)}</span>` : '') : `<b>${+x.toFixed(4)}</b>`}</td>`).join('')}<td>${R.a[i]}</td></tr>`).join('')}
-        <tr><th>销量</th>${R.b.map((x) => `<td>${x}</td>`).join('')}<td></td></tr></table></div>`;
-    }
     function run() {
       const data = { c: $('#trc').value, a: $('#tra').value, b: $('#trb').value }; S.set('t_tr', data);
       const out = $('#trout');
@@ -330,17 +343,18 @@
         if ([...a, ...b, ...C.flat()].some((x) => !isFinite(x))) throw new Error('有无法识别的数字');
         R = SV.transport(C, a, b);
       } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
-      let html = R.dummy ? `<div class="note-line">产销不平衡，已加入虚拟${R.dummy === 'col' ? '销地' : '产地'}（运价为 0）。</div>` : '';
-      html += `<div class="tab-step"><h4>伏格尔法初始方案　总运费 ${+R.initialCost.toFixed(4)}</h4>${table(R, R.initial)}<div class="note-line">分配顺序：${R.vogel.map((v) => `${v.by}（罚数 ${v.pen}）→ (A${v.cell[0] + 1}, B${v.cell[1] + 1}) = ${+v.q.toFixed(4)}`).join('；')}${R.zeros.length ? `。退化，补 0 于 ${R.zeros.map((z) => `(A${z[0] + 1}, B${z[1] + 1})`).join('、')}` : ''}。</div></div>`;
-      R.iters.forEach((it, k) => {
-        html += `<div class="tab-step"><h4>第 ${k + 1} 次调整</h4>${table(R, it.X, it.loop, it.sig)}<div class="note-line">位势 u = (${it.u.map((x) => +x.toFixed(4)).join(', ')})，v = (${it.v.map((x) => +x.toFixed(4)).join(', ')})。(A${it.enter[0] + 1}, B${it.enter[1] + 1}) 检验数 ${+it.sigma.toFixed(4)} 最小，入基。闭回路 ${it.loop.map((c, i) => `(A${c[0] + 1},B${c[1] + 1})${it.signs[i] > 0 ? '+' : '−'}`).join(' → ')}，θ = ${+it.theta.toFixed(4)}，(A${it.leave[0] + 1}, B${it.leave[1] + 1}) 出基。总运费变为 ${+it.newCost.toFixed(4)}。</div></div>`;
-      });
-      if (R.final) html += `<div class="tab-step"><h4>最优方案</h4>${table(R, R.final.X, null, R.final.sig)}<div class="note-line">位势 u = (${R.final.u.map((x) => +x.toFixed(4)).join(', ')})，v = (${R.final.v.map((x) => +x.toFixed(4)).join(', ')})，空格检验数全部 ≥ 0。</div></div><div class="result">最小总运费 <b>${+R.final.cost.toFixed(4)}</b>。${R.multiple ? '有空格检验数为 0：<b>存在其他最优方案</b>。' : ''}</div>`;
-      out.innerHTML = html;
+      out.innerHTML = trSolHTML(R);
     }
     run();
   }
 
+  function mat(M, sel) { return `<div class="scroll"><table class="tb">${M.map((r, i) => `<tr>${r.map((x, j) => `<td class="${sel && sel[i] === j ? 'piv' : ''}">${x}</td>`).join('')}</tr>`).join('')}</table></div>`; }
+  function asSolHTML(M, R, mode) {
+    return `${R.converted ? `<div class="tab-step"><h4>化为最小化：用最大元素减去每个元素</h4>${mat(R.converted)}</div>` : ''}
+          <div class="tab-step"><h4>行约简、列约简之后</h4>${mat(R.reduced)}<div class="note-line">如果这里已经能找到 ${M.length} 个不同行、不同列的 0，就不需要画线调整。</div></div>
+          <div class="tab-step"><h4>最优指派</h4>${mat(M, R.assign)}</div>
+          <div class="result">${R.assign.map((j, i) => `${i + 1} → ${j + 1}`).join('，')}；${mode === 'max' ? '最大效益' : '最小费用'} <b>${R.total}</b></div>`;
+  }
   function toolAssign(el) {
     const d = S.get('t_as', { m: '4 8 7 15\n7 9 17 14\n6 9 12 8\n6 7 14 6', mode: 'min' });
     el.innerHTML = `<div class="card form">
@@ -349,7 +363,6 @@
       <div class="hint">给出精确最优指派（最多 9×9），并列出行列约简后的矩阵，方便核对匈牙利法的第一步。</div>
       <div class="row"><button class="btn primary" id="asgo">求解</button></div></div><div class="out" id="asout"></div>`;
     $('#asgo').onclick = run;
-    function mat(M, sel) { return `<div class="scroll"><table class="tb">${M.map((r, i) => `<tr>${r.map((x, j) => `<td class="${sel && sel[i] === j ? 'piv' : ''}">${x}</td>`).join('')}</tr>`).join('')}</table></div>`; }
     function run() {
       const data = { m: $('#asm').value, mode: $('#asmode').value }; S.set('t_as', data);
       const out = $('#asout');
@@ -357,10 +370,7 @@
         const M = parseMatrix(data.m);
         if (M.flat().some((x) => !isFinite(x))) throw new Error('有无法识别的数字');
         const R = SV.assignment(M, data.mode);
-        out.innerHTML = `${R.converted ? `<div class="tab-step"><h4>化为最小化：用最大元素减去每个元素</h4>${mat(R.converted)}</div>` : ''}
-          <div class="tab-step"><h4>行约简、列约简之后</h4>${mat(R.reduced)}<div class="note-line">如果这里已经能找到 ${M.length} 个不同行、不同列的 0，就不需要画线调整。</div></div>
-          <div class="tab-step"><h4>最优指派</h4>${mat(M, R.assign)}</div>
-          <div class="result">${R.assign.map((j, i) => `${i + 1} → ${j + 1}`).join('，')}；${data.mode === 'max' ? '最大效益' : '最小费用'} <b>${R.total}</b></div>`;
+        out.innerHTML = asSolHTML(M, R, data.mode);
       } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
     }
     run();
@@ -966,6 +976,317 @@
   }
   window.orOpenDemo = openDemo;
 
+  /* ───────────── 练题:概念选择题(按大纲每章配套)+ 计算大题(程序随机出数字,解答由求解器精确算出) ─────────────
+     st.qc[题id] = {box, due, ok, bad}:概念题按 1/3/7/14/30 天回来;st.qt[题型] = {n, ok};st.qw = 做错的计算题 [{k, s}] */
+  const QB = C.quiz || [];
+  st.qc = st.qc || {}; st.qt = st.qt || {}; st.qw = st.qw || [];
+  const QIV = [0, 1, 3, 7, 14, 30];
+  function rng(seed) { let a = seed >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const ri = (R, a, b) => a + Math.floor(R() * (b - a + 1));
+  const shuffle = (R, a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const SUBS = '₀₁₂₃₄₅₆₇₈₉', sb = n => String(n).split('').map(d => SUBS[d]).join('');
+  const X = j => 'x' + sb(j + 1), Y = i => 'y' + sb(i + 1), V = i => 'v' + sb(i + 1);
+  function lin(co, nm) {                                         // [2, −1, 0] → 2x₁ − x₂
+    let s = '';
+    co.forEach((c, j) => { if (!c) return; const a = Math.abs(c), t = (a === 1 ? '' : a) + nm(j);
+      s += s ? (c < 0 ? ' − ' : ' + ') + t : (c < 0 ? '−' : '') + t; });
+    return s || '0';
+  }
+  const tb = (head, rows, cls) => `<div class="scroll"><table class="tb${cls ? ' ' + cls : ''}"><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr>${r.map(x => `<td>${x}</td>`).join('')}</tr>`).join('')}</table></div>`;
+  const rnd = v => Math.round(v * 100) / 100;
+  const OPS = { '<=': '≤', '>=': '≥', '=': '=' };
+
+  function graphSVG(n, E, opt) {                                 // 无向/有向图,点放在圆上(有向图按层)
+    const P = opt.pos || Array.from({ length: n }, (_, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n; return [160 + 118 * Math.cos(a), 128 + 104 * Math.sin(a)]; });
+    let s = `<svg viewBox="0 0 320 256" class="demo-svg qg">${opt.dir ? '<defs><marker id="qa" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path d="M0 0L10 5L0 10z" class="cp-h"/></marker></defs>' : ''}`;
+    E.forEach(([a, b, w], k) => {
+      const p = P[a], q = P[b], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, on = opt.hl && opt.hl[k];
+      s += `<line x1="${p[0] + ux * 15}" y1="${p[1] + uy * 15}" x2="${q[0] - ux * 16}" y2="${q[1] - uy * 16}" class="dj-e${on ? ' route' : ''}"${opt.dir ? ' marker-end="url(#qa)"' : ''}/>
+        <text x="${(p[0] + q[0]) / 2 - uy * 9}" y="${(p[1] + q[1]) / 2 + ux * 9 + 4}" class="dg-lab sm" text-anchor="middle">${w}</text>`;
+    });
+    P.forEach((p, i) => { s += `<circle cx="${p[0]}" cy="${p[1]}" r="14" class="dj-n"/><text x="${p[0]}" y="${p[1] + 5}" class="dj-l" text-anchor="middle">${opt.names ? opt.names[i] : V(i)}</text>`; });
+    return `<div class="demo-pic">${s}</svg></div>`;
+  }
+  function randGraph(R, n) {                                     // 连通、每点 2–4 条边的无向图
+    for (let t = 0; t < 300; t++) {
+      const E = [], has = (a, b) => E.some(e => (e[0] === a && e[1] === b) || (e[0] === b && e[1] === a));
+      const ord = [0].concat(shuffle(R, Array.from({ length: n - 1 }, (_, i) => i + 1)));
+      for (let k = 1; k < n; k++) { const a = ord[ri(R, Math.max(0, k - 2), k - 1)]; E.push([Math.min(a, ord[k]), Math.max(a, ord[k]), ri(R, 1, 9)]); }
+      for (let k = 0; k < n; k++) { const a = ri(R, 0, n - 1), b = ri(R, 0, n - 1); if (a !== b && !has(a, b)) E.push([Math.min(a, b), Math.max(a, b), ri(R, 1, 9)]); }
+      const deg = Array(n).fill(0); E.forEach(e => { deg[e[0]]++; deg[e[1]]++; });
+      if (E.length >= n + 2 && deg.every(d => d <= 4)) return E.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+    }
+    return null;
+  }
+
+  const GEN = {
+    lp2: { ch: '02', name: '图解法', make(R) {
+      for (let t = 0; t < 400; t++) {
+        const c = [ri(R, 1, 6), ri(R, 1, 6)];
+        const cons = [[ri(R, 1, 4), ri(R, 1, 4)], [ri(R, 1, 4), ri(R, 0, 2)], [ri(R, 0, 2), ri(R, 1, 4)]].map(([a, b]) => [a, b, ri(R, 6, 24)]);
+        const L = cons.concat([[1, 0, 0], [0, 1, 0]]), Vx = [];
+        const ok = p => p[0] > -1e-9 && p[1] > -1e-9 && cons.every(k => k[0] * p[0] + k[1] * p[1] <= k[2] + 1e-9);
+        for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+          const [a1, b1, r1] = L[i], [a2, b2, r2] = L[j], det = a1 * b2 - a2 * b1; if (!det) continue;
+          const p = [(r1 * b2 - r2 * b1) / det, (a1 * r2 - a2 * r1) / det];
+          if (ok(p) && !Vx.some(q => Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]) < 1e-9)) Vx.push(p);
+        }
+        if (Vx.length < 4 || Vx.some(p => Math.abs(p[0] - Math.round(p[0])) > 1e-9 || Math.abs(p[1] - Math.round(p[1])) > 1e-9)) continue;
+        if (cons.some(k => !Vx.some(p => Math.abs(k[0] * p[0] + k[1] * p[1] - k[2]) < 1e-9))) continue;    // 不要多余约束
+        const cx = Vx.reduce((s, p) => s + p[0], 0) / Vx.length, cy = Vx.reduce((s, p) => s + p[1], 0) / Vx.length;
+        Vx.sort((p, q) => Math.atan2(p[1] - cy, p[0] - cx) - Math.atan2(q[1] - cy, q[0] - cx));
+        const z = Vx.map(p => c[0] * p[0] + c[1] * p[1]), best = Math.max(...z);
+        if (z.filter(v => v === best).length > 1) continue;
+        const bi = z.indexOf(best), bp = Vx[bi], tight = cons.filter(k => Math.abs(k[0] * bp[0] + k[1] * bp[1] - k[2]) < 1e-9);
+        const m = Math.max(...Vx.map(p => Math.max(p[0], p[1]))) + 1, k = 236 / m, gx = x => 34 + x * k, gy = y => 250 - y * k;
+        let svg = `<div class="demo-pic"><svg viewBox="0 0 290 270" class="demo-svg">`;
+        for (let i = 0; i <= m; i++) svg += `<line x1="${gx(i)}" y1="${gy(0)}" x2="${gx(i)}" y2="${gy(m)}" class="dg-grid"/><line x1="${gx(0)}" y1="${gy(i)}" x2="${gx(m)}" y2="${gy(i)}" class="dg-grid"/><text x="${gx(i)}" y="${gy(0) + 14}" class="dg-t" text-anchor="middle">${i}</text>${i ? `<text x="${gx(0) - 6}" y="${gy(i) + 4}" class="dg-t" text-anchor="end">${i}</text>` : ''}`;
+        cons.forEach(([a, b, r]) => { const pts = [[0, b ? r / b : 0], [a ? r / a : 0, 0], [m, b ? (r - a * m) / b : 0], [a ? (r - b * m) / a : 0, m]].filter(p => p[0] >= -1e-9 && p[1] >= -1e-9 && p[0] <= m + 1e-9 && p[1] <= m + 1e-9 && Math.abs(a * p[0] + b * p[1] - r) < 1e-6);
+          if (pts.length >= 2) svg += `<line x1="${gx(pts[0][0])}" y1="${gy(pts[0][1])}" x2="${gx(pts[1][0])}" y2="${gy(pts[1][1])}" class="dg-line"/>`; });
+        svg += `<polygon points="${Vx.map(p => gx(p[0]) + ',' + gy(p[1])).join(' ')}" class="dg-feas"/>`;
+        const zl = [[0, best / c[1]], [best / c[0], 0]];
+        svg += `<line x1="${gx(zl[0][0])}" y1="${gy(zl[0][1])}" x2="${gx(zl[1][0])}" y2="${gy(zl[1][1])}" class="dg-z"/>`;
+        Vx.forEach(p => { svg += `<circle cx="${gx(p[0])}" cy="${gy(p[1])}" r="3.5" class="dg-v"/>`; });
+        svg += `<circle cx="${gx(bp[0])}" cy="${gy(bp[1])}" r="7" class="dg-best"/></svg></div>`;
+        return {
+          q: `用图解法求解:<div class="qm">max z = ${lin(c, X)}<br>${cons.map(k => `${lin(k.slice(0, 2), X)} ≤ ${k[2]}`).join('<br>')}<br>x₁, x₂ ≥ 0</div>写出可行域的全部顶点、最优解和最优值。`,
+          sol: `<p>依次画出三条约束直线,三个半平面与第一象限的公共部分就是可行域(红色)。顶点及目标值:</p>
+            ${tb(['顶点', 'z = ' + lin(c, X)], Vx.map((p, i) => [`(${p[0]}, ${p[1]})`, i === bi ? `<b>${z[i]}</b>` : z[i]]))}
+            ${svg}<p>目标函数等值线 ${lin(c, X)} = z 沿法向 (${c[0]}, ${c[1]}) 平移,z 越大越往右上。最后离开可行域的点是 <b>(${bp[0]}, ${bp[1]})</b>(虚线是 z = ${best} 的等值线)。</p>
+            <p>该点处 ${tight.map(k => `${lin(k.slice(0, 2), X)} = ${k[2]}`).join('、')} 取等号(这些资源恰好用完)。</p>
+            <div class="result">最优解 x₁ = ${bp[0]},x₂ = ${bp[1]},最优值 <b>z* = ${best}</b></div>` };
+      }
+    } },
+    simplex: { ch: '03', name: '单纯形法', make(R) {
+      const den = q => { const p = String(q).split('/'); return p[1] ? +p[1] : 1; };
+      for (let t = 0; t < 400; t++) {
+        const c = [ri(R, 1, 6), ri(R, 1, 6), ri(R, 0, 5)], A = [0, 1, 2].map(() => [ri(R, 0, 4), ri(R, 0, 4), ri(R, 0, 4)]), b = [0, 1, 2].map(() => ri(R, 4, 30));
+        if (A.some(r => r.every(x => !x)) || [0, 1, 2].some(j => A.every(r => !r[j]))) continue;
+        let res; try { res = SV.simplex(SV.parseLP(`max ${c.join(' ')}\n${A.map((r, i) => r.join(' ') + ' <= ' + b[i]).join('\n')}`)); } catch (e) { continue; }
+        if (res.status !== 'optimal' || res.tables.length < 3 || res.tables.length > 4) continue;
+        const last = res.tables[res.tables.length - 1];
+        if (last.b.some(v => den(v) > 4) || den(res.z) > 4) continue;
+        return { q: `用单纯形法求解:<div class="qm">max z = ${lin(c, X)}<br>${A.map((r, i) => `${lin(r, X)} ≤ ${b[i]}`).join('<br>')}<br>x₁, x₂, x₃ ≥ 0</div>写出每张单纯形表。`,
+          sol: `<p>加松弛变量 x₄、x₅、x₆ 化为标准型,以它们为初始基。检验数 σⱼ = cⱼ − C<sub>B</sub>B⁻¹Pⱼ,max 问题全部 ≤ 0 为最优。</p>${lpSolHTML(res)}` };
+      }
+    } },
+    dual: { ch: '04', name: '写对偶问题', make(R) {
+      const isMax = R() < 0.6, m = 3, n = 3;
+      const c = [0, 1, 2].map(() => ri(R, 1, 7) * (R() < 0.15 ? -1 : 1)), A = [0, 1, 2].map(() => [0, 1, 2].map(() => R() < 0.15 ? 0 : ri(R, -3, 5) || 1)), b = [0, 1, 2].map(() => ri(R, 2, 20));
+      const ops = ['<=', '>=', '='].map(() => 0).map(() => ['<=', '>=', '='][R() < 0.45 ? 0 : R() < 0.6 ? 1 : 2]);
+      const sg = [0, 1, 2].map(() => R() < 0.6 ? '>=0' : R() < 0.5 ? '<=0' : 'free');
+      if (!ops.some(o => o !== (isMax ? '<=' : '>=')) && !sg.some(s => s !== '>=0')) { ops[1] = '='; sg[2] = 'free'; }
+      // 规则:原问题 max → 对偶 min;约束 ≤ ↔ y ≥ 0,≥ ↔ y ≤ 0,= ↔ y 无约束;x ≥ 0 ↔ 对偶约束 ≥,x ≤ 0 ↔ ≤,x 无约束 ↔ =。原问题 min 时全部反过来。
+      const ySign = ops.map(o => o === '=' ? 'free' : (o === '<=') === isMax ? '>=0' : '<=0');
+      const dOp = sg.map(s => s === 'free' ? '=' : (s === '>=0') === isMax ? '>=' : '<=');
+      const signTxt = (s, v) => s === 'free' ? v + ' 无符号限制' : v + (s === '>=0' ? ' ≥ 0' : ' ≤ 0');
+      const AT = [0, 1, 2].map(j => A.map(r => r[j]));
+      return { q: `写出下列线性规划的对偶问题:<div class="qm">${isMax ? 'max' : 'min'} z = ${lin(c, X)}<br>${A.map((r, i) => `${lin(r, X)} ${OPS[ops[i]]} ${b[i]}`).join('<br>')}<br>${sg.map((s, j) => signTxt(s, X(j))).join(',')}</div>`,
+        sol: `<p>原问题求 ${isMax ? 'max' : 'min'},对偶问题求 ${isMax ? 'min' : 'max'};每个约束对应一个对偶变量 yᵢ,目标系数是原问题的右端 b,约束系数矩阵转置,右端是原问题的目标系数 c。</p>
+          ${tb(['原问题', '对偶问题'], ops.map((o, i) => [`第 ${i + 1} 个约束 ${OPS[o]}`, signTxt(ySign[i], Y(i))]).concat(sg.map((s, j) => [signTxt(s, X(j)), `第 ${j + 1} 个约束 ${OPS[dOp[j]]}`])))}
+          <div class="qm">${isMax ? 'min' : 'max'} w = ${lin(b, Y)}<br>${AT.map((r, j) => `${lin(r, Y)} ${OPS[dOp[j]]} ${c[j]}`).join('<br>')}<br>${ySign.map((s, i) => signTxt(s, Y(i))).join(',')}</div>
+          <p class="dim">口诀(原问题求 max):约束「≤ 正常 → y ≥ 0,≥ 反常 → y ≤ 0,= → 自由」;变量「≥ 0 正常 → 对偶约束 ≥,≤ 0 → ≤,自由 → =」。原问题求 min 时,「正常」的约束是 ≥,对偶约束的方向也全部反过来。</p>` };
+    } },
+    transport: { ch: '05', name: '运输问题', make(R) {
+      for (let t = 0; t < 300; t++) {
+        const C = [0, 1, 2].map(() => [0, 1, 2, 3].map(() => ri(R, 1, 12))), unb = R() < 0.3;
+        const b = [0, 1, 2, 3].map(() => ri(R, 2, 9) * 5), tot = b.reduce((s, x) => s + x, 0) + (unb ? ri(R, 1, 3) * 5 : 0);
+        const a1 = ri(R, 2, Math.floor(tot / 5) - 4) * 5, a2 = ri(R, 1, Math.floor((tot - a1) / 5) - 1) * 5, a = [a1, a2, tot - a1 - a2];
+        if (a.some(x => x <= 0)) continue;
+        let Rs; try { Rs = SV.transport(C, a, b); } catch (e) { continue; }
+        if (!Rs.final || Rs.iters.length < 1 || Rs.iters.length > 3 || Rs.zeros.length) continue;
+        return { q: `某公司有 3 个产地、4 个销地,单位运价、产量和销量如下。${unb ? '<b>注意产销是否平衡。</b>' : ''}用伏格尔法求初始调运方案,再用位势法检验、闭回路法调整,求最优调运方案和最小总运费。
+            ${tb(['', 'B₁', 'B₂', 'B₃', 'B₄', '产量'], C.map((r, i) => ['A' + sb(i + 1)].concat(r, [a[i]])).concat([['销量'].concat(b, [''])]))}`,
+          sol: trSolHTML(Rs) };
+      }
+    } },
+    assign: { ch: '06', name: '指派问题', make(R) {
+      const mx = R() < 0.25, M = [0, 1, 2, 3].map(() => [0, 1, 2, 3].map(() => ri(R, 2, 15))), Rs = SV.assignment(M, mx ? 'max' : 'min');
+      return { q: `4 个人完成 4 项任务,每人只做一项、每项只由一人做。${mx ? '各人完成各任务的<b>效益</b>' : '各人完成各任务的<b>时间</b>'}如下,用匈牙利法求使${mx ? '总效益最大' : '总时间最少'}的指派方案。${tb(['', '任务 1', '任务 2', '任务 3', '任务 4'], M.map((r, i) => ['甲乙丙丁'[i]].concat(r)))}`,
+        sol: `${asSolHTML(M, Rs, mx ? 'max' : 'min')}<p class="dim">表中第 i 行是${'甲乙丙丁'.split('').map((p, i) => p + '=' + (i + 1)).join('、')}。若约简后找不到 4 个独立 0:用最少直线覆盖所有 0,未覆盖元素减去其中最小值、两线交叉处加上它,再试指派。</p>` };
+    } },
+    dp: { ch: '07', name: '动态规划·资源分配', make(R) {
+      const N = R() < 0.5 ? 4 : 5, g = [0, 1, 2].map(() => { const inc = shuffle(R, Array.from({ length: N }, () => ri(R, 0, 7))).sort((x, y) => y - x); const r = [0]; inc.forEach(d => r.push(r[r.length - 1] + d)); return r; });
+      const f3 = g[2].slice(), f2 = [], u2 = [], rows2 = [];
+      for (let s = 0; s <= N; s++) { let best = -1, us = []; const cells = []; for (let u = 0; u <= s; u++) { const v = g[1][u] + f3[s - u]; cells.push(`${g[1][u]}+${f3[s - u]}`); if (v > best) { best = v; us = [u]; } else if (v === best) us.push(u); }
+        f2[s] = best; u2[s] = us; rows2.push([s].concat(Array.from({ length: N + 1 }, (_, u) => u <= s ? (us.indexOf(u) >= 0 ? `<b>${cells[u]}</b>` : cells[u]) : ''), [best, us.join(' 或 ')])); }
+      let f1 = -1, u1 = []; const c1 = [];
+      for (let u = 0; u <= N; u++) { const v = g[0][u] + f2[N - u]; c1.push(v); if (v > f1) { f1 = v; u1 = [u]; } else if (v === f1) u1.push(u); }
+      const plans = []; u1.forEach(a => u2[N - a].forEach(b2 => plans.push([a, b2, N - a - b2])));
+      let brute = -1; for (let a = 0; a <= N; a++) for (let b2 = 0; a + b2 <= N; b2++) brute = Math.max(brute, g[0][a] + g[1][b2] + g[2][N - a - b2]);
+      if (brute !== f1) return null;
+      return { q: `把 ${N} 台设备分给 3 个车间,各车间分到 u 台时的新增利润(万元)如下。用动态规划求利润最大的分配方案。${tb(['u'].concat(Array.from({ length: N + 1 }, (_, i) => i)), g.map((r, k) => ['车间 ' + (k + 1)].concat(r)))}`,
+        sol: `<p>阶段 k = 车间 k;状态 sₖ = 分配给第 k 至第 3 个车间的设备数;决策 uₖ = 分给车间 k 的台数;状态转移 sₖ₊₁ = sₖ − uₖ;递推 fₖ(sₖ) = max{gₖ(uₖ) + fₖ₊₁(sₖ − uₖ)},f₃(s) = g₃(s)。逆序计算:</p>
+          <p><b>k = 3</b>:f₃(s) = g₃(s) = ${f3.map((v, s) => `${v}`).join('、')}(s = 0…${N})</p>
+          <p><b>k = 2</b>:表中每格是 g₂(u) + f₃(s − u),加粗的是最大值</p>${tb(['s₂ \\ u₂'].concat(Array.from({ length: N + 1 }, (_, i) => i), ['f₂', 'u₂*']), rows2)}
+          <p><b>k = 1</b>:s₁ = ${N},${c1.map((v, u) => `u₁=${u}:${g[0][u]}+${f2[N - u]}=${v}`).join(';')},f₁(${N}) = <b>${f1}</b>,u₁* = ${u1.join(' 或 ')}。</p>
+          <div class="result">最优分配(车间 1, 2, 3):${plans.map(p => `(${p.join(', ')})`).join(' 或 ')},最大利润 <b>${f1}</b> 万元</div>` };
+    } },
+    dijkstra: { ch: '08', name: '最短路 Dijkstra', make(R) {
+      const n = R() < 0.5 ? 6 : 7, E = randGraph(R, n); if (!E) return null;
+      const d = Array(n).fill(Infinity), prev = Array(n).fill(-1), done = Array(n).fill(false), rows = []; d[0] = 0;
+      for (let step = 0; step < n; step++) {
+        let u = -1; for (let i = 0; i < n; i++) if (!done[i] && (u < 0 || d[i] < d[u])) u = i;
+        if (d[u] === Infinity) return null;
+        done[u] = true;
+        E.forEach(([a, b2, w]) => [[a, b2], [b2, a]].forEach(([x, y]) => { if (x === u && !done[y] && d[u] + w < d[y]) { d[y] = d[u] + w; prev[y] = u; } }));
+        rows.push([step + 1, V(u)].concat(d.map((v, i) => i === u ? `<b>${v}</b>` : done[i] ? '' : v === Infinity ? '∞' : v)));
+      }
+      const path = i => { const p = []; for (let v = i; v >= 0; v = prev[v]) p.unshift(V(v)); return p.join('→'); };
+      const tree = E.map(([a, b2]) => prev[b2] === a || prev[a] === b2);
+      return { q: `用 Dijkstra 算法求 v₁ 到其余各点的最短路(无向图,边上数字为长度):${graphSVG(n, E, {})}<p class="dim">${E.map(([a, b2, w]) => `${V(a)}${V(b2)} = ${w}`).join(',')}</p>`,
+        sol: `<p>每一步在临时标号中选最小的定为永久标号(加粗),再用它更新相邻点。表中每行是这一步结束后的标号(空格 = 已是永久标号)。</p>${tb(['步', '定下'].concat(Array.from({ length: n }, (_, i) => V(i))), rows)}
+          ${graphSVG(n, E, { hl: tree })}${tb(['终点', '最短路', '长度'], Array.from({ length: n - 1 }, (_, i) => [V(i + 1), path(i + 1), d[i + 1]]))}<p class="dim">红色的边组成最短路树。</p>` };
+    } },
+    mst: { ch: '08', name: '最小支撑树', make(R) {
+      const n = R() < 0.5 ? 6 : 7, E = randGraph(R, n); if (!E) return null;
+      const order = E.map((e, k) => k).sort((x, y) => E[x][2] - E[y][2] || x - y), par = Array.from({ length: n }, (_, i) => i), find = x => par[x] === x ? x : (par[x] = find(par[x]));
+      const rows = [], pick = Array(E.length).fill(false); let tot = 0, cnt = 0;
+      order.forEach(k => { if (cnt === n - 1) return; const [a, b2, w] = E[k], ra = find(a), rb = find(b2);
+        if (ra === rb) rows.push([`${V(a)}${V(b2)}`, w, '成圈,跳过']); else { par[ra] = rb; pick[k] = true; tot += w; cnt++; rows.push([`${V(a)}${V(b2)}`, w, `<b>加入</b>(第 ${cnt} 条)`]); } });
+      return { q: `用避圈法(Kruskal)求下图的最小支撑树及其总长度:${graphSVG(n, E, {})}<p class="dim">${E.map(([a, b2, w]) => `${V(a)}${V(b2)} = ${w}`).join(',')}</p>`,
+        sol: `<p>把边按长度从小到大排,依次检查:不和已选的边构成圈就加入,够 ${n - 1} 条(点数 − 1)就停。</p>${tb(['边', '长度', '处理'], rows)}${graphSVG(n, E, { hl: pick })}
+          <div class="result">最小支撑树(红色)总长度 <b>${tot}</b></div><p class="dim">长度相同的边先后顺序不同,得到的树可能不同,但总长度一定相同。</p>` };
+    } },
+    maxflow: { ch: '08', name: '最大流', make(R) {
+      const nm = ['s', 'v₁', 'v₂', 'v₃', 'v₄', 't'], pos = [[22, 128], [112, 46], [112, 210], [208, 46], [208, 210], [298, 128]];
+      const base = [[0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [4, 5]], extra = shuffle(R, [[1, 2], [2, 1], [3, 4], [4, 3], [1, 4], [2, 3]]).slice(0, 3);
+      const arcs = base.concat(extra.filter((e, i, A) => !A.slice(0, i).some(f2 => f2[0] === e[1] && f2[1] === e[0]))).map(([a, b2]) => [a, b2, ri(R, 2, 9)]);
+      const n = 6, cap = Array.from({ length: n }, () => Array(n).fill(0)), fl = Array.from({ length: n }, () => Array(n).fill(0));
+      arcs.forEach(([a, b2, c]) => { cap[a][b2] = c; });
+      const steps = []; let total = 0;
+      for (let it = 0; it < 30; it++) {
+        const pr = Array(n).fill(null); pr[0] = [-1, 0]; const qu = [0];
+        while (qu.length && !pr[5]) { const u = qu.shift(); for (let v = 0; v < n; v++) { if (pr[v]) continue; if (cap[u][v] - fl[u][v] > 0) { pr[v] = [u, 1]; qu.push(v); } else if (fl[v][u] > 0) { pr[v] = [u, -1]; qu.push(v); } } }
+        if (!pr[5]) { var labeled = pr.map(Boolean); break; }
+        const path = []; for (let v = 5; v !== 0; v = pr[v][0]) path.unshift([pr[v][0], v, pr[v][1]]);
+        const th = Math.min(...path.map(([u, v, d]) => d > 0 ? cap[u][v] - fl[u][v] : fl[v][u]));
+        path.forEach(([u, v, d]) => { if (d > 0) fl[u][v] += th; else fl[v][u] -= th; });
+        total += th;
+        steps.push(`${nm[0]}${path.map(([u, v, d]) => (d > 0 ? '→' : '⇠') + nm[v]).join('')},θ = min{${path.map(([u, v, d]) => d > 0 ? cap[u][v] - fl[u][v] + th : fl[v][u] + th).join(', ')}} = ${th}${path.some(p => p[2] < 0) ? '(⇠ 为后向边,退回流量)' : ''}`);
+      }
+      if (!labeled) return null;
+      const cut = arcs.filter(([a, b2]) => labeled[a] && !labeled[b2]), cutCap = cut.reduce((s, e) => s + e[2], 0);
+      if (cutCap !== total || steps.length < 2 || cut.every(e => e[0] === 0) || cut.every(e => e[1] === 5)) return null;   // 割全在起点或终点的太简单
+      return { q: `求下面网络从 s 到 t 的最大流,并写出最小割(弧上数字为容量):${graphSVG(n, arcs, { dir: true, pos: pos, names: nm })}<p class="dim">${arcs.map(([a, b2, c]) => `${nm[a]}→${nm[b2]} (${c})`).join(',')}</p>`,
+        sol: `<p>从零流开始,每次找一条增广链(前向弧不饱和、后向弧有流量),沿链增加 θ:</p><ol>${steps.map(x => `<li>${x}</li>`).join('')}</ol>
+          <p>再标号:从 s 出发能到达的点是 {${nm.filter((_, i) => labeled[i]).join(', ')}},t 无法标号,找不到增广链,当前流即最大流。</p>
+          ${tb(['弧', '容量', '流量'], arcs.map(([a, b2, c]) => [`${nm[a]}→${nm[b2]}`, c, fl[a][b2]]))}
+          <div class="result">最大流量 <b>${total}</b>;最小割 {${cut.map(([a, b2]) => nm[a] + '→' + nm[b2]).join(', ')}},容量 ${cut.map(e => e[2]).join(' + ')} = ${cutCap},与最大流相等。</div>` };
+    } },
+    cpm: { ch: '16', name: '网络计划 CPM', make(R) {
+      const n = ri(R, 7, 8), L = 'ABCDEFGH'.slice(0, n).split(''), dur = L.map(() => ri(R, 1, 9)), pre = L.map(() => []);
+      for (let k = 1; k < n; k++) { if (k <= 1 && R() < 0.6) continue; const m = R() < 0.55 ? 1 : 2; shuffle(R, Array.from({ length: k }, (_, i) => i)).slice(0, m).forEach(i => pre[k].push(i)); pre[k].sort(); }
+      const succ = L.map((_, i) => pre.map((p, k) => p.indexOf(i) >= 0 ? k : -1).filter(k => k >= 0));
+      if (succ.filter(s => !s.length).length > 2) return null;
+      const ES = [], EF = [], LS = [], LF = [];
+      L.forEach((_, k) => { ES[k] = Math.max(0, ...pre[k].map(i => EF[i])); EF[k] = ES[k] + dur[k]; });
+      const T = Math.max(...EF);
+      for (let k = n - 1; k >= 0; k--) { LF[k] = Math.min(T, ...succ[k].map(j => LS[j])); LS[k] = LF[k] - dur[k]; }
+      const TF = L.map((_, k) => LS[k] - ES[k]), FF = L.map((_, k) => (succ[k].length ? Math.min(...succ[k].map(j => ES[j])) : T) - EF[k]);
+      const starts = L.map((_, k) => k).filter(k => !pre[k].length && TF[k] === 0), crit = [];
+      starts.forEach(s0 => (function walk(k, p) { const nx = succ[k].filter(j => TF[j] === 0 && ES[j] === EF[k]); if (!nx.length) { if (EF[k] === T) crit.push(p); return; } nx.forEach(j => walk(j, p.concat(L[j]))); })(s0, [L[s0]]));
+      if (TF.every(x => x === 0)) return null;
+      return { q: `某工程的工作清单如下(时间:天)。画出网络图,计算各工作的最早/最迟开始和结束时间、总时差、自由时差,确定关键路线和总工期。${tb(['工作'].concat(L), [['时间'].concat(dur), ['紧前工作'].concat(pre.map(p => p.length ? p.map(i => L[i]).join('、') : '—'))])}`,
+        sol: `<p>顺推:ES = 紧前工作 EF 的最大值,EF = ES + t;逆推:LF = 紧后工作 LS 的最小值(没有紧后工作的取总工期),LS = LF − t。TF = LS − ES;FF = 紧后工作 ES 的最小值 − EF。</p>
+          ${tb(['工作', 't', 'ES', 'EF', 'LS', 'LF', 'TF', 'FF'], L.map((l, k) => [TF[k] === 0 ? `<b>${l}</b>` : l, dur[k], ES[k], EF[k], LS[k], LF[k], TF[k] === 0 ? '<b>0</b>' : TF[k], FF[k]]))}
+          <div class="result">总工期 <b>${T}</b> 天;关键工作 ${L.filter((_, k) => TF[k] === 0).join('、')};关键路线 ${crit.map(p => p.join(' → ')).join(' 和 ')}</div>
+          <p class="dim">画双代号网络图时,两项工作起止节点相同、或紧前关系部分重叠,要加虚工作。</p>` };
+    } },
+    decision: { ch: '10', name: '决策准则与期望值', make(R) {
+      const A = ['A₁', 'A₂', 'A₃'], P = shuffle(R, [[2, 5, 3], [3, 4, 3], [1, 6, 3], [4, 4, 2], [2, 3, 5]])[0].map(x => x / 10), a = 0.6;
+      const M = A.map(() => [0, 1, 2].map(() => ri(R, -6, 20) * 10));
+      const mx = M.map(r => Math.max(...r)), mn = M.map(r => Math.min(...r)), hz = M.map((r, i) => rnd(a * mx[i] + (1 - a) * mn[i])), av = M.map(r => rnd(r.reduce((s, x) => s + x, 0) / 3));
+      const colMax = [0, 1, 2].map(j => Math.max(...M.map(r => r[j]))), reg = M.map(r => r.map((x, j) => colMax[j] - x)), mr = reg.map(r => Math.max(...r));
+      const ev = M.map(r => rnd(r.reduce((s, x, j) => s + x * P[j], 0))), best = Math.max(...ev), evpi = rnd(colMax.reduce((s, x, j) => s + x * P[j], 0) - best);
+      const arg = (v, f) => A.filter((_, i) => v[i] === f(...v)).join('、');
+      return { q: `某企业有三个方案,未来市场有三种状态,收益矩阵(万元)如下:${tb(['', '状态 1', '状态 2', '状态 3'], M.map((r, i) => [A[i]].concat(r)))}
+          (1)分别按乐观准则、悲观准则、折中准则(乐观系数 α = ${a})、等可能准则、最小后悔值准则选择方案;<br>(2)若三种状态的概率为 ${P.join('、')},按期望值准则选择方案,并求完全信息价值 EVPI。`,
+        sol: `${tb(['方案', '最大值', '最小值', '折中值', '平均值', '最大后悔值', '期望值'], M.map((r, i) => [A[i], mx[i], mn[i], hz[i], av[i], mr[i], ev[i]]))}
+          <p>后悔值 = 该状态下的最大收益 − 本方案收益:${tb(['', '状态 1', '状态 2', '状态 3'], reg.map((r, i) => [A[i]].concat(r)))}</p>
+          <ul><li>乐观(大中取大):${arg(mx, Math.max)}</li><li>悲观(小中取大):${arg(mn, Math.max)}</li><li>折中(α·最大 + (1−α)·最小,取大):${arg(hz, Math.max)}</li><li>等可能(平均值取大):${arg(av, Math.max)}</li><li>最小后悔值(最大后悔值取小):${arg(mr, Math.min)}</li><li>期望值准则:${arg(ev, Math.max)},期望收益 ${best}</li></ul>
+          <div class="result">有完全信息时:各状态都选最好的方案,期望收益 ${colMax.map((x, j) => `${P[j]}×${x}`).join(' + ')} = ${rnd(best + evpi)};EVPI = ${rnd(best + evpi)} − ${best} = <b>${evpi}</b> 万元</div>` };
+    } },
+  };
+  const GORDER = ['lp2', 'simplex', 'dual', 'transport', 'assign', 'dp', 'dijkstra', 'mst', 'maxflow', 'cpm', 'decision'];
+  function genQ(kind, seed) { for (let k = 0; k < 20; k++) { const g = GEN[kind].make(rng(seed + k * 7919)); if (g) return g; } return null; }
+
+  /* 练题首页:概念题一组 10 道;计算题按题型,每点一次换一套数字 */
+  function viewQ(ch) {
+    const pool = QB.filter(q => !ch || q.ch === ch), now = Date.now(), done = pool.filter(q => st.qc[q.id]).length, due = pool.filter(q => st.qc[q.id] && st.qc[q.id].due <= now).length;
+    const kinds = GORDER.filter(k => !ch || GEN[k].ch === ch), c = ch && chOf(ch);
+    $app.innerHTML = `<div class="or-page">
+      <a href="${c ? '#/or/c/' + ch : '#/or'}" class="back" id="orback">‹ ${c ? esc(c.title) : '运筹学'}</a>
+      <h1 class="or-h1">${c ? '练本章' : '练题'}</h1>
+      ${pool.length ? `<div class="grp-h">概念题 · 选择</div><div class="grp"><a class="row-i chev" href="#/or/q/c/${ch || 'all'}"><span>练 10 道</span><span class="v">${due ? '待复习 ' + due + ' · ' : ''}做过 ${done} / ${pool.length}</span></a></div>` : ''}
+      ${kinds.length ? `<div class="grp-h">计算大题 · 每次换新数字</div><div class="grp">${kinds.map(k => { const s = st.qt[k] || { n: 0, ok: 0 }, cc = chOf(GEN[k].ch);
+        return `<a class="row-i chev" href="#/or/q/k/${k}"><span>${GEN[k].name}${!ch && cc && cc.d ? `<small class="dim"> · ${cc.d}</small>` : ''}</span><span class="v">${s.n ? `做对 ${s.ok} / ${s.n}` : ''}</span></a>`; }).join('')}</div>` : ''}
+      ${!ch && st.qw.length ? `<div class="grp-h">做错的计算题</div><div class="grp">${st.qw.slice(-8).reverse().map(w => `<a class="row-i chev" href="#/or/q/k/${w.k}/${w.s}"><span>${GEN[w.k] ? GEN[w.k].name : w.k}</span><span class="v">${new Date(w.t).toLocaleDateString()}</span></a>`).join('')}</div>` : ''}
+    </div>`;
+    window.scrollTo(0, 0);
+    $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
+  }
+  let cq = null;                                                  // 当前一组概念题
+  function viewQC(ch) {
+    if (!cq || cq.ch !== ch || cq.i >= cq.list.length && cq.fresh) {
+      const pool = QB.filter(q => ch === 'all' || q.ch === ch), now = Date.now(), R = Math.random;
+      const due = pool.filter(q => st.qc[q.id] && st.qc[q.id].due <= now), fresh = shuffle(R, pool.filter(q => !st.qc[q.id])), rest = pool.filter(q => st.qc[q.id] && st.qc[q.id].due > now).sort((x, y) => st.qc[x.id].due - st.qc[y.id].due);
+      const list = due.concat(fresh, rest).slice(0, 10).map(q => ({ q: q, ord: shuffle(R, q.o.map((_, i) => i)), pick: -1 }));
+      cq = { ch: ch, list: list, i: 0, right: 0, fresh: false };
+    }
+    if (cq.i >= cq.list.length) {
+      $app.innerHTML = `<div class="or-page"><a href="#/or/q${cq.ch === 'all' ? '' : '/ch/' + cq.ch}" class="back" id="orback">‹ 练题</a><h1 class="or-h1">这组做完了</h1>
+        <div class="or-card done"><b>${cq.right} / ${cq.list.length}</b><p class="dim">做错的题会在 1 天后回来,做对的间隔越来越长。</p></div>
+        <button class="go" id="again">再来 10 道</button></div>`;
+      $('#again').onclick = () => { cq.fresh = true; viewQC(ch); };
+      cq.fresh = true; return;
+    }
+    const it = cq.list[cq.i], q = it.q, cc = chOf(q.ch), answered = it.pick >= 0;
+    $app.innerHTML = `<div class="or-page or-qc">
+      <a href="#/or/q${ch === 'all' ? '' : '/ch/' + ch}" class="back" id="orback">‹ 练题</a>
+      <div class="qc-meta"><span>${cq.i + 1} / ${cq.list.length}</span><span>${cc ? (cc.d ? '第 ' + cc.d + ' 章 · ' : '') + esc(cc.title) : ''}</span></div>
+      <div class="qc-q">${mdInline(q.q)}</div>
+      <div class="qc-opts">${it.ord.map((oi, k) => `<button class="qc-o${answered ? (oi === q.a ? ' ok' : k === it.pick ? ' bad' : ' dim') : ''}" data-k="${k}"><b>${'ABCD'[k]}</b><span>${mdInline(q.o[oi])}</span></button>`).join('')}</div>
+      ${answered ? `<div class="qc-e">${it.ord[it.pick] === q.a ? '<b class="demo-ok">对了。</b>' : `<b class="demo-bad">选错了,答案是 ${'ABCD'[it.ord.indexOf(q.a)]}。</b>`}${mdInline(q.e)}</div>
+        <div class="qc-bar"><a href="#" id="qcai">没懂,问 AI</a><button class="go sm" id="qcnext">${cq.i + 1 < cq.list.length ? '下一题' : '看结果'}</button></div>` : ''}
+    </div>`;
+    $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
+    if (!answered) $$('.qc-o').forEach(b => b.onclick = () => {
+      it.pick = +b.dataset.k; const right = it.ord[it.pick] === q.a, s = st.qc[q.id] || { box: 0, ok: 0, bad: 0 };
+      if (right) { s.box = Math.min(5, s.box + 1); s.ok++; cq.right++; } else { s.box = 1; s.bad++; }
+      s.due = Date.now() + QIV[s.box] * DAY_MS - 3600000; st.qc[q.id] = s; saveOR(); viewQC(ch);
+    });
+    else {
+      $('#qcnext').onclick = () => { cq.i++; viewQC(ch); window.scrollTo(0, 0); };
+      $('#qcai').onclick = ev => { ev.preventDefault(); askAI(`这道选择题我没懂:\n${q.q}\n选项:${q.o.map((o, i) => 'ABCD'[i] + '. ' + o).join(';')}\n答案:${q.o[q.a]}\n\n请讲清楚为什么,以及其他选项错在哪里。`, q.ch); };
+    }
+  }
+  function viewQK(kind, seed) {
+    if (!GEN[kind]) return viewQ();
+    if (!seed) { location.replace('#/or/q/k/' + kind + '/' + Math.floor(Math.random() * 1e9)); return; }
+    const g = genQ(kind, +seed), cc = chOf(GEN[kind].ch), key = kind + ':' + seed, graded = (st.qg || {})[key];
+    $app.innerHTML = `<div class="or-page or-qk">
+      <div class="or-bar"><a href="#/or/q" class="back" id="orback">‹ 练题</a><a href="#" id="qkai" class="or-ask">问 AI</a></div>
+      <div class="or-eyebrow">${esc(GEN[kind].name)}${cc && cc.d ? ' · 第 ' + cc.d + ' 章' : ''}</div>
+      ${g ? `<div class="qk-q md">${g.q}</div><p class="dim sm">先在纸上做完,再看解答。</p>
+        <div id="qksol" hidden><div class="qk-sol md">${g.sol}</div>
+          <div class="qk-grade">${graded ? `<span class="dim">已记录:${graded === 1 ? '做对了' : '做错了'}</span>` : '<button class="ghost" data-g="0">做错了</button><button class="go sm" data-g="1">做对了</button>'}</div></div>
+        <div class="qk-bar"><button class="ghost" id="qknew">换一道</button><button class="go sm" id="qkshow">看解答</button></div>` : '<p class="dim">这次没生成出合适的题,点「换一道」。</p><div class="qk-bar"><button class="go sm" id="qknew">换一道</button></div>'}
+    </div>`;
+    window.scrollTo(0, 0);
+    $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
+    $('#qknew').onclick = () => location.replace('#/or/q/k/' + kind + '/' + Math.floor(Math.random() * 1e9));
+    const sh = $('#qkshow'); if (sh) sh.onclick = () => { $('#qksol').hidden = false; sh.style.display = 'none'; $('.qk-bar').style.position = 'static'; $('#qksol').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    $$('.qk-grade [data-g]').forEach(b => b.onclick = () => {
+      const ok = +b.dataset.g, s = st.qt[kind] || { n: 0, ok: 0 }; s.n++; s.ok += ok; st.qt[kind] = s;
+      st.qg = st.qg || {}; st.qg[key] = ok ? 1 : 2;
+      st.qw = st.qw.filter(w => w.k + ':' + w.s !== key); if (!ok) st.qw.push({ k: kind, s: +seed, t: Date.now() }); st.qw = st.qw.slice(-40);
+      saveOR(); $('.qk-grade').innerHTML = `<span class="dim">已记录:${ok ? '做对了' : '做错了,放进「做错的计算题」'}</span>`;
+    });
+    $('#qkai').onclick = ev => { ev.preventDefault(); const t = g ? $('.qk-q').innerText : ''; askAI(`这是一道「${GEN[kind].name}」练习题:\n${t}\n\n请先给我解题思路的提示,不要直接给答案。`, GEN[kind].ch); };
+  }
+  function qcStats() { const now = Date.now(); return { due: QB.filter(q => st.qc[q.id] && st.qc[q.id].due <= now).length, total: QB.length + GORDER.length }; }
+
   /* ── 路由入口(app.js 调用):parts = ['or', 子页, 参数] ── */
   window.renderOR = function (parts) {
     clearInterval(tickH); selBtn.hidden = true;
@@ -973,6 +1294,7 @@
     const sub = parts[1] || '';
     if (sub === 'c') return viewChapter(parts[2]);
     if (sub === 'cards') return viewCards();
+    if (sub === 'q') return parts[2] === 'c' ? viewQC(parts[3] || 'all') : parts[2] === 'k' ? viewQK(parts[3], parts[4]) : viewQ(parts[2] === 'ch' ? parts[3] : '');
     if (sub === 'tools') { renderTools(parts[2] || S.get('tool', 'simplex')); window.scrollTo(0, 0); const b = $('#orback'); if (b) b.onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } }; return; }
     if (sub === 'ai') return viewORAI(parts[2]);
     return viewHome();
