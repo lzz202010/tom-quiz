@@ -286,7 +286,7 @@ function el(tag, cls, inner) { const n = document.createElement(tag); if (cls) n
 function load(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 隐私模式 */ } }
 function themeToggle() { return document.createTextNode(''); }     // 旧站页头的外观按钮、科目切换,这里不需要
-function subjectTabs() { const a = el('a', 'back wr-back', '‹ 学习'); a.href = '#/learn'; return a; }   // 写作首页左上角回「学习」
+function subjectTabs() { const a = el('a', 'back wr-back', '‹ 练习'); a.href = '#/'; a.onclick = () => { S.homeTab = 'wr'; save(); }; return a; }   // 写作首页左上角回首页的「写作」
 function render() { route(); }
 /* 运筹学模块:第一次进 #/or 才加载(marked + 课程数据 + 计算器 + 模块本身) */
 function loadOR(cb) {
@@ -299,17 +299,6 @@ function loadOR(cb) {
 /* 运筹学计入进度的章(按西安工业大学 IE 复试大纲;09 排队论一般不考,不计入) */
 const OR_CORE = ['01', '02', '03', '04', '05', '06', '07', '08', '10', '15', '16'];
 const orDone = os => (os.done || []).filter(n => OR_CORE.indexOf(n) >= 0).length;
-/* 学习:管综写作 + 运筹学(以后的课程也放这里) */
-function viewLearn() {
-  const wr = load('gzb.wr.v1', {}), wRead = Object.keys(wr.read || {}).length;
-  const os = load('ult.or.v1', {}), oDone = orDone(os);
-  const oDue = Object.values(os.fc || {}).filter(x => x.due <= Date.now()).length;
-  html(`<section class="slim"></section>
-  <div class="learn">
-    <a class="lcard" href="#/writing"><b>管综写作</b><span>论证有效性 · 论说文 · 真题精读</span><em>已读 ${wRead} / 30</em></a>
-    <a class="lcard" href="#/or"><b>运筹学</b><span>讲义 · 练题 · 动画 · 闪卡</span><em>已学完 ${oDone} / ${OR_CORE.length} 章${oDue ? ' · 闪卡 ' + oDue + ' 张待复习' : ''}</em></a>
-  </div>`);
-}
 function loadWriting(cb) {
   if (window.renderWriting) { cb(); return; }
   const v = (window.UFILES.v ? '?v=' + window.UFILES.v : '');
@@ -390,10 +379,10 @@ function toast(msg) {
 function fmt(n, d) { return n.toFixed(d === undefined ? 1 : d); }
 function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 function subjSwitch(route, withOR) {
-  const onOR = withOR !== undefined && route === 'home' && S.homeTab === 'or';
+  const tab = withOR !== undefined && route === 'home' ? S.homeTab : '';     // 首页上「写作」「运筹学」是额外的视图
   return '<div class="seg">' + Object.keys(SUBJ).map(k =>
-    `<button class="${!onOR && S.subj === k ? 'on' : ''}" data-subj="${k}" data-route="${route}">${SUBJ[k].name}</button>`).join('')
-    + (route === 'home' ? `<button class="${onOR ? 'on' : ''}" data-subj="or" data-route="home">运筹学</button>` : '') + '</div>';
+    `<button class="${!tab && S.subj === k ? 'on' : ''}" data-subj="${k}" data-route="${route}">${SUBJ[k].name}</button>`).join('')
+    + (route === 'home' ? `<button class="${tab === 'wr' ? 'on' : ''}" data-subj="wr" data-route="home">写作</button><button class="${tab === 'or' ? 'on' : ''}" data-subj="or" data-route="home">运筹学</button>` : '') + '</div>';
 }
 function bar(m, k) { return `<span class="bar k${k}"><i style="width:${k ? Math.round(m * 100) : 0}%"></i></span>`; }   // 没侦察的不画(先验 50% 会误导)
 
@@ -412,8 +401,21 @@ function viewHomeOR() {
   </section>`);
   $('#go').onclick = () => { location.hash = os.last ? '#/or/c/' + os.last : '#/or/c/00'; };
 }
+/* 首页的「写作」:大数字是已读篇数,主按钮接着读上次那篇 */
+function viewHomeWR() {
+  const wr = load('gzb.wr.v1', {}), n = Object.keys(wr.read || {}).length;
+  html(`<section class="home">
+    ${subjSwitch('home', true)}
+    <div class="big"><span class="num">${n}</span><span class="of">/ 30 篇</span></div>
+    <div class="cap">管综写作 · 已读</div>
+    <button class="go" id="go">${wr.last ? '继续读' : '开始'}</button>
+    <a href="#/writing" class="dim sm">全部篇目 · 怎么写 · 考前一页纸</a>
+  </section>`);
+  $('#go').onclick = () => { location.hash = wr.last ? '#/writing/read/' + wr.last : '#/writing'; };
+}
 function viewHome() {
   if (S.homeTab === 'or') return viewHomeOR();
+  if (S.homeTab === 'wr') return viewHomeWR();
   const subj = S.subj, cf = SUBJ[subj];
   const tested = topicsOf(subj).filter(t => stage(subj, t.id).k).length, all = topicsOf(subj).length;
   const resume = S.cur && S.cur.subj === subj, today = S.days[dayKey()] || 0;
@@ -608,13 +610,19 @@ function next() {
   if (a0 && !a0.ok && a0.at && cur.mode !== 'paper' && cur.mode !== 'review') { dwellEvidence(cur.subj, cur.ids[cur.i], (Date.now() - a0.at) / 1000); a0.at = 0; }
   if (cur.i < cur.ids.length - 1) { cur.i++; cur.qt = 0; save(); viewSession(); return; }
   if (cur.dyn && cur.ids.length < cur.n) {                 // 逐题出题:先答完这题,再按最新能力配下一题
-    if (!cur.ans[cur.ids[cur.i]]) { toast('先选一个答案'); return; }
     const q = chooseNext(cur, DATA[cur.subj]);
     if (q) { cur.ids.push(q.id); cur.i++; cur.qt = 0; save(); viewSession(); return; }
   }
   if (cur.mode === 'review' || cur.mode === 'one') { leaveSession(true); return; }
-  if (cur.mode !== 'paper' && cur.ids.some(id => !cur.ans[id])) {
-    cur.i = cur.ids.findIndex(id => !cur.ans[id]); save(); viewSession(); toast('还有题没做'); return;
+  const left = cur.mode !== 'paper' ? cur.ids.filter(id => !cur.ans[id]) : [];
+  if (left.length) {                 // 可以跳过不答;结束前说一声,没答的不算对错(不动能力分、不进错题)
+    ask('还有 ' + left.length + ' 题没答,没答的不算对错。结束这组?', { ok: '结束', cancel: '回去作答' }).then(function (y) {
+      if (S.cur !== cur) return;
+      if (!y) { cur.i = cur.ids.indexOf(left[0]); cur.qt = 0; save(); viewSession(); return; }
+      left.forEach(id => { cur.ans[id] = { p: '', ok: false, t: 0, skip: 1 }; });
+      finish();
+    });
+    return;
   }
   finish();
 }
@@ -708,7 +716,7 @@ function viewSum() {
       <div class="big">${s.mode === 'paper' ? `<span class="num">${ok * pts}</span><span class="of">/ ${n * pts}</span>`
         : scouting ? `<span class="num">${ok}</span><span class="of">/ ${n}</span>`
         : `<span class="num">${fmt(s.est1)}</span><span class="of">${Math.abs(delta) >= 0.05 ? (delta > 0 ? '+' : '') + fmt(delta) : ''}</span>`}</div>
-      <div class="cap">${s.mode === 'paper' ? '对 ' + ok + ' / ' + n + (s.ids.some(id => (s.ans[id] || {}).skip) ? ' · 未答 ' + s.ids.filter(id => (s.ans[id] || {}).skip).length : '') : scouting ? '摸底' : ok + '/' + n}</div>
+      <div class="cap">${s.mode === 'paper' ? '对 ' + ok + ' / ' + n + (s.ids.some(id => (s.ans[id] || {}).skip) ? ' · 未答 ' + s.ids.filter(id => (s.ans[id] || {}).skip).length : '') : scouting ? '摸底' : ok + '/' + n + (s.ids.some(id => (s.ans[id] || {}).skip) ? ' · 未答 ' + s.ids.filter(id => (s.ans[id] || {}).skip).length : '')}</div>
       <button class="go" id="again">${s.mode === 'paper' ? '返回' : '继续'}</button>
       <div class="links"><a href="#" id="rv">回看</a><a href="#" id="pr">打印</a></div>
     </section>`);
@@ -1561,7 +1569,7 @@ function route() {
   document.title = 'Ultimate';
   const h = location.hash.replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
-  const tab = r === 't' || r === 'papers' || r === 'bank' ? 'me' : r === 'sum' ? 'home' : r === 'writing' || r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作、运筹学在「学习」里
+  const tab = r === 't' || r === 'papers' || r === 'bank' ? 'me' : r === 'sum' || r === 'writing' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作在首页,「学习」就是运筹学
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
   if (r !== 's' && S.cur && S.cur.qt && !S.cur.away) { S.cur.away = Date.now(); save(); }
   document.body.classList.toggle('playing', r === 's');
@@ -1573,7 +1581,7 @@ function route() {
   else if (r === 's') viewSession();
   else if (r === 'sum') viewSum();
   else if (r === 'ai') viewAI('main');
-  else if (r === 'learn') viewLearn();
+  else if (r === 'learn') location.replace('#/or');     // 「学习」现在只有运筹学,直接进运筹学首页
   else if (r === 'or') loadOR(() => { if (location.hash.indexOf('#/or') === 0) window.renderOR(h); });
   else if (r === 'writing') loadWriting(() => { if (location.hash.indexOf('#/writing') === 0) window.renderWriting(); });
   else viewHome();
@@ -1581,7 +1589,7 @@ function route() {
 document.addEventListener('click', function (ev) {
   const b = ev.target.closest('[data-subj]');
   if (!b) return;
-  if (b.dataset.subj === 'or') S.homeTab = 'or';          // 首页的运筹学只是首页的一个视图,其他页的科目仍是数学/逻辑
+  if (b.dataset.subj === 'or' || b.dataset.subj === 'wr') S.homeTab = b.dataset.subj;          // 首页的运筹学只是首页的一个视图,其他页的科目仍是数学/逻辑
   else { S.subj = b.dataset.subj; S.homeTab = ''; }
   save(); route();
 });

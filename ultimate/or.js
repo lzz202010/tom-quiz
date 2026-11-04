@@ -104,7 +104,6 @@
     const last = st.last && chOf(st.last);
     const qs = qcStats(), dd = (n, t) => n ? `<em>${n}</em>${t}` : '';
     $app.innerHTML = `<div class="or-page or-home">
-      <a href="#/learn" class="back" id="orback">‹ 学习</a>
       <div class="or-top"><h1 class="or-h1">运筹学</h1><button class="or-sbtn" id="orsb" aria-label="搜讲义"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
       <div class="or-sbox" id="orsbox" hidden><input class="or-search" id="ors" type="search" placeholder="搜讲义" autocomplete="off"><div id="orsr"></div></div>
       <div class="or-prog"><span class="bar k3"><i style="width:${doneN / core.length * 100}%"></i></span><span>${doneN} / ${core.length} 章</span></div>
@@ -124,7 +123,6 @@
       <div class="or-demos">${Object.keys(DEMOS).map(d => { const t = DEMOS[d].title.split(':'); return `<a href="#" data-demo="${d}"><i>▶</i><b>${esc(t[0])}</b><span>${esc(t[1] || '')}</span></a>`; }).join('')}</div>
     </div>`;
     window.scrollTo(0, 0);
-    $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
     $$('[data-demo]').forEach(a => a.onclick = ev => { ev.preventDefault(); openDemo(a.dataset.demo); });
     const inp = $('#ors'), out = $('#orsr');
     $('#orsb').onclick = () => { const bx = $('#orsbox'); bx.hidden = !bx.hidden; if (!bx.hidden) inp.focus(); };
