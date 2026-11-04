@@ -447,8 +447,8 @@ function viewTopic(subj, tid) {
     const t = d.topic[tid], m = mastery(subj, tid), st = stage(subj, tid), L = tpList(subj, tid);
     const qs = d.qs.filter(q => q.t === tid).sort((a, b) => (b.real || 0) - (a.real || 0) || (b.y || 0) - (a.y || 0) || a.lv - b.lv);
     const done = qs.filter(q => S.cards[q.id]).length;
-    html(`<section class="hero slim">
-      <a class="back" href="#/bank" id="back">←</a>
+    html(`<a class="back" href="#/bank" id="back">←</a>
+    <section class="hero slim">
       <h1>${t.name}</h1>
       <div class="kv"><span>${st.k ? '掌握 ' + Math.round(m * 100) + '%' : '未测'}</span><span>丢 ${fmt(leak(subj, t))} 分/年</span><span>做过 ${done}/${qs.length}</span></div>
       ${L.length ? `<div class="spark">${L.slice(-20).map(x => `<i class="${x.r >= 1 ? 'y' : x.r > 0 ? 'm' : 'n'}"></i>`).join('')}</div>` : ''}
@@ -464,7 +464,9 @@ function viewTopic(subj, tid) {
     $('#pr').onclick = () => printAsk(subj, qs.map(q => q.id), t.name, true);
     app.querySelectorAll('[data-one]').forEach(a => a.onclick = function (ev) {
       ev.preventDefault();
-      startSession({ mode: 'one', subj: subj, ids: [a.dataset.one], title: t.name });
+      // 从列表里点一题:从这题起按列表顺序连着做(最多 30 题),有「下一题」;以前是单题模式,做完就退出
+      const all = qs.map(q => q.id), k = all.indexOf(a.dataset.one);
+      startSession({ mode: 'list', subj: subj, ids: all.slice(k, k + 30), title: t.name });
     });
   });
 }
@@ -561,29 +563,46 @@ function viewSession() {
     const verdictOf = (x, qx, ax) => revealOf(x) ? `<div class="verdict ${ax.ok ? 'ok' : ax.skip ? 'skip' : 'bad'}">${ax.ok ? '✓' : ax.skip ? '未答 · 答案 ' + qx.ans : qx.ans}
         <span class="mono${ax.t > secOf(cur.subj, qx.t) * 1.25 ? ' hot' : ''}">${mmss(ax.t)}</span>${qx.skip ? '<em>可放弃</em>' : ''}</div>
         <div class="sol">${qx.sol || ''}</div>` : '';
-    let body;
+    let bodyL, bodyR;
     if (!multi) {
-      body = `<div class="meta"><span>${q.src}</span>${tools(id)}</div>
+      bodyL = `<div class="meta"><span>${q.src}</span>${tools(id)}</div>
       <div class="stem">${q.stem}</div>
       ${q.fig ? `<img class="fig" src="${q.fig}" alt="">` : ''}
-      ${q.kind === 'cond' ? `<div class="conds"><p>(1) ${q.c1}</p><p>(2) ${q.c2}</p></div>` : ''}
-      ${optsOf(id, q, a)}${verdictOf(id, q, a)}`;
+      ${q.kind === 'cond' ? `<div class="conds"><p>(1) ${q.c1}</p><p>(2) ${q.c2}</p></div>` : ''}`;
+      bodyR = `${optsOf(id, q, a)}${verdictOf(id, q, a)}`;
     } else {                               // 一页多问:共用题干只出现一次
       const shared = q.stem.slice(0, q.stem.length - q.ask.length).replace(/(<br>)+$/, '');
-      body = `<div class="meta"><span>${q.src.replace(/ 第 \d+ 题$/, '')} · 共 ${pids.length} 问</span></div>
-      <div class="stem">${shared}</div>
-      ${pids.map((x, k) => { const qx = d.byId[x]; return `<section class="sub"><div class="subh"><b>第 ${k + 1} 问</b>${tools(x)}</div>
+      bodyL = `<div class="meta"><span>${q.src.replace(/ 第 \d+ 题$/, '')} · 共 ${pids.length} 问</span></div>
+      <div class="stem">${shared}</div>`;
+      bodyR = `${pids.map((x, k) => { const qx = d.byId[x]; return `<section class="sub"><div class="subh"><b>第 ${k + 1} 问</b>${tools(x)}</div>
         <div class="stem ask">${qx.ask}</div>${optsOf(x, qx, cur.ans[x])}${verdictOf(x, qx, cur.ans[x])}</section>`; }).join('')}`;
     }
+    // 横屏(电脑 / 手机横放)左右分屏:左 题干、右 选项与解析,各自滚动,不用上下来回翻;竖屏就是原来的上下排列
+    let pct = 50; try { pct = clamp(+localStorage.getItem('ult.split') || 50, 25, 75); } catch (e) { /* 无存储 */ }
+    const sk = id + '|' + ps, same = viewSession._k === sk;
+    viewSession._k = sk;
+    const sl = same ? [($('.qleft') || {}).scrollTop || 0, ($('.qright') || {}).scrollTop || 0] : [0, 0];
     html(`${head}
-    <article class="q ${isBoss ? 'isboss' : ''}${multi ? ' multi' : ''}">
-      ${body}
+    <article class="q ${isBoss ? 'isboss' : ''}${multi ? ' multi' : ''}" style="--qsplit:${pct}%">
+      <div class="qleft">${bodyL}</div><div class="qdiv" title="拖动调整宽度,双击恢复"></div><div class="qright">${bodyR}</div>
     </article>
     <footer class="qfoot">
       <button class="ghost" id="prev" ${ps ? '' : 'disabled'}>‹</button>
       ${cur.mode === 'paper' && !cur.done ? `<span class="left mono"><span id="left"></span><span class="dim"> · ${cur.ids.filter(x => cur.ans[x]).length}/${cur.ids.length}</span></span>` : ''}
       <button class="go sm" id="next">${nextLabel(cur)}</button>
     </footer>`);
+    if (same) { const ql = $('.qleft'), qr = $('.qright'); if (ql) ql.scrollTop = sl[0]; if (qr) qr.scrollTop = sl[1]; }      // 作答后重画,两栏保持原来的滚动位置
+    const dv = $('.qdiv');
+    if (dv) {                                   // 拖动中间竖线调整两栏宽度(25%–75%),双击恢复一半一半
+      const art = dv.parentNode;
+      dv.addEventListener('pointerdown', ev => {
+        ev.preventDefault(); dv.setPointerCapture(ev.pointerId);
+        const mv = e => { const b = art.getBoundingClientRect(), p = clamp((e.clientX - b.left) / b.width * 100, 25, 75); art.style.setProperty('--qsplit', p + '%'); dv._p = p; };
+        const up = () => { dv.removeEventListener('pointermove', mv); dv.removeEventListener('pointerup', up); try { localStorage.setItem('ult.split', String(Math.round(dv._p || 50))); } catch (e) { /* 无存储 */ } };
+        dv.addEventListener('pointermove', mv); dv.addEventListener('pointerup', up);
+      });
+      dv.ondblclick = () => { art.style.setProperty('--qsplit', '50%'); try { localStorage.removeItem('ult.split'); } catch (e) { /* 无存储 */ } };
+    }
     app.querySelectorAll('[data-rmw]').forEach(el => el.onclick = ev => { ev.preventDefault(); removeWrong(el.dataset.rmw); el.remove(); toast('已移出错题本'); });
     app.querySelectorAll('[data-fav]').forEach(el => el.onclick = ev => { ev.preventDefault(); const x = el.dataset.fav; toggleFav(x, cur.subj); el.classList.toggle('on', !!S.fav[x]); el.textContent = S.fav[x] ? '★ 已收藏' : '☆ 收藏'; });
     app.querySelectorAll('.opt').forEach(b => b.onclick = () => answer(b.dataset.p, b.dataset.id));
@@ -1243,7 +1262,8 @@ function viewWrongs() {
     app.querySelectorAll('[data-del]').forEach(a => a.onclick = ev => { ev.preventDefault(); removeWrong(a.dataset.del);
       a.closest('.wrow').remove(); const n = $('#wn'); n.textContent = +n.textContent - 1; toast('已移出错题本'); });
     app.querySelectorAll('[data-open]').forEach(a => a.onclick = ev => { ev.preventDefault();
-      startSession({ mode: 'one', subj: subj, ids: [a.dataset.open], title: '错题' }); });
+      const k = ids.indexOf(a.dataset.open);
+      startSession({ mode: 'redo', subj: subj, ids: ids.slice(k, k + 30), title: '错题' }); });
     const clr = $('#wclr');
     if (clr) clr.onclick = ev => { ev.preventDefault(); ask('清空' + SUBJ[subj].name + '全部 ' + ids.length + ' 道错题?之后再做错会重新进来。', { ok: '清空', danger: true })
       .then(y => { if (y) { ids.forEach(removeWrong); viewWrongs(); } }); };
@@ -1767,7 +1787,7 @@ document.addEventListener('keydown', function (ev) {
 /* 做题页左右滑动换题(手机):左滑下一题、右滑上一题;从屏幕左边缘起手的留给 iOS 的返回手势 */
 let sw = null;
 app.addEventListener('touchstart', function (e) {
-  if (!document.body.classList.contains('playing') || e.touches.length > 1) { sw = null; return; }
+  if (!document.body.classList.contains('playing') || e.touches.length > 1 || window.matchMedia('(orientation: landscape) and (min-width: 700px)').matches) { sw = null; return; }   // 横屏分屏时不滑动换题(两栏各自上下滚动)
   const t = e.touches[0];
   sw = t.clientX < 24 || e.target.closest('.katex-display, table') ? null : { x: t.clientX, y: t.clientY, t: Date.now() };
 }, { passive: true });
@@ -1794,7 +1814,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     const h = vv ? vv.height : window.innerHeight, top = vv ? vv.offsetTop : 0;
     rs.setProperty('--vvh', Math.round(h) + 'px');
     rs.setProperty('--vvt', Math.round(top) + 'px');
-    const tb = document.querySelector('.top'); if (tb && window.innerWidth > 700) rs.setProperty('--toph', Math.round(tb.getBoundingClientRect().height) + 'px');
+    var tb = document.querySelector('.top'); if (tb && window.innerWidth > 700) rs.setProperty('--toph', Math.round(tb.getBoundingClientRect().height) + 'px');
+    if (tb) rs.setProperty('--hdr', Math.round(tb.getBoundingClientRect().height) + 'px');   // 顶栏高度(手机上也量),返回箭头固定在它下面
     document.body.classList.toggle('kb', window.innerHeight - h > 120);
     if (document.body.classList.contains('chatmode') && window.scrollY) window.scrollTo(0, 0);   // 别让页面被 Safari 推着走
     const mb = document.getElementById('msgs'); if (mb && mb._bottom !== false) requestAnimationFrame(() => { mb.scrollTop = mb.scrollHeight; });   // 键盘弹起时停在最新消息
