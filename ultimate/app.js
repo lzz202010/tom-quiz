@@ -7,7 +7,8 @@ const $ = (s, el) => (el || document).querySelector(s);
 const app = $('#app');
 const DAY = 86400000;
 const KEY = 'ult.v1';
-const SUBJ = { math: { name: '数学', pts: 3, per: 25, sec: 150, tgt: 60 }, logic: { name: '逻辑', pts: 2, per: 30, sec: 120, tgt: 46 } };
+const SUBJ = { math: { name: '数学', pts: 3, per: 25, sec: 150, tgt: 60 }, logic: { name: '逻辑', pts: 2, per: 30, sec: 120, tgt: 46 },
+  gk: { name: '公考', pts: 1, per: 135, sec: 55, tgt: 95 } };
 const IV = [1, 3, 7, 16, 35];
 const LET = 'ABCDE';
 const LVN = ['', '基础', '中等', '较难', '挑战'];
@@ -17,11 +18,13 @@ const gN = () => S.groupN || 10;        // 每组题数(AI 可改,5–20)
 
 /* ───────────── 状态 ───────────── */
 function fresh() {
-  return { subj: 'math', cards: {}, tp: {}, days: {}, goal: 20, target: { math: SUBJ.math.tgt, logic: SUBJ.logic.tgt },
-           papers: {}, hist: [], cur: null };
+  return { subj: 'math', cards: {}, tp: {}, days: {}, goal: 20, target: { math: SUBJ.math.tgt, logic: SUBJ.logic.tgt, gk: SUBJ.gk.tgt },
+           papers: {}, hist: [], cur: null, fav: {} };
 }
 let S;
 try { S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { S = fresh(); }
+S.target = Object.assign({ math: SUBJ.math.tgt, logic: SUBJ.logic.tgt, gk: SUBJ.gk.tgt }, S.target);
+S.fav = S.fav || {};                       // 手动收藏的题:id -> {s: 科目, at: 时间}(随备份走)
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 隐私模式等 */ } }
 
 const META = window.UMETA;
@@ -36,6 +39,8 @@ function loadData(subj) {
       const d = DATA[subj];
       d.byId = {};
       d.qs.forEach(function (q) { d.byId[q.id] = q; });
+      d.grp = {};
+      d.qs.forEach(function (q) { if (q.grp) (d.grp[q.grp] = d.grp[q.grp] || []).push(q.id); });
       d.topic = {};
       d.topics.forEach(function (t) { d.topic[t.id] = t; });
       ok(d);
@@ -45,6 +50,8 @@ function loadData(subj) {
   });
 }
 function topicsOf(subj) { return META[subj].topics; }
+/* 这个考点一道题的考场节奏(秒):公考各题型差别大,topics 里带 sec;数学/逻辑用科目统一值 */
+function secOf(subj, tid) { const t = topicsOf(subj).find(x => x.id === tid); return (t && t.sec) || SUBJ[subj].sec; }
 function topicName(subj, tid) { const t = topicsOf(subj).find(x => x.id === tid); return t ? t.name : tid; }
 
 /* ───────────── 能力模型(Elo / 一参数 IRT) ─────────────
@@ -237,7 +244,7 @@ function chooseNext(cur, d) {
 
 /* ───────────── 作答记录 ───────────── */
 function record(subj, q, pick, secs) {
-  const ok = pick === q.ans, slow = secs > SUBJ[subj].sec * 1.25;
+  const ok = pick === q.ans, slow = secs > secOf(subj, q.t) * 1.25;
   const r = ok ? (slow ? 0.75 : 1) : 0;
   const c = S.cards[q.id];
   const now = Date.now();
@@ -257,7 +264,7 @@ function record(subj, q, pick, secs) {
   const L = S.tp[subj][q.t] = (S.tp[subj][q.t] || []).concat([{ r: r, lv: q.lv }]).slice(-20);
   if (ok) eloUpdate(subj, q.t, q.lv, r);
   else {
-    const T = SUBJ[subj].sec;
+    const T = secOf(subj, q.t);
     let o = odds(clamp(SLIP * pKnow / (SLIP * pKnow + (1 - pKnow)), 0.02, 0.98));
     if (secs > 0 && secs < T * 0.35) o *= 2.2; else if (secs > T * 1.5) o *= 0.5;
     const post = unodds(o), u = eloUpdate(subj, q.t, q.lv, 0, 1 - post);
@@ -474,7 +481,7 @@ function startDyn(subj, o) {
     }
     const q = chooseNext(o, d);
     if (!q) { toast('这里的题都做完了'); return; }
-    o.ids = [q.id];
+    o.ids = []; pushQ(o, d, q);
     if (!o.title) o.title = topicsOf(subj).some(t => !tpList(subj, t.id).length) ? '摸底' : o.focus.length ? topicName(subj, o.focus[0]) : '练习';
     startSession(o);
   });
@@ -505,56 +512,84 @@ function leaveSession(clear) {
 }
 function snapshot(subj) { const o = {}; topicsOf(subj).forEach(t => { o[t.id] = stage(subj, t.id).k; }); return o; }
 
+/* 共用题干(分析推理 / 资料分析 / 阅读材料)的几问合成一页:同组(grp)且在本组练习里相邻的题,共用一份题干,各问各答各判分 */
+function pageRange(cur, d, i) {
+  const g = (d.byId[cur.ids[i]] || {}).grp;
+  let s0 = i, e0 = i;
+  if (g) {
+    while (s0 > 0 && (d.byId[cur.ids[s0 - 1]] || {}).grp === g) s0--;
+    while (e0 + 1 < cur.ids.length && (d.byId[cur.ids[e0 + 1]] || {}).grp === g) e0++;
+  }
+  return [s0, e0];
+}
+/* 逐题现配时,选中的题如果属于一组共用题干,把同组的其余几问紧跟着一起放进来 */
+function pushQ(cur, d, q) {
+  cur.ids.push(q.id);
+  if (q.grp && d.grp && d.grp[q.grp]) d.grp[q.grp].forEach(function (x) { if (cur.ids.indexOf(x) < 0 && !(d.byId[x] || {}).skip) cur.ids.push(x); });
+}
 let tick = null;
 function viewSession() {
   const cur = S.cur;
   if (!cur) { location.replace('#/'); return; }
   loadData(cur.subj).then(function (d) {
     if (cur.mode === 'paper' && !cur.done && Date.now() > cur.dl) { submitPaper(); return; }
-    const id = cur.ids[cur.i], q = d.byId[id], a = cur.ans[id];
-    const reveal = a && (cur.mode !== 'paper' || cur.done);
+    const rg = pageRange(cur, d, cur.i), ps = rg[0], pe = rg[1];
+    cur.i = ps;
+    const pids = cur.ids.slice(ps, pe + 1), multi = pids.length > 1;
+    const id = cur.ids[ps], q = d.byId[id], a = cur.ans[id];
+    S.lastQ = { id: id, subj: cur.subj, at: Date.now() };
+    const revealOf = x => cur.ans[x] && (cur.mode !== 'paper' || cur.done);
+    const reveal = revealOf(id);
+    const pageDone = pids.every(x => cur.ans[x]);
     if (cur.away) { if (cur.qt) cur.qt += Date.now() - cur.away; cur.away = 0; }      // 离开做题页/切到后台的时间不算用时
-    if (!a && !cur.qt) cur.qt = Date.now();
-    const isBoss = cur.boss === id;
-    const opts = q.kind === 'cond' ? COND_OPTS : q.opts;
+    if (!pageDone && !cur.qt) cur.qt = Date.now();
+    const isBoss = pids.indexOf(cur.boss) >= 0;
     const head = `<div class="qhead">
       <a class="x" href="#" id="quit" title="离开(进度保留)">✕</a>
       <div class="dots">${cur.ids.map((x, k) => { const r = cur.ans[x];
         const c = !r ? '' : (cur.mode === 'paper' && !cur.done) ? 'a' : r.skip ? 'u' : r.ok ? 'y' : 'n';
-        return `<i class="${c}${k === cur.i ? ' cur' : ''}${cur.boss === x ? ' boss' : ''}" data-go="${k}"></i>`; }).join('')}${
+        return `<i class="${c}${k >= ps && k <= pe ? ' cur' : ''}${cur.boss === x ? ' boss' : ''}" data-go="${k}"></i>`; }).join('')}${
         cur.dyn ? '<i></i>'.repeat(Math.max(0, cur.n - cur.ids.length)) : ''}</div>
       ${cur.mode === 'paper' && !cur.done ? '<a href="#" class="subbtn" id="sub">交卷</a>' : '<span class="clock mono" id="clock"></span>'}</div>`;
-    html(`${head}
-    <article class="q ${isBoss ? 'isboss' : ''}">
-      <div class="meta"><span>${q.src}</span></div>
+    const tools = x => `${S.cards[x] && isWrongC(S.cards[x]) ? `<a href="#" class="fav" data-rmw="${x}">移出错题本</a>` : ''}<a href="#" class="fav${S.fav[x] ? ' on' : ''}" data-fav="${x}">${S.fav[x] ? '★ 已收藏' : '☆ 收藏'}</a>`;
+    const optsOf = (x, qx, ax) => { const rv = revealOf(x), os = qx.kind === 'cond' ? COND_OPTS : qx.opts;
+      return `<div class="opts">${os.map((o, k) => { const L = LET[k];
+        let c = '';
+        if (ax && ax.p === L) c = rv ? (ax.ok ? 'right' : 'wrong') : 'picked';
+        if (rv && qx.ans === L && !ax.ok) c = 'answer';
+        return `<button class="opt ${c}" data-p="${L}" data-id="${x}" ${rv ? 'disabled' : ''}><b>${L}</b><span>${o}</span></button>`; }).join('')}</div>`; };
+    const verdictOf = (x, qx, ax) => revealOf(x) ? `<div class="verdict ${ax.ok ? 'ok' : ax.skip ? 'skip' : 'bad'}">${ax.ok ? '✓' : ax.skip ? '未答 · 答案 ' + qx.ans : qx.ans}
+        <span class="mono${ax.t > secOf(cur.subj, qx.t) * 1.25 ? ' hot' : ''}">${mmss(ax.t)}</span>${qx.skip ? '<em>可放弃</em>' : ''}</div>
+        <div class="sol">${qx.sol || ''}</div>` : '';
+    let body;
+    if (!multi) {
+      body = `<div class="meta"><span>${q.src}</span>${tools(id)}</div>
       <div class="stem">${q.stem}</div>
       ${q.fig ? `<img class="fig" src="${q.fig}" alt="">` : ''}
       ${q.kind === 'cond' ? `<div class="conds"><p>(1) ${q.c1}</p><p>(2) ${q.c2}</p></div>` : ''}
-      <div class="opts">${opts.map((o, k) => { const L = LET[k];
-        let c = '';
-        if (a && a.p === L) c = reveal ? (a.ok ? 'right' : 'wrong') : 'picked';
-        if (reveal && q.ans === L && !a.ok) c = 'answer';
-        return `<button class="opt ${c}" data-p="${L}" ${reveal ? 'disabled' : ''}><b>${L}</b><span>${o}</span></button>`; }).join('')}</div>
-      ${reveal ? `<div class="verdict ${a.ok ? 'ok' : a.skip ? 'skip' : 'bad'}">${a.ok ? '✓' : a.skip ? '未答 · 答案 ' + q.ans : q.ans}
-        <span class="mono${a.t > SUBJ[cur.subj].sec * 1.25 ? ' hot' : ''}">${mmss(a.t)}</span>${q.skip ? '<em>可放弃</em>' : ''}</div>
-        <div class="sol">${q.sol || ''}</div>
-        ${aiKey() ? `<div class="aiex"><a href="#" id="aiex">${!a.ok && a.p ? 'AI 讲解:我为什么选 ' + a.p : 'AI 深讲这道题'}</a><div id="aiout"></div></div>` : ''}` : ''}
+      ${optsOf(id, q, a)}${verdictOf(id, q, a)}`;
+    } else {                               // 一页多问:共用题干只出现一次
+      const shared = q.stem.slice(0, q.stem.length - q.ask.length).replace(/(<br>)+$/, '');
+      body = `<div class="meta"><span>${q.src.replace(/ 第 \d+ 题$/, '')} · 共 ${pids.length} 问</span></div>
+      <div class="stem">${shared}</div>
+      ${pids.map((x, k) => { const qx = d.byId[x]; return `<section class="sub"><div class="subh"><b>第 ${k + 1} 问</b>${tools(x)}</div>
+        <div class="stem ask">${qx.ask}</div>${optsOf(x, qx, cur.ans[x])}${verdictOf(x, qx, cur.ans[x])}</section>`; }).join('')}`;
+    }
+    html(`${head}
+    <article class="q ${isBoss ? 'isboss' : ''}${multi ? ' multi' : ''}">
+      ${body}
     </article>
     <footer class="qfoot">
-      <button class="ghost" id="prev" ${cur.i ? '' : 'disabled'}>‹</button>
+      <button class="ghost" id="prev" ${ps ? '' : 'disabled'}>‹</button>
       ${cur.mode === 'paper' && !cur.done ? `<span class="left mono"><span id="left"></span><span class="dim"> · ${cur.ids.filter(x => cur.ans[x]).length}/${cur.ids.length}</span></span>` : ''}
       <button class="go sm" id="next">${nextLabel(cur)}</button>
     </footer>`);
-    app.querySelectorAll('.opt').forEach(b => b.onclick = () => answer(b.dataset.p));
+    app.querySelectorAll('[data-rmw]').forEach(el => el.onclick = ev => { ev.preventDefault(); removeWrong(el.dataset.rmw); el.remove(); toast('已移出错题本'); });
+    app.querySelectorAll('[data-fav]').forEach(el => el.onclick = ev => { ev.preventDefault(); const x = el.dataset.fav; toggleFav(x, cur.subj); el.classList.toggle('on', !!S.fav[x]); el.textContent = S.fav[x] ? '★ 已收藏' : '☆ 收藏'; });
+    app.querySelectorAll('.opt').forEach(b => b.onclick = () => answer(b.dataset.p, b.dataset.id));
     app.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { cur.i = +b.dataset.go; cur.qt = 0; save(); viewSession(); });
-    $('#prev').onclick = () => { cur.i--; cur.qt = 0; save(); viewSession(); };
+    $('#prev').onclick = () => { cur.i = pageRange(cur, d, ps - 1)[0]; cur.qt = 0; save(); viewSession(); };
     $('#next').onclick = next;
-    const ax = $('#aiex');
-    if (ax) {
-      const pk = a.ok || !a.p ? q.ans : a.p;            // 做对或没答:深讲;做错:针对选的那项
-      if (window.indexedDB) kvGet('ex:' + id + '|' + pk).then(h => { if (h && $('#aiout')) { ax.remove(); aiExplain(q, pk, $('#aiout')); } });
-      ax.onclick = ev => { ev.preventDefault(); ax.remove(); aiExplain(q, pk, $('#aiout')); };
-    }
     $('#quit').onclick = ev => { ev.preventDefault(); leaveSession(cur.mode === 'review' || cur.mode === 'one'); };
     const sub = $('#sub');
     if (sub) sub.onclick = ev => { ev.preventDefault(); askSubmit(); };
@@ -571,22 +606,25 @@ function viewSession() {
       }
       const el = $('#clock');
       if (!el) { clearInterval(tick); return; }
-      if (a) { el.textContent = ''; return; }
+      if (pageDone) { el.textContent = ''; return; }
       const s = (Date.now() - cur.qt) / 1000;
       el.textContent = mmss(s);
-      el.className = 'clock mono' + (s > SUBJ[cur.subj].sec ? ' over' : '');
+      el.className = 'clock mono' + (s > secOf(cur.subj, q.t) ? ' over' : '');
     };
     upd(); tick = setInterval(upd, 1000);
     if (reveal && !a.ok) { const v = $('.verdict'); if (v) setTimeout(() => v.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60); }
   });
 }
-function answer(p) {
-  const cur = S.cur, d = DATA[cur.subj], id = cur.ids[cur.i], q = d.byId[id];
+function answer(p, id) {
+  const cur = S.cur, d = DATA[cur.subj], pr = pageRange(cur, d, cur.i);
+  id = id || cur.ids.slice(pr[0], pr[1] + 1).find(x => !cur.ans[x]) || cur.ids[cur.i];       // 键盘作答:本页第一道没答的
+  const q = d.byId[id];
   const secs = (Date.now() - (cur.qt || Date.now())) / 1000;
+  const rest = cur.ids.slice(pr[0], pr[1] + 1).filter(x => x !== id && !cur.ans[x]).length;     // 本页还有几问没答:计时接着走,别清零
   if (cur.mode === 'paper' && !cur.done) {
     cur.ans[id] = { p: p, t: (cur.ans[id] ? cur.ans[id].t : 0) + secs };
-    cur.qt = 0;
-    if (cur.i < cur.ids.length - 1) cur.i++;
+    cur.qt = rest ? Date.now() : 0;
+    if (!rest && pr[1] < cur.ids.length - 1) cur.i = pr[1] + 1;
     save(); viewSession(); return;
   }
   if (cur.ans[id]) return;
@@ -596,22 +634,25 @@ function answer(p) {
   if (!r.ok && cur.dyn && (cur.tags || {})[id] !== '摸底' && (cur.extra || 0) < 2) { cur.pendVar = q.t; cur.extra = (cur.extra || 0) + 1; }
   cur.combo = r.ok ? cur.combo + 1 : 0;
   cur.best = Math.max(cur.best, cur.combo);
-  cur.qt = 0;
+  cur.qt = rest ? Date.now() : 0;
   save(); viewSession();
 }
 function next() {
   const cur = S.cur;
-  if (cur.mode === 'paper' && !cur.done && cur.i === cur.ids.length - 1) {
+  const pg = pageRange(cur, DATA[cur.subj], cur.i), pe = pg[1];
+  if (cur.mode === 'paper' && !cur.done && pe === cur.ids.length - 1) {
     const k = cur.ids.findIndex(x => !cur.ans[x]);
     if (k >= 0) { cur.i = k; cur.qt = 0; save(); viewSession(); return; }       // 最后一题按钮:有没答的先带过去
     askSubmit(); return;
   }
-  const a0 = cur.ans[cur.ids[cur.i]];
-  if (a0 && !a0.ok && a0.at && cur.mode !== 'paper' && cur.mode !== 'review') { dwellEvidence(cur.subj, cur.ids[cur.i], (Date.now() - a0.at) / 1000); a0.at = 0; }
-  if (cur.i < cur.ids.length - 1) { cur.i++; cur.qt = 0; save(); viewSession(); return; }
+  cur.ids.slice(pg[0], pe + 1).forEach(function (x) {
+    const a0 = cur.ans[x];
+    if (a0 && !a0.ok && a0.at && cur.mode !== 'paper' && cur.mode !== 'review') { dwellEvidence(cur.subj, x, (Date.now() - a0.at) / 1000); a0.at = 0; }
+  });
+  if (pe < cur.ids.length - 1) { cur.i = pe + 1; cur.qt = 0; save(); viewSession(); return; }
   if (cur.dyn && cur.ids.length < cur.n) {                 // 逐题出题:先答完这题,再按最新能力配下一题
     const q = chooseNext(cur, DATA[cur.subj]);
-    if (q) { cur.ids.push(q.id); cur.i++; cur.qt = 0; save(); viewSession(); return; }
+    if (q) { pushQ(cur, DATA[cur.subj], q); cur.i = pe + 1; cur.qt = 0; save(); viewSession(); return; }
   }
   if (cur.mode === 'review' || cur.mode === 'one') { leaveSession(true); return; }
   const left = cur.mode !== 'paper' ? cur.ids.filter(id => !cur.ans[id]) : [];
@@ -670,7 +711,7 @@ function startPaper(subj, pid) {
   });
 }
 function nextLabel(cur) {
-  const last = cur.i === cur.ids.length - 1 && !(cur.dyn && cur.ids.length < cur.n);
+  const last = pageRange(cur, DATA[cur.subj], cur.i)[1] === cur.ids.length - 1 && !(cur.dyn && cur.ids.length < cur.n);
   if (!last) return '下一题';
   if (cur.mode !== 'paper' || cur.done) return '完成';
   const left = cur.ids.filter(x => !cur.ans[x]).length;
@@ -709,7 +750,7 @@ function viewSum() {
     const pts = SUBJ[s.subj].pts;
     const ups = topicsOf(s.subj).filter(t => (s.lv0 || {})[t.id] !== undefined && stage(s.subj, t.id).k > s.lv0[t.id] && s.lv0[t.id] > 0);
     const found = topicsOf(s.subj).filter(t => s.lv0 && s.lv0[t.id] === 0 && stage(s.subj, t.id).k > 0);
-    const slow = s.ids.filter(id => (s.ans[id] || {}).ok && s.ans[id].t > SUBJ[s.subj].sec * 1.25).length;
+    const slow = s.ids.filter(id => (s.ans[id] || {}).ok && s.ans[id].t > secOf(s.subj, d.byId[id].t) * 1.25).length;
     const bossA = s.boss && s.ans[s.boss];
     const scouting = topicsOf(s.subj).some(t => !stage(s.subj, t.id).k);
     html(`<section class="home">
@@ -732,16 +773,21 @@ function viewSum() {
 /* 我的:iOS「设置」式分组列表——上面两个数,下面一组组圆角卡片,每行左名右值 */
 function viewMe() {
   const subj = S.subj, cf = SUBJ[subj];
-  const wrong = Object.keys(S.cards).filter(id => S.cards[id].s === subj && S.cards[id].w > 0 && S.cards[id].st < 3 && S.cards[id].kind !== 'slip');
+  const wrong = Object.keys(S.cards).filter(id => S.cards[id].s === subj && isWrongC(S.cards[id]));
   const done = Object.keys(S.cards).filter(id => S.cards[id].s === subj).length;
+  const fav = favIds(subj);
   const row = (id, label, val, cls) => `<a href="#" class="row-i${cls ? ' ' + cls : ''}" id="${id}"><span>${label}</span><span class="v">${val || ''}</span></a>`;
   html(`<section class="slim">${subjSwitch('me')}</section>
   <section class="stats"><div><b>${done}</b><span>做过</span></div><div><b>${wrong.length}</b><span>待攻克错题</span></div></section>
   <div class="grp-h">题库</div>
   <div class="grp">${row('bkp', '真题套卷', META[subj].papers.length + ' 套', 'chev')}${row('bkt', '按考点', topicsOf(subj).length + ' 个', 'chev')}</div>
   <div class="grp-h">错题</div>
-  <div class="grp">${row('redo', '重做错题', wrong.length ? Math.min(wrong.length, gN()) + ' 题' : '', wrong.length ? 'chev' : 'off')}
+  <div class="grp">${row('wlist', '错题本', wrong.length ? wrong.length + ' 题' : '', wrong.length ? 'chev' : 'off')}
+    ${row('redo', '重做错题', wrong.length ? Math.min(wrong.length, gN()) + ' 题' : '', wrong.length ? 'chev' : 'off')}
     ${row('prw', '打印错题', '', wrong.length ? 'chev' : 'off')}</div>
+  <div class="grp-h">收藏</div>
+  <div class="grp">${row('favgo', '做收藏的题', fav.length ? fav.length + ' 题' : '', fav.length ? 'chev' : 'off')}
+    ${row('favpr', '打印收藏', '', fav.length ? 'chev' : 'off')}</div>
   <div class="grp-h">AI 设置</div>
   <div class="grp">${row('aiprov', '服务商', PROV()[AI.provider].name, 'chev')}${row('aikey', 'API Key', AI.keys[AI.provider] ? '已设置' : builtinKey(AI.provider) ? '内置' : '未设置', 'chev')}
     ${row('airem', '记住 Key', AI.remember ? '记住' : '关闭网页即清除', 'chev')}
@@ -750,7 +796,8 @@ function viewMe() {
   <div class="grp-h">目标分</div>
   <div class="grp">
     <label class="row-i"><span>数学</span><span class="v"><input type="number" inputmode="numeric" id="tm" min="20" max="75" value="${S.target.math}"> / 75</span></label>
-    <label class="row-i"><span>逻辑</span><span class="v"><input type="number" inputmode="numeric" id="tl" min="20" max="60" value="${S.target.logic}"> / 60</span></label></div>
+    <label class="row-i"><span>逻辑</span><span class="v"><input type="number" inputmode="numeric" id="tl" min="20" max="60" value="${S.target.logic}"> / 60</span></label>
+    <label class="row-i"><span>公考</span><span class="v"><input type="number" inputmode="numeric" id="tg" min="30" max="135" value="${S.target.gk}"> / 135</span></label></div>
   <div class="grp-h">数据</div>
   <div class="grp">${row('ex', '导出备份', S.lastBackup ? ago(S.lastBackup) : '从未', 'chev')}${row('im', '从备份恢复', '', 'chev')}</div>
   <div class="grp-h">本机自动备份 · 每天一份,留 7 天</div>
@@ -760,8 +807,12 @@ function viewMe() {
   const num = (el, k, f) => { el.onchange = () => { const v = Math.round(+el.value); if (v > 0) { f(v); save(); toast('已保存'); } }; };
   num($('#tm'), 'm', v => { S.target.math = Math.min(75, v); });
   num($('#tl'), 'l', v => { S.target.logic = Math.min(60, v); });
+  num($('#tg'), 'g', v => { S.target.gk = Math.min(135, v); });
   $('#redo').onclick = () => wrong.length && loadData(S.subj).then(() => startSession({ mode: 'redo', subj: S.subj, title: '错题重做',
     ids: wrong.sort((a, b) => S.cards[a].due - S.cards[b].due).slice(0, gN()) }));
+  $('#wlist').onclick = () => wrong.length && (location.hash = '#/wrongs');
+  $('#favgo').onclick = () => fav.length && loadData(S.subj).then(() => startSession({ mode: 'list', subj: S.subj, title: '收藏', ids: fav.slice() }));
+  $('#favpr').onclick = () => fav.length && loadData(S.subj).then(() => printAsk(S.subj, fav.slice(), SUBJ[S.subj].name + '收藏', false));
   $('#prw').onclick = () => wrong.length && printAsk(S.subj, wrong, SUBJ[S.subj].name + '错题', false);
   $('#bkp').onclick = () => { S.bankTab = 'papers'; save(); location.hash = '#/bank'; };
   $('#bkt').onclick = () => { S.bankTab = 'topics'; save(); location.hash = '#/bank'; };
@@ -850,7 +901,7 @@ async function importBackup(ev) {
   inp.onchange = () => inp.files[0] && inp.files[0].text().then(t => applyBackup(t, inp.files[0].name)).catch(() => toast('文件读不了'));
   inp.click();
 }
-function restoreS(data) { S = Object.assign(fresh(), data); if (!data.elo) { S.elo = null; migrateElo(); } save(); route(); }
+function restoreS(data) { S = Object.assign(fresh(), data); S.fav = S.fav || {}; S.target = Object.assign({ math: SUBJ.math.tgt, logic: SUBJ.logic.tgt, gk: SUBJ.gk.tgt }, S.target); if (!data.elo) { S.elo = null; migrateElo(); } save(); route(); }
 function applyBackup(text, name) {
   let d;
   try { d = JSON.parse(text); } catch (e) { toast('不是 Ultimate 的备份文件'); return; }
@@ -902,6 +953,7 @@ const AI_PROV = { deepseek: { name: 'DeepSeek', base: 'https://api.deepseek.com/
   anthropic: { name: 'Anthropic', base: undefined, hint: 'sk-ant-…', official: true } };
 const AIK = 'ult.ai.v1', AICK = 'ult.aichat.v1';
 let AI = Object.assign({ keys: {}, provider: 'deepseek', model: 'deepseek-flash', effort: 'low', budget: 100000, fallback: true, used: {}, remember: true, custom: [] }, load(AIK, {}));
+AI.effort = 'low';          // 推理强度固定最低档:省 token、回得快(旧存档里的值也覆盖)
 if (AI.key) { AI.keys.anthropic = AI.key; delete AI.key; }        // 旧版只有一个 Key
 /* 「记住 Key」关掉时 Key 只放在 sessionStorage(关掉网页即清除),localStorage 里不存 */
 try { if (!AI.remember) AI.keys = JSON.parse(sessionStorage.getItem(AIK + '.keys') || '{}'); } catch (e) { /* 无痕模式 */ }
@@ -940,7 +992,8 @@ function useChat(id) {
   CHAT = load(chatStore(id), null) || { msgs: [], view: [], tok: 0, at: 0, snap: '' };
 }
 const prof = () => CHAT_PROFILES[CHAT_ID] || CHAT_PROFILES.main;
-let aiBusy = false;
+let aiBusy = false, aiAbort = null, aiTimedOut = false;
+function aiStop() { if (aiAbort) aiAbort.abort(); }
 function aiToday() { return AI.used[dayKey()] || { in: 0, out: 0, usd: 0 }; }
 function kTok(n) { return n >= 10000 ? (n / 10000).toFixed(1) + ' 万' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
 async function aiCall(body, maxTokens) {
@@ -948,18 +1001,30 @@ async function aiCall(body, maxTokens) {
   const u = aiToday();
   if (u.in + u.out >= AI.budget) throw new Error('今天的 AI 额度(' + kTok(AI.budget) + ' token)用完了,明天再来,或在「我的」里调高上限');
   if (aiBusy) throw new Error('上一个请求还没回来');
-  aiBusy = true;
+  aiBusy = true; aiAbort = new AbortController();
+  renderMsgs(true);                      // 立刻显示「思考中」,发送钮变「停止」
   try {
     const A = (await import('./vendor/anthropic-sdk-1.0.0.mjs')).default;
     const pv = PROV()[AI.provider], ds = !pv.official;              // ds:兼容模式(DeepSeek 和自定义服务商)
     const client = new A({ apiKey: aiKey(), baseURL: pv.base, dangerouslyAllowBrowser: true, maxRetries: 1 });
     const req = Object.assign({ model: MODELS()[AI.model][5] || AI.model, max_tokens: maxTokens, output_config: { effort: AI.effort } }, body);
+    if (ds && !AI.noThink) req.thinking = { type: 'disabled' };       // 兼容接口(DeepSeek 等)最低档 = 不思考
     if (!ds) req.cache_control = { type: 'ephemeral' };
     if (ds && req.tools) req.tools = req.tools.map(t => { const c = Object.assign({}, t); delete c.strict; return c; });
     if (!ds && AI.fallback && AI.model !== 'claude-haiku-5-5') { req.betas = ['server-side-fallback-2026-07-01']; req.fallbacks = 'default'; }   // 被安全策略拒绝时服务端换模型重试
     let res;
-    try { res = await (ds ? client.messages : client.beta.messages).create(req); }     // 兼容模式不走 beta 通道
-    catch (e) {
+    const once = () => { aiAbort = new AbortController(); aiTimedOut = false;
+      const tm = setTimeout(() => { aiTimedOut = true; aiAbort.abort(); }, 45000);          // 45 秒没回就放弃,不让界面一直转
+      return (ds ? client.messages : client.beta.messages).create(req, { signal: aiAbort.signal }).finally(() => clearTimeout(tm)); };    // 兼容模式不走 beta 通道
+    try {
+      try { res = await once(); }
+      catch (e0) {                                  // 「关闭思考」参数被接口拒绝或卡住:去掉它重发一次,并记住
+        if (req.thinking && !(aiAbort.signal.aborted && !aiTimedOut) && (aiTimedOut || e0.status === 400)) { delete req.thinking; AI.noThink = true; saveAI(); res = await once(); }
+        else throw e0;
+      }
+    } catch (e) {
+      if (aiTimedOut) throw new Error('回复超时(45 秒),可能是网络或接口卡住了,稍后重试');
+      if (aiAbort.signal.aborted) throw Object.assign(new Error('已停止'), { aborted: true });
       if (e instanceof A.AuthenticationError) {
         const kind = keyKind(aiKey());
         throw new Error(kind && kind !== AI.provider ? '这个 Key 看起来是 ' + PROV()[kind].name + ' 的,服务商却选的是 ' + PROV()[AI.provider].name + ',去「我的 → 服务商」换一下'
@@ -1001,6 +1066,7 @@ function richText(src) {
   s = s.replace(/@@K(\d+)@@/g, (m, i) => keep[i].raw !== undefined ? keep[i].raw : m);
   let h = window.marked ? marked.parse(s, { gfm: true, breaks: true }) : '<p>' + s.replace(/\n/g, '<br>') + '</p>';
   h = h.replace(/@@K(\d+)@@/g, (_, i) => katexStr(keep[i].m, keep[i].d));
+  h = h.replace(/\[\[q:([^\]\s<]+)\]\]/g, (_, id) => '<a href="#" class="qlink" data-q="' + id + '">▶ 做这题 ' + id + '</a>');
   return h.replace(/<table>/g, '<div class="scroll"><table>').replace(/<\/table>/g, '</table></div>');
 }
 const mdLite = richText;
@@ -1008,12 +1074,12 @@ const mdLite = richText;
 /* 学情摘要(约 600 token):每个考点一行 */
 function aiSnapshot() {
   const L = [], now = Date.now();
-  ['math', 'logic'].forEach(function (subj) {
+  ['math', 'logic', 'gk'].forEach(function (subj) {
     const ts = topicsOf(subj), cf = SUBJ[subj], tested = ts.filter(t => tpList(subj, t.id).length).length;
     L.push(`[${cf.name}] ${tested < ts.length ? '摸底 ' + tested + '/' + ts.length : '预估 ' + fmt(est(subj)) + '/' + cf.per * cf.pts} · 目标 ${S.target[subj]}`);
     ts.forEach(function (t) {
       const n = tpList(subj, t.id).length, cs = Object.values(S.cards).filter(c => c.s === subj && c.t === t.id);
-      const gap = cs.filter(c => c.w > 0 && c.st < 3 && c.kind !== 'slip').length, slip = cs.filter(c => c.kind === 'slip').length, bf = biasOf(subj, t.id);
+      const gap = cs.filter(isWrongC).length, slip = cs.filter(c => c.kind === 'slip').length, bf = biasOf(subj, t.id);
       const b = (S.bias || {})[subj + '|' + t.id];
       L.push(`${t.id} ${t.name}|考频${t.w}|${n ? '掌握' + Math.round(mastery(subj, t.id) * 100) + '%|做' + n : '未测'}${gap ? '|待攻克' + gap : ''}${slip ? '|失误' + slip : ''}${bf !== 1 ? '|推送×' + bf + '(剩' + Math.ceil((b.until - now) / DAY) + '天)' : ''}`);
     });
@@ -1025,6 +1091,7 @@ function aiSnapshot() {
   L.push('近7天题量:' + days.join(','));
   const os = load('ult.or.v1', {});
   L.push(`[运筹学] 已学完 ${orDone(os)}/${OR_CORE.length} 章 · 闪卡待复习 ${Object.values(os.fc || {}).filter(x => x.due <= now).length} 张(学员也要考运筹学,安排时间要兼顾)`);
+  if (S.lastQ && Date.now() - S.lastQ.at < 6 * 3600e3) L.push('刚才在看的题:' + S.lastQ.id + '(' + SUBJ[S.lastQ.subj].name + ')——学员说「这题」多半指它,可用 read_question 读');
   const hs = S.hist.slice(0, 5).map(h => SUBJ[h.subj].name + h.title + ' ' + h.ok + '/' + h.n);
   if (hs.length) L.push('最近几组:' + hs.join(';'));
   return L.join('\n');
@@ -1097,16 +1164,38 @@ function mascot(ex, size, head) {
 const AI_SYS = `你是 Ultimate 管综刷题站里的私人教练,有权直接操作这个网站。学员备考管理类联考(数学 75 分、逻辑 60 分),有基础,追求提分效率。
 每段对话开头会附:学员的长期记忆(你之前记下的)、学情摘要;数据变化后会再附新摘要。字段:考频=平均每套卷考几题;掌握=做对该考点典型难度真题的概率;待攻克=判定为真不会或还在观察的错题;失误=系统根据作答行为判定为会做但手滑的错题;推送×=当前推送倍数(0=暂停)。
 做事方式:学员要求什么就直接用工具做,不要反问确认;要具体分析某块时,先用 get_wrong_questions / get_topic_detail 看真实题目和记录再下结论,不凭空猜。你判断某块该调整时可以直接调整,并说明理由。学员透露的偏好、作息、目标、反复出现的薄弱点,用 remember 记下(简短),过时的用 forget 删掉。
-回答:中文,直接、具体,只依据数据,不编造。一般 200 字以内;要报告时不超过 600 字。用 Markdown(可用列表、加粗,少用表格);数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\) 或 Unicode 拼凑的上下标。操作完一句话说明做了什么。
-套卷 id:数学 m+年份(m2010–m2025)、全真模拟 mk1–mk8;逻辑 l+年份(l2020–l2026)。考点 id 见学情摘要每行开头;题目 id 从 get_wrong_questions 得到。`;
-CHAT_PROFILES.main = { title: 'AI 教练', sys: () => AI_SYS, tools: true, snap: true, hello: '我是小胖鱼。今天想练哪块?',
-  ph: '说说你的情况', chips: () => ['分析一下我现在的学情', '看看我的错题,说说错在哪', '错题里我只要排列组合的', '数列我很稳了,少推点'] };
+回答:中文,直接、具体,只依据数据,不编造。极简:先给结论,一般 80 字以内;要分析或报告也不超过 250 字;不寒暄、不复述数据、不写总结句、不列没被问到的建议。用 Markdown(可用列表、加粗,少用表格);数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\) 或 Unicode 拼凑的上下标。操作完一句话说明做了什么。
+你熟悉这个网站的全部内容:怎么用、某功能在哪、算法为什么这样推,先用 site_info 查再答;学员要找题就 find_questions,要看某题的题干/答案/解析就 read_question(不要凭记忆讲题);提到具体题时写 [[q:题id]],界面会变成「做这题」按钮,不要整题复述。网站里没有的功能直接说没有。
+套卷 id:数学 m+年份(m2010–m2025)、全真模拟 mk1–mk8;逻辑 l+年份(l2020–l2026);公考(国考行测 2021–2026,subject=gk,满分 135)套卷 id 形如 k2025-判断推理。考点 id 见学情摘要每行开头;题目 id 从 get_wrong_questions 得到。`;
+CHAT_PROFILES.main = { title: 'AI 教练', sys: () => AI_SYS + (window.UKB ? '\n' + window.UKB.overview : ''), tools: true, snap: true, hello: '我是小胖鱼。这个站的功能、题库、算法我都熟,问我怎么用、让我找题、分析学情都行。',
+  ph: '说说你的情况或问网站怎么用',
+  chips: function () {
+    const subj = S.subj, ts = topicsOf(subj).filter(t => tpList(subj, t.id).length >= 2);
+    const weak = ts.slice().sort((a, b) => mastery(subj, a.id) - mastery(subj, b.id))[0], nw = wrongIds(subj, []).length;
+    const L = ['分析一下我现在的学情'];
+    if (weak) L.push('「' + weak.name + '」怎么快速提上去?');
+    if (nw) L.push('看看我的错题,说说错在哪');
+    L.push('这个网站有哪些功能?', '帮我找一道' + (weak ? weak.name.split(' ')[0] : topicsOf(subj)[0].name.split(' ')[0]) + '的难题');
+    return L;
+  } };
+/* 网站知识库(ai-kb.js,构建生成):概览放进系统提示,细节由 site_info 工具按需查 */
+let kbP = null;
+function loadKB() {
+  if (window.UKB) return Promise.resolve(window.UKB);
+  return kbP = kbP || new Promise(function (ok) {
+    const s = document.createElement('script');
+    s.src = 'ai-kb.js' + (window.UFILES && window.UFILES.v ? '?v=' + window.UFILES.v : '');
+    s.onload = () => ok(window.UKB); s.onerror = () => ok(null);
+    document.head.append(s);
+  });
+}
+const KBSEC = () => Object.keys((window.UKB || {}).sections || {});
 const USD_CNY = 7.1;        // 估算用汇率
 const yuan = usd => '¥' + (usd * USD_CNY).toFixed(usd * USD_CNY < 1 ? 3 : 2);
 function aiTools() {
-  const tids = topicsOf('math').concat(topicsOf('logic')).map(t => t.id);
-  const pids = META.math.papers.concat(META.logic.papers).map(p => p.id).concat(['']);
-  const subject = { type: 'string', enum: ['math', 'logic'] }, topics = { type: 'array', items: { type: 'string', enum: tids } };
+  const tids = topicsOf('math').concat(topicsOf('logic'), topicsOf('gk')).map(t => t.id);
+  const pids = META.math.papers.concat(META.logic.papers, META.gk.papers).map(p => p.id).concat(['']);
+  const subject = { type: 'string', enum: ['math', 'logic', 'gk'] }, topics = { type: 'array', items: { type: 'string', enum: tids } };
   const obj = (props, req) => ({ type: 'object', additionalProperties: false, required: req || Object.keys(props), properties: props });
   const pick = (desc) => obj({ subject: subject, source: { type: 'string', enum: ['wrong', 'topic', 'paper'], description: 'wrong=待攻克错题;topic=考点里的题;paper=整套卷' },
     topic_ids: Object.assign({ description: '限定的考点,空数组=不限' }, topics), paper_id: { type: 'string', enum: pids, description: 'source=paper 时填,否则空字符串' },
@@ -1125,13 +1214,50 @@ function aiTools() {
     T('set_target', '修改某科目标分。', obj({ subject: subject, score: { type: 'integer' } })),
     T('navigate', '回复结束后打开网站的某个页面。', obj({ page: { type: 'string', enum: ['home', 'bank', 'me', 'writing', 'topic'] }, subject: subject,
       topic_id: { type: 'string', enum: tids.concat(['']), description: 'page=topic 时填,否则空字符串' } })),
+    T('site_info', '查网站说明书:功能怎么用、页面在哪、练习与算法规则、各科目考点表和题库规模、套卷目录、运筹学/写作/备份/打印/AI 说明。学员问「怎么用/在哪/为什么」时先调用。',
+      obj({ section: { type: 'string', enum: KBSEC(), description: 'pages=页面入口 train=练习机制 algo=算法 wrong=错题与收藏 print=打印 or=运筹学 writing=写作 backup=备份 ai=AI 自己 data=题库来源 subject_math/logic/gk=该科目考点表与套卷' } })),
+    T('find_questions', '在题库里按关键词找题(关键词用空格分隔,须全部命中题干/选项/来源)。返回题 id、来源、考点、难度和题干开头。找到后可用 read_question 读详情,或在回复里写 [[q:题id]] 给学员做题按钮。',
+      obj({ subject: subject, query: { type: 'string', description: '关键词,可空' }, topic_id: { type: 'string', enum: tids.concat(['']), description: '限定考点,空字符串=不限' },
+            year: { type: 'integer', description: '限定真题年份,0=不限' }, limit: { type: 'integer', description: '1–8' } })),
+    T('read_question', '读一道题的完整内容:题干、选项、正确答案、解析,以及学员对这题的作答记录。讲题、核对答案前先调用。', obj({ question_id: { type: 'string' } })),
+    T('practice_questions', '把指定的几道题(最多 30 道,须同一科目)组成一组练习,回复结束后自动开始。', obj({ question_ids: { type: 'array', items: { type: 'string' } } })),
     T('remember', '把关于学员的一条信息存进长期记忆(每条 60 字以内,最多 12 条,新对话都会带上)。', obj({ note: { type: 'string' } })),
     T('forget', '删除一条过时的长期记忆。', obj({ index: { type: 'integer', description: '记忆编号,从 1 开始' } })),
   ];
 }
+/* 错题本里的题:错过、还没连续做对到「会了」、没被判成失误、也没被手动移出 */
+function isWrongC(c) { return c.w > 0 && c.st < 3 && c.kind !== 'slip' && !c.rm; }
+function removeWrong(id) { const c = S.cards[id]; if (c) { c.rm = Date.now(); save(); } }   // 手动移出;以后再做错会重新进来
+function viewWrongs() {
+  const subj = S.subj;
+  loadData(subj).then(function (d) {
+    const ids = wrongIds(subj, []);
+    const row = id => { const q = d.byId[id], c = S.cards[id]; if (!q) return '';
+      const txt = q.stem.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 46);
+      return `<div class="wrow" data-id="${id}"><div class="wt"><span class="dim">${q.src} · 错 ${c.w} 次</span><span>${txt}</span></div>
+        <a href="#" class="wopen" data-open="${id}">看</a><a href="#" class="wdel" data-del="${id}">移出</a></div>`; };
+    html(`<a href="#/me" class="back">← 我的</a>
+    <section class="slim">${subjSwitch('wrongs')}</section>
+    <div class="grp-h">${SUBJ[subj].name}错题本 · <span id="wn">${ids.length}</span> 题${ids.length ? ' <a href="#" id="wclr" class="wclr">全部清空</a>' : ''}</div>
+    <section class="wlist">${ids.map(row).join('') || '<div class="row-i off"><span>没有错题</span></div>'}</section>`);
+    app.querySelectorAll('[data-del]').forEach(a => a.onclick = ev => { ev.preventDefault(); removeWrong(a.dataset.del);
+      a.closest('.wrow').remove(); const n = $('#wn'); n.textContent = +n.textContent - 1; toast('已移出错题本'); });
+    app.querySelectorAll('[data-open]').forEach(a => a.onclick = ev => { ev.preventDefault();
+      startSession({ mode: 'one', subj: subj, ids: [a.dataset.open], title: '错题' }); });
+    const clr = $('#wclr');
+    if (clr) clr.onclick = ev => { ev.preventDefault(); ask('清空' + SUBJ[subj].name + '全部 ' + ids.length + ' 道错题?之后再做错会重新进来。', { ok: '清空', danger: true })
+      .then(y => { if (y) { ids.forEach(removeWrong); viewWrongs(); } }); };
+  });
+}
+function toggleFav(id, subj) {
+  S.fav = S.fav || {};
+  if (S.fav[id]) delete S.fav[id]; else S.fav[id] = { s: subj, at: Date.now() };
+  save(); toast(S.fav[id] ? '已收藏' : '已取消收藏');
+}
+function favIds(subj) { S.fav = S.fav || {}; return Object.keys(S.fav).filter(id => S.fav[id].s === subj).sort((a, b) => S.fav[b].at - S.fav[a].at); }
 function wrongIds(subj, tids) {
   return Object.keys(S.cards).filter(id => { const c = S.cards[id];
-    return c.s === subj && c.w > 0 && c.st < 3 && c.kind !== 'slip' && (!tids.length || tids.indexOf(c.t) >= 0); })
+    return c.s === subj && isWrongC(c) && (!tids.length || tids.indexOf(c.t) >= 0); })
     .sort((a, b) => S.cards[a].due - S.cards[b].due);
 }
 function tName(subj, tids) { return tids.length ? tids.map(t => topicName(subj, t)).join('、') : SUBJ[subj].name; }
@@ -1192,6 +1318,41 @@ async function runTool(name, x) {
     if (x.page === 'home' || x.page === 'bank') S.subj = x.subject;
     CHAT.after = { nav: to }; return 'ok:回复结束后打开';
   }
+  if (name === 'site_info') {
+    await loadKB();
+    const t = ((window.UKB || {}).sections || {})[x.section];
+    note('查了网站说明:' + x.section);
+    return t || 'error:没有这一节,可选:' + KBSEC().join('、');
+  }
+  if (name === 'find_questions') {
+    const d = await loadData(x.subject), kws = String(x.query || '').split(/\s+/).filter(Boolean), lim = clamp(Math.round(+x.limit || 5), 1, 8);
+    const hit = d.qs.filter(q => (!x.topic_id || q.t === x.topic_id) && (!x.year || q.y === x.year) && !q.skip &&
+      (!kws.length || (t => kws.every(k => t.indexOf(k) >= 0))(plainQ(q.stem + ' ' + (q.c1 || '') + ' ' + (q.c2 || '') + ' ' + (q.opts || []).join(' ')) + q.src + (q.tag || ''))));
+    note('找到 ' + hit.length + ' 道题' + (kws.length ? '(' + kws.join(' ') + ')' : ''));
+    if (!hit.length) return '没有符合的题';
+    return '共 ' + hit.length + ' 道,列前 ' + Math.min(lim, hit.length) + ' 道:\n' + hit.slice(0, lim).map(q =>
+      '[' + q.id + '] ' + q.src + '·' + topicName(x.subject, q.t) + '·' + LVN[q.lv] + '\n' + plainQ(q.stem).replace(/\s+/g, ' ').slice(0, 70)).join('\n');
+  }
+  if (name === 'read_question') {
+    const f = await findById(x.question_id);
+    if (!f) return 'error:没有这道题 ' + x.question_id;
+    const q = f.q, c = S.cards[q.id], opts = q.kind === 'cond' ? COND_OPTS : q.opts;
+    note('读了题 ' + q.id);
+    return '[' + q.id + '] ' + q.src + '·' + topicName(f.subj, q.t) + '·' + LVN[q.lv] + '\n' + plainQ(q.stem).slice(0, 700)
+      + (q.kind === 'cond' ? '\n(1)' + plainQ(q.c1).slice(0, 200) + '\n(2)' + plainQ(q.c2).slice(0, 200) : '')
+      + '\n' + opts.map((o, i) => LET[i] + '.' + plainQ(o).slice(0, 80)).join('\n') + '\n答案:' + q.ans + '\n解析:' + plainQ(q.sol).replace(/\s+/g, ' ').slice(0, 900)
+      + '\n学员记录:' + (c ? '做过 ' + c.n + ' 次,对 ' + c.ok + ',错 ' + c.w + ',最近选 ' + (c.p || '—') + (c.kind === 'slip' ? ',判为失误' : c.rm ? ',已移出错题本' : '') : '没做过');
+  }
+  if (name === 'practice_questions') {
+    const ids = (x.question_ids || []).slice(0, 30), f = ids.length ? await findById(ids[0]) : null;
+    if (!f) return 'error:没有找到这些题';
+    const d = await loadData(f.subj), ok = ids.filter(id => d.byId[id]);
+    if (!ok.length) return 'error:这些题不在同一科目或不存在';
+    const act = { kind: 'go', subj: f.subj, source: 'ids', ids: ok, label: '指定题' };
+    note('练习:指定 ' + ok.length + ' 题', act);
+    CHAT.after = { act: act };
+    return 'ok:回复结束后自动开始(' + ok.length + ' 题)';
+  }
   if (name === 'make_practice' || name === 'make_print') {
     const tids = x.topic_ids || [], n = clamp(Math.round(+x.count || 10), 1, name === 'make_print' ? 60 : 30);
     let avail, label;
@@ -1213,8 +1374,14 @@ async function runTool(name, x) {
   }
   return 'error:未知工具';
 }
+async function findById(id) {
+  const first = /^k/.test(id) ? 'gk' : /^[gj]\d|^cd-/.test(id) ? 'logic' : 'math';
+  for (const sj of [first].concat(['math', 'logic', 'gk'].filter(x => x !== first))) { const d = await loadData(sj); if (d.byId[id]) return { subj: sj, q: d.byId[id] }; }
+  return null;
+}
 function doAct(act) {
   loadData(act.subj).then(function (d) {
+    if (act.source === 'ids') { startSession({ mode: 'list', subj: act.subj, ids: act.ids, title: act.label }); return; }
     if (act.source === 'paper') {
       const p = d.papers.find(q => q.id === act.pid);
       if (act.kind === 'print') printAsk(act.subj, p.ids, p.name, false); else startPaper(act.subj, act.pid);
@@ -1260,6 +1427,7 @@ function chatIntact(msgs) {
   return true;
 }
 async function aiSend(text, retried) {
+  if (CHAT_ID === 'main') await loadKB();
   const P = prof(), snap = P.snap ? aiSnapshot() : '', sig = ctxSig();
   // 太长、隔太久、设置变了、历史残缺:换新上下文(带上次要点),而不是让请求失败
   if (CHAT.msgs.length && (CHAT.tok > 12000 || Date.now() - CHAT.at > 6 * 3600e3 || CHAT.sig !== sig || !chatIntact(CHAT.msgs))) newChat(true);
@@ -1274,7 +1442,7 @@ async function aiSend(text, retried) {
   const tools = P.tools ? aiTools() : null, sys = P.sys();
   try {
     for (let i = 0; i < 6; i++) {
-      const res = await aiCall(Object.assign({ system: sys, messages: CHAT.msgs }, tools ? { tools: tools } : {}), 4000);
+      const res = await aiCall(Object.assign({ system: sys, messages: CHAT.msgs }, tools ? { tools: tools } : {}), 1500);
       CHAT.msgs.push({ role: 'assistant', content: res.content });       // 原样追加(含思考块),不改写历史
       CHAT.tok = res._tin + (res.usage.output_tokens || 0); CHAT.at = Date.now();
       const t = aiText(res);
@@ -1290,7 +1458,13 @@ async function aiSend(text, retried) {
   } catch (e) {
     // 请求没成功:撤回刚追加、还没得到回复的那条用户消息(没进入对话,不算改历史)
     const lastM = CHAT.msgs[CHAT.msgs.length - 1];
+    if (e.aborted && lastM && lastM.role === 'user' && Array.isArray(lastM.content)) {       // 工具循环中途停止:补一句助手回复,保持 user/assistant 交替
+      CHAT.msgs.push({ role: 'assistant', content: [{ type: 'text', text: '(已停止)' }] });
+      CHAT.view.push({ who: 'act', text: '已停止' });
+      saveChat(); return;
+    }
     if (lastM && lastM.role === 'user' && typeof lastM.content === 'string') { CHAT.msgs.pop(); CHAT.view.pop(); }
+    if (e.aborted) { CHAT.view.push({ who: 'me', text: text }, { who: 'act', text: '已停止' }); saveChat(); return; }
     // 接口说请求格式不对(多半是旧历史的问题):自动开新对话再试一次
     if (e.status === 400 && !retried && CHAT.msgs.length) {
       newChat(true); CHAT.view.push({ who: 'act', text: '之前的对话接不上了,已自动开了新对话' }); saveChat();
@@ -1327,9 +1501,10 @@ function viewAI(id) {
   const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; };
   ta.addEventListener('input', grow);
   ta.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); send(ta.value); } };
-  $('#ask').onsubmit = ev => { ev.preventDefault(); send(ta.value); };
+  const go = () => aiBusy ? aiStop() : send(ta.value);
+  $('#ask').onsubmit = ev => { ev.preventDefault(); go(); };
   // 手机上点「发送」不让输入框失焦(否则键盘先收起、整页跳一下)
-  $('#sendb').addEventListener('touchend', ev => { ev.preventDefault(); send(ta.value); });
+  $('#sendb').addEventListener('touchend', ev => { ev.preventDefault(); go(); });
   $('#newc').onclick = ev => { ev.preventDefault(); if (!aiBusy) { newChat(true); renderMsgs(true); } };
   $('#clrc').onclick = ev => { ev.preventDefault(); if (!aiBusy) ask('清空所有对话记录?(长期记忆保留,可在「我的」里清)', { ok: '清空' }).then(y => { if (y) { newChat(false); renderMsgs(true); } }); };
   const sk = $('#setkey'); if (sk) sk.onclick = ev => { ev.preventDefault(); askKey().then(() => viewAI()); };
@@ -1347,7 +1522,7 @@ function renderMsgs(stick) {
       : m.who === 'sep' ? `<div class="sep"><span>新对话</span></div>`
       : m.who === 'act' ? `<div class="act">✓ ${esc(m.text)}${m.act ? ` <a href="#" data-act="${i}">${m.act.kind === 'print' ? '再打开' : '再开始'}</a>` : ''}</div>`
       : m.who === 'err' ? `<div class="ai-row">${mascot('sad', 32, true)}<div class="err">${esc(m.text)}</div></div>`
-      : `<div class="ai-row">${v[i - 1] && v[i - 1].who === 'ai' ? '<span class="av-sp"></span>' : mascot('idle', 32, true)}<div class="ai">${render(m.text)}</div></div>`).join('') : '')
+      : `<div class="ai-row">${v[i - 1] && v[i - 1].who === 'ai' ? '<span class="av-sp"></span>' : mascot('idle', 32, true)}<div class="ai">${render(m.text)}${!aiBusy && i === v.length - 1 && P.tools ? `<div class="mact"><a href="#" data-copy="${i}">复制</a><a href="#" data-regen="1">重答</a></div>` : ''}</div></div>`).join('') : '')
     + (!v.length || v[v.length - 1].who === 'sep' ? `<div class="hello">${v.length ? '' : `<div class="hello-m">${mascot('happy', 112)}</div><p>${esc(P.hello)}</p>`}
       <div class="chips">${chips.map(c => Array.isArray(c) ? `<a href="#" data-chip="${esc(c[1] || '')}" data-fill="${c[1] ? '' : esc(c[2] || '')}">${esc(c[0])}</a>` : `<a href="#" data-chip="${esc(c)}">${esc(c)}</a>`).join('')}</div></div>` : '')
     + (aiBusy ? `<div class="ai-row thinking">${mascot('think', 32, true)}<div class="ai dim">小胖鱼思考中…</div></div>` : '');
@@ -1357,11 +1532,21 @@ function renderMsgs(stick) {
     if (a.dataset.chip) { viewAI.send(a.dataset.chip); return; }
     const q = $('#q'); q.value = a.dataset.fill; q.focus(); q.dispatchEvent(new Event('input'));     // 「批改我的解答」这类:先填个开头让人接着写
   });
+  box.querySelectorAll('.qlink').forEach(a => a.onclick = ev => { ev.preventDefault();
+    findById(a.dataset.q).then(f => f ? startSession({ mode: 'one', subj: f.subj, ids: [f.q.id], title: '题' }) : toast('没找到这道题')); });
+  box.querySelectorAll('[data-copy]').forEach(a => a.onclick = ev => { ev.preventDefault();
+    const t = v[+a.dataset.copy].text; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('已复制'), () => toast('复制失败')); });
+  box.querySelectorAll('[data-regen]').forEach(a => a.onclick = ev => { ev.preventDefault();
+    if (aiBusy) return;
+    const vi = v.map(m => m.who).lastIndexOf('me'), mi = CHAT.msgs.map(m => m.role === 'user' && typeof m.content === 'string').lastIndexOf(true);
+    if (vi < 0 || mi < 0) return;
+    const text = v[vi].text; v.length = vi; CHAT.msgs.length = mi;
+    viewAI.send(text); });
   box.querySelectorAll('[data-act]').forEach(a => a.onclick = ev => { ev.preventDefault(); doAct(v[+a.dataset.act].act); });
   if (stick || atBottom) box.scrollTop = box.scrollHeight;
   box.onscroll = () => { box._bottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80; };
   box._bottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-  const sb = $('#sendb'); if (sb) sb.disabled = aiBusy;
+  const sb = $('#sendb'); if (sb) { sb.disabled = false; sb.textContent = aiBusy ? '停止' : '发送'; sb.classList.toggle('stop', aiBusy); }
   const f = $('#aif'); if (f) f.textContent = `${MODELS()[AI.model][0]} · 今日 ${kTok(u.in + u.out)} / ${kTok(AI.budget)} token · 约 ${yuan(u.usd)}${CHAT.tok ? ' · 本对话 ' + kTok(CHAT.tok) : ''}`;
 }
 /* 服务商选择:列出内置和自定义的,可添加/删除自定义(要求 Anthropic 兼容接口) */
@@ -1424,31 +1609,8 @@ function askKey() {
     AI.keys[AI.provider] = k; saveAI(); toast(k ? 'Key 已保存' : 'Key 已删除');
   });
 }
-/* 错题讲解:针对选错的那个选项;按「题|选项」缓存在本机,重复看不花 token */
-const AI_EX_SYS = '你是管综(管理类联考)数学/逻辑辅导老师。学员做错了一道题,请针对他选的那个错误选项讲清:他大概错在哪一步、正确思路的关键一步、下次怎么避免。中文,180 字以内,不复述题目;数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\);可用 Markdown 列表和加粗,不用表格。';
 function plainQ(h) { return String(h || '').replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'); }
 /* 做对/没答时的「深讲」:固定结构,把参考解析没说透的地方补齐 */
-const AI_DEEP_SYS = `你是管综(管理类联考)数学/逻辑名师。给学员把这道题讲透,按下面的结构写,每部分用加粗小标题:
-**题型**:一句话说出这是什么题型、考哪个知识点。
-**突破口**:题干里哪个信息是关键,为什么从这里下手。
-**步骤**:完整推导,不跳步,每步说明依据(公式、性质或推理规则);条件充分性题要分别判断条件(1)、(2),必要时再联合。
-**秒杀**:考场上更快的做法(特值、排除、估算、选项特征等);没有就写「无」。
-**易错**:最容易错在哪、错误选项是怎么设陷阱的。
-**同类题**:以后看到什么特征就用这个方法。
-要求:中文;结论与「正确答案」一致,如发现参考解析有误要指出;数学式一律用 LaTeX(行内 $...$,独立一行 $$...$$,不要用 \\( \\));逻辑题用「前提①②③ → 推出」的符号化写法;总长 350 字以内,不复述题目。`;
-async function aiExplain(q, pick, box) {
-  const k = 'ex:' + q.id + '|' + pick, hit = window.indexedDB ? await kvGet(k) : null;
-  if (hit) { box.innerHTML = mdLite(hit); typeset(box); return; }
-  box.innerHTML = '<span class="dim">思考中…</span>';
-  const opts = q.kind === 'cond' ? COND_OPTS : q.opts;
-  const msg = `题目:${plainQ(q.stem)}${q.kind === 'cond' ? `\n条件(1):${plainQ(q.c1)}\n条件(2):${plainQ(q.c2)}` : ''}\n选项:${opts.map((o, i) => LET[i] + '. ' + plainQ(o)).join(' ')}\n正确答案:${q.ans}\n学员选了:${pick}\n参考解析:${plainQ(q.sol)}`;
-  try {
-    const res = await aiCall({ system: pick === q.ans ? AI_DEEP_SYS : AI_EX_SYS, messages: [{ role: 'user', content: msg }] }, pick === q.ans ? 3500 : 2500);
-    const t = aiText(res) || '(没有得到讲解)';
-    if (res.stop_reason !== 'refusal' && window.indexedDB) kvSet(k, t);
-    box.innerHTML = mdLite(res.stop_reason === 'refusal' ? '(这条请求被安全策略拒绝了)' : t); typeset(box);
-  } catch (e) { box.innerHTML = '<span class="hot">' + esc(e.message || String(e)) + '</span>'; }
-}
 
 /* ───────────── 打印:所见即所得的 A4 分页预览 ─────────────
    先把每道题渲染到一个和纸面同宽的隐藏容器里量出真实高度,再按 A4 可用高度一页页装(题不跨页),
@@ -1474,7 +1636,7 @@ function printAsk(subj, ids, title, pickCount) {
     let list = ids, token = 0;
     const fit = () => { box.style.zoom = Math.min(1, ($('.pv-scroll', pv).clientWidth - 24) / 794); };
     const draw = function () {
-      list = !pickCount ? ids : ids.filter(id => o.which === 'all' || (o.which === 'new' ? !S.cards[id] : S.cards[id] && S.cards[id].w > 0 && S.cards[id].kind !== 'slip')).slice(0, +o.n);
+      list = !pickCount ? ids : ids.filter(id => o.which === 'all' || (o.which === 'new' ? !S.cards[id] : S.cards[id] && isWrongC(S.cards[id]))).slice(0, +o.n);
       const my = ++token;
       if (!list.length) { box.innerHTML = '<section class="page"><p class="doc-empty">没有符合条件的题</p></section>'; $('.pv-n', pv).textContent = ''; return; }
       paginate(paperBlocks(d, subj, list, title, o)).then(function (pages) {
@@ -1499,7 +1661,7 @@ function optCols(opts) {
 /* 纸面拆成块:页头、每道题、答案表、每题解析;块是分页的最小单位 */
 function paperBlocks(d, subj, ids, title, o) {
   const qs = ids.map(id => d.byId[id]), dt = new Date();
-  const mins = Math.round(qs.length * SUBJ[subj].sec / 60 * 0.95);
+  const mins = Math.round(qs.reduce((a, q) => a + secOf(subj, q.t), 0) / 60 * 0.95);
   const head = `<header class="doc-h"><h1>${esc(title)}</h1>
       <div class="doc-m"><span>${SUBJ[subj].name} · ${qs.length} 题 · 建议 ${mins} 分钟 · ${dt.getFullYear()}.${dt.getMonth() + 1}.${dt.getDate()}</span>
       <span class="doc-f"><span>用时</span><span>得分</span></span></div></header>
@@ -1569,7 +1731,7 @@ function route() {
   document.title = 'Ultimate';
   const h = location.hash.replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
-  const tab = r === 't' || r === 'papers' || r === 'bank' ? 'me' : r === 'sum' || r === 'writing' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作在首页,「学习」就是运筹学
+  const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作在首页,「学习」就是运筹学
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
   if (r !== 's' && S.cur && S.cur.qt && !S.cur.away) { S.cur.away = Date.now(); save(); }
   document.body.classList.toggle('playing', r === 's');
@@ -1578,6 +1740,7 @@ function route() {
   if (r === 't') viewTopic(h[1], h[2]);
   else if (r === 'bank' || r === 'papers') viewBank();
   else if (r === 'me') viewMe();
+  else if (r === 'wrongs') viewWrongs();
   else if (r === 's') viewSession();
   else if (r === 'sum') viewSum();
   else if (r === 'ai') viewAI('main');

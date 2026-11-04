@@ -65,11 +65,11 @@
       hello: c ? '这一章哪里没懂,直接问我。' : '运筹学的问题都可以问我。',
       sys: () => `你是一位耐心、严谨的运筹学助教,用简体中文回答。学生报考西安工业大学工业工程与管理(MEM),运筹学是复试科目,范围按韩伯棠《管理运筹学》:线性规划(单纯形、大 M / 两阶段、对偶、灵敏度)、运输(含转运、生产-库存)、整数规划与指派、目标规划、图与网络、网络计划(PERT/CPM)、动态规划、决策论;排队论、对策论一般不考。考试题型是选择、填空、简答和建模计算大题,不能用软件。记号:max 问题检验数 σj = cj − CB·B⁻¹·Pj,全部 ≤ 0 为最优。
 要求:
-1. 先给直觉,再给严格步骤;能举例就用课程里的例子。
+1. 一句话直觉 + 最短的严格步骤;不额外举例,除非学生要。
 2. 数学公式用 LaTeX:行内 $...$,独立公式 $$...$$;单纯形表、运输表用 Markdown 表格。
 3. 学生要「提示」时只给思路,不直接给答案;学生要「批改」时,逐步检查,指出第一个出错的步骤和原因,并说明这一步在考试中大约扣几分。
 4. 出题时给考试风格的题目,先不给答案,等学生作答。
-5. 回答简洁,不要堆砌术语;对计算结果要自己验算一遍。
+5. 极简:先给结论,一般 150 字以内(计算题只写关键步骤);不寒暄、不复述问题、不写总结;计算结果自己验算一遍。
 学生当前在看:「${where}」。${ctx ? '\n\n以下是这一章的讲义内容,回答时以它为准:\n' + ctx : ''}`,
       chips: function () {
         if (id === 'tools') return [['怎么用计算器检查作业', '我该怎样用计算器检查自己手算的单纯形表或运输表?哪些地方最容易算错?']];
@@ -115,14 +115,15 @@
         <a href="#/or/ai/all"><b>问 AI</b><span>随时答疑</span></a>
       </div>
       <div class="grp-h">学习路线</div>
-      <ol class="or-path">${groups.map(g => `<li class="or-stage">${esc(g.name)}</li>${g.list.map(c => {
+      <div class="or-path">${groups.map(g => `<div class="or-stage">${esc(g.name)}</div><div class="or-row">${g.list.map(c => {
         const p = st.pos[c.no] || 0, dn = st.done.indexOf(c.no) >= 0, cur = last && last.no === c.no;
-        return `<li class="or-step${dn ? ' done' : ''}${cur ? ' cur' : ''}"><a href="#/or/c/${c.no}"><i class="nd">${dn ? '✓' : c.d ? +c.d : c.n === 0 ? '·' : '✎'}</i>
-          <span><b>${esc(c.title)}</b>${c.tag ? `<em>${c.tag}</em>` : ''}${CH_DEMOS[c.no] ? '<em class="hasd">▶ 动画</em>' : ''}${!dn && p > 0.05 ? `<em>读到 ${Math.round(p * 100)}%</em>` : ''}</span></a></li>`; }).join('')}`).join('')}</ol>
+        return `<a class="or-ch${dn ? ' done' : ''}${cur ? ' cur' : ''}" href="#/or/c/${c.no}"><i class="nd">${dn ? '✓' : c.d ? +c.d : c.n === 0 ? '·' : '✎'}</i>
+          <b>${esc(c.title)}</b><span class="mt">${c.tag ? `<em>${c.tag}</em>` : ''}${CH_DEMOS[c.no] ? '<em class="hasd">▶ 动画</em>' : ''}${!dn && p > 0.05 ? `<em>读到 ${Math.round(p * 100)}%</em>` : ''}</span></a>`; }).join('')}</div>`).join('')}</div>
       <div class="grp-h">动画演示</div>
       <div class="or-demos">${Object.keys(DEMOS).map(d => { const t = DEMOS[d].title.split(':'); return `<a href="#" data-demo="${d}"><i>▶</i><b>${esc(t[0])}</b><span>${esc(t[1] || '')}</span></a>`; }).join('')}</div>
     </div>`;
     window.scrollTo(0, 0);
+    $$('.or-row').forEach(r => { const c = $('.or-ch.cur', r); if (c) r.scrollLeft = Math.max(0, c.offsetLeft - 18 - (r.clientWidth - c.offsetWidth) / 2); });     // 当前章滚到行中间
     $$('[data-demo]').forEach(a => a.onclick = ev => { ev.preventDefault(); openDemo(a.dataset.demo); });
     const inp = $('#ors'), out = $('#orsr');
     $('#orsb').onclick = () => { const bx = $('#orsbox'); bx.hidden = !bx.hidden; if (!bx.hidden) inp.focus(); };

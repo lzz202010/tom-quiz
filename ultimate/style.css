@@ -594,20 +594,24 @@ body.chatmode { overflow: hidden; }
 .or-tools canvas { width: 100%; max-width: 520px; height: auto; display: block; margin: 0 auto; }
 
 /* ───── 运筹学:学习路线 ───── */
-.or-path { list-style: none; margin: 0; padding: 0 0 0 4px; }
-.or-stage { font-size: 12px; color: var(--mute); margin: 14px 0 4px 44px; }
-.or-step a { position: relative; display: flex; align-items: center; gap: 14px; padding: 9px 0; min-height: 50px; }
-.or-step a::before { content: ""; position: absolute; left: 16px; top: -10px; bottom: -10px; width: 2px; background: var(--line); z-index: 0; }
-.or-step:first-of-type a::before { top: 50%; }
-.or-step .nd { position: relative; z-index: 1; flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-  font-style: normal; font-family: var(--mono); font-size: 13px; background: var(--bg); border: 2px solid var(--line); color: var(--mute); }
-.or-step.done .nd { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.or-step.cur .nd { border-color: var(--acc); color: var(--acc); box-shadow: 0 0 0 4px color-mix(in srgb, var(--acc) 15%, transparent); }
-.or-step b { display: block; font-weight: 500; font-size: 15px; }
-.or-step.done b { color: var(--soft); }
-.or-step em { font-style: normal; font-size: 12px; color: var(--mute); margin-right: 8px; }
-.or-step em.hasd { color: var(--acc); }
-.or-step a:active { opacity: .6; }
+.or-path { margin: 0; }
+.or-stage { font-size: 12px; color: var(--mute); margin: 16px 0 8px; }
+.or-row { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  margin: 0 -18px; padding: 2px 18px 6px; scroll-padding: 0 18px; position: relative; }
+.or-row::-webkit-scrollbar { display: none; }
+.or-ch { position: relative; flex: none; width: 148px; min-height: 108px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; border-radius: 16px; background: var(--card); color: var(--ink); }
+.or-ch .nd { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal;
+  font-family: var(--mono); font-size: 12px; background: var(--bg); color: var(--mute); }
+.or-ch.done .nd { background: var(--ink); color: var(--bg); }
+.or-ch.cur { box-shadow: inset 0 0 0 1.5px var(--acc); }
+.or-ch.cur .nd { color: var(--acc); }
+.or-ch b { font-weight: 500; font-size: 15px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.or-ch.done b { color: var(--soft); }
+.or-ch .mt { margin-top: auto; display: flex; flex-wrap: wrap; gap: 2px 8px; min-height: 16px; }
+.or-ch em { font-style: normal; font-size: 12px; color: var(--mute); }
+.or-ch em.hasd { color: var(--acc); }
+.or-ch:active { opacity: .65; }
 
 /* 章节里的「先看动画」卡片 */
 .or-demo { display: flex; align-items: center; gap: 12px; margin: 6px 0 12px; padding: 12px 14px; border-radius: 14px; background: var(--ink); color: var(--bg); }
@@ -744,3 +748,36 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .katex { position: relative; }   /* KaTeX 隐藏的 MathML 层是绝对定位,不加这句会逃出横向滚动的表格,把整页撑宽 */
 .scroll, .tw { position: relative; }
 .qk-q, .qk-sol, .qc-q, .qc-e { overflow-wrap: anywhere; }
+
+/* 公考题干/解析里的图与表(国考行测原题) */
+.gk-img { display: block; max-width: 100%; height: auto; margin: 10px auto; border-radius: 6px; background: #fff; }
+.gk-tex { display: inline-block; height: 1.35em; width: auto; vertical-align: -.3em; background: #fff; border-radius: 2px; }
+.gk-t { border-collapse: collapse; margin: 10px 0; font-size: 13.5px; max-width: 100%; display: block; overflow-x: auto; }
+.gk-t td, .gk-t th { border: 1px solid var(--line, rgba(128,128,128,.3)); padding: 4px 8px; text-align: center; }
+.stem, .opt, .sol { overflow-wrap: anywhere; }
+.meta .fav { margin-left: auto; color: var(--mute); text-decoration: none; padding: 2px 4px; }
+.meta .fav.on { color: var(--acc); }
+.meta .fav + .fav, .meta #rmw { margin-left: auto; }
+.meta #rmw + .fav { margin-left: 8px; }
+.wlist { display: flex; flex-direction: column; }
+.wrow { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line, rgba(128,128,128,.15)); }
+.wrow .wt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.wrow .wt span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrow a { text-decoration: none; color: var(--soft); padding: 6px 4px; }
+.wrow .wdel { color: var(--acc); }
+.wclr { float: right; color: var(--acc); text-decoration: none; }
+
+/* AI 对话:题目按钮、复制/重答、停止 */
+.ai .qlink { display: inline-block; margin: 3px 4px; vertical-align: middle; line-height: 1.5; padding: 5px 12px; border-radius: 14px; background: var(--ink); color: var(--bg); font-size: 13px; text-decoration: none; }
+.ai .mact { display: flex; gap: 14px; margin-top: 8px; font-size: 12.5px; }
+.ai .mact a { color: var(--mute); text-decoration: none; }
+.chat-app .ask .go.sm.stop { background: transparent; color: var(--acc); box-shadow: inset 0 0 0 1.5px var(--acc); }
+.aiex a.busy { opacity: .4; pointer-events: none; }
+
+/* 共用题干的几问合成一页 */
+.q.multi .sub { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line, rgba(128,128,128,.18)); }
+.q.multi .subh { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 13px; color: var(--mute); }
+.q.multi .subh b { font-weight: 600; color: var(--ink); letter-spacing: .04em; }
+.q.multi .subh .fav { margin-left: auto; }
+.q.multi .subh .fav + .fav { margin-left: 8px; }
+.q.multi .stem.ask { font-weight: 500; }
