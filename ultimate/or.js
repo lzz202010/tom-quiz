@@ -1291,7 +1291,7 @@
   /* ── 路由入口(app.js 调用):parts = ['or', 子页, 参数] ── */
   window.renderOR = function (parts) {
     clearInterval(tickH); selBtn.hidden = true;
-    document.title = '运筹学 · Ultimate';
+    document.title = '运筹学 · beta111';
     const sub = parts[1] || '';
     if (sub === 'c') return viewChapter(parts[2]);
     if (sub === 'cards') return viewCards();

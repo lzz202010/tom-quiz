@@ -923,8 +923,8 @@ async function importBackup(ev) {
 function restoreS(data) { S = Object.assign(fresh(), data); S.fav = S.fav || {}; S.target = Object.assign({ math: SUBJ.math.tgt, logic: SUBJ.logic.tgt, gk: SUBJ.gk.tgt }, S.target); if (!data.elo) { S.elo = null; migrateElo(); } save(); route(); }
 function applyBackup(text, name) {
   let d;
-  try { d = JSON.parse(text); } catch (e) { toast('不是 Ultimate 的备份文件'); return; }
-  if (d.app !== 'ultimate' || !d.S) { toast('不是 Ultimate 的备份文件'); return; }
+  try { d = JSON.parse(text); } catch (e) { toast('不是本站的备份文件'); return; }
+  if (d.app !== 'ultimate' || !d.S) { toast('不是本站的备份文件'); return; }
   const n = Object.keys(d.S.cards || {}).length;
   ask('用「' + name + '」恢复?\n备份时间 ' + new Date(d.at).toLocaleString('zh-CN') + ',做过 ' + n + ' 题。\n当前记录会被覆盖。', { ok: '恢复' })
     .then(y => { if (y) { if (d.OR) store('ult.or.v1', d.OR); if (d.WR) store('gzb.wr.v1', d.WR); restoreS(d.S); toast('已恢复'); } });
@@ -1180,7 +1180,7 @@ function mascot(ex, size, head) {
     ${mouth}${bub}${front}
   </svg>`;
 }
-const AI_SYS = `你是 Ultimate 管综刷题站里的私人教练,有权直接操作这个网站。学员备考管理类联考(数学 75 分、逻辑 60 分),有基础,追求提分效率。
+const AI_SYS = `你是 beta111 管综刷题站里的私人教练,有权直接操作这个网站。学员备考管理类联考(数学 75 分、逻辑 60 分),有基础,追求提分效率。
 每段对话开头会附:学员的长期记忆(你之前记下的)、学情摘要;数据变化后会再附新摘要。字段:考频=平均每套卷考几题;掌握=做对该考点典型难度真题的概率;待攻克=判定为真不会或还在观察的错题;失误=系统根据作答行为判定为会做但手滑的错题;推送×=当前推送倍数(0=暂停)。
 做事方式:学员要求什么就直接用工具做,不要反问确认;要具体分析某块时,先用 get_wrong_questions / get_topic_detail 看真实题目和记录再下结论,不凭空猜。你判断某块该调整时可以直接调整,并说明理由。学员透露的偏好、作息、目标、反复出现的薄弱点,用 remember 记下(简短),过时的用 forget 删掉。
 回答:中文,直接、具体,只依据数据,不编造。极简:先给结论,一般 80 字以内;要分析或报告也不超过 250 字;不寒暄、不复述数据、不写总结句、不列没被问到的建议。用 Markdown(可用列表、加粗,少用表格);数学式一律用 LaTeX:行内 $...$,独立一行用 $$...$$,不要用 \\( \\) 或 Unicode 拼凑的上下标。操作完一句话说明做了什么。
@@ -1748,7 +1748,7 @@ document.addEventListener('visibilitychange', function () {
 /* ───────────── 路由 ───────────── */
 function route() {
   clearInterval(tick);
-  document.title = 'Ultimate';
+  document.title = 'beta111';
   const h = location.hash.replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
   const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作在首页,「学习」就是运筹学

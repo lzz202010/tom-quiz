@@ -1,5 +1,5 @@
 /* 站名手写体:只含 "Ultimate" 这几个字母的子集(2.5KB),本地托管,不依赖 Google Fonts(国内常被墙,会卡首屏) */
-@font-face { font-family: "Great Vibes"; src: url("vendor/fonts/great-vibes-ultimate.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Great Vibes"; src: url("vendor/fonts/great-vibes-beta111.woff") format("woff"); font-display: swap; }
 /* Ultimate · 低对比、少线条:墨色深浅 + 一个朱红,艺术字只用在站名 */
 :root {
   --bg: #161615; --bg2: #1e1e1c; --card: #1b1b1a; --line: #262624; --ink: #d6d4cd; --soft: #a8a69f; --mute: #74726c;

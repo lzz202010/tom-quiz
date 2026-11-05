@@ -28,7 +28,7 @@
   window.renderWriting = function () {
     const parts = (location.hash || '').split('/');       // ['#','writing', 'read', id]
     dropPg();
-    document.title = '写作 · Ultimate';
+    document.title = '写作 · beta111';
     if (parts[2] === 'read' && BY[parts[3]]) return renderRead(BY[parts[3]]);
     if (parts[2] === 'doc' && DOCS[parts[3]]) return renderDoc(parts[3]);
     return renderHome();
@@ -236,7 +236,7 @@
     else if (ev.key === 'Escape') go('#/writing');
   });
   window.addEventListener('hashchange', function () {
-    if ((location.hash || '').indexOf('#/writing') !== 0) { dropPg(); document.title = 'Ultimate'; }
+    if ((location.hash || '').indexOf('#/writing') !== 0) { dropPg(); document.title = 'beta111'; }
   });
   // 首页滚动位置:离开首页去阅读前记下
   window.addEventListener('scroll', function () { if ((location.hash || '') === '#/writing' || (location.hash || '') === '#/writing/') homeY = window.scrollY; }, { passive: true });
