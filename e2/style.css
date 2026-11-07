@@ -65,42 +65,76 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--red);cursor:point
 .pv-pages{width:794px;margin:0 auto;transform-origin:top center}
 .doc-empty{text-align:center;color:#888;padding-top:300px}
 
-/* ───── A4 纸面:尺寸写死,打印与屏幕完全一致 ───── */
+/* ───── A4 纸面:尺寸写死,屏幕与打印一致 ───── */
 .page{position:relative;width:210mm;height:297mm;background:#fff;color:#141414;
-  margin:0 auto 18px;padding:10mm 12mm 9mm;overflow:hidden;
+  margin:0 auto 18px;padding:11mm 13mm 10mm;overflow:hidden;
   display:flex;flex-direction:column;
   font-family:Georgia,"Times New Roman","Songti SC",serif;
   box-shadow:0 2px 14px #0002}
-.ph{display:flex;justify-content:space-between;align-items:flex-end;flex:0 0 auto;
-  border-bottom:.3mm solid #333;padding-bottom:1.4mm;margin-bottom:2.4mm;
-  font:10px/1.25 -apple-system,"PingFang SC",sans-serif;color:#666}
-.ph b{color:var(--red);font-weight:700;letter-spacing:.1em}
+.page.raw{padding:8mm 10mm 10mm}
+
+.ph{display:flex;align-items:baseline;flex:0 0 auto;gap:9px;
+  border-bottom:1.2px solid #2a2a28;padding-bottom:1.8mm;margin-bottom:4mm;
+  font:10.5px/1.3 -apple-system,"PingFang SC",sans-serif;color:#6a6862}
+.ph .brand{font:700 15px/1 Georgia,serif;color:var(--red);letter-spacing:.05em}
+.ph .meta{margin-left:auto}
+
+.ttl{display:flex;align-items:baseline;gap:10px;flex:0 0 auto;margin-bottom:3.5mm}
+.ttl h1{margin:0;font:600 18px/1.25 "Songti SC","Noto Serif SC",Georgia,serif;letter-spacing:.02em}
+.ttl h1 small{font:400 11.5px/1 -apple-system,sans-serif;color:#8a8780;margin-left:8px;letter-spacing:0}
+.ttl .sub{margin-left:auto;font:11px/1.3 -apple-system,"PingFang SC",sans-serif;color:#8a8780;white-space:nowrap}
+
 .slot{flex:1;min-height:0;display:flex;flex-direction:column}
-.content{flex:0 0 auto;font-size:13px;line-height:1.36}
-.lines{flex:1;min-height:7mm;display:flex;flex-direction:column;
-  justify-content:flex-end;overflow:hidden}
-.lines i{display:block;height:7.1mm;border-bottom:1px solid #dcdad3;flex:0 0 auto}
-.pf{position:absolute;left:12mm;right:12mm;bottom:3.2mm;display:flex;justify-content:space-between;
+.content{flex:0 0 auto;font-size:13px;line-height:1.55}
+.sect{display:flex;align-items:center;gap:8px;margin:0 0 2mm;
+  font:600 10px/1.4 -apple-system,"PingFang SC",sans-serif;letter-spacing:.14em;color:var(--red)}
+.sect::after{content:"";flex:1;border-top:1px solid #e4e1da}
+.sect span{font-weight:400;color:#aaa;letter-spacing:.16em}
+.sect.q{margin-top:5mm}
+
+.passage p{margin:0 0 .62em;text-align:justify;hyphens:auto;line-height:1.55}
+.passage p:last-child{margin-bottom:0}
+.passage .gap{text-decoration:none;border-bottom:1px solid #444;padding:0 .4em;color:#111}
+
+.dirbox{font:12.5px/1.65 Georgia,"Songti SC",serif;color:#222;
+  border-left:2px solid var(--red);padding:1mm 0 1mm 3.5mm;margin:0 0 4mm}
+.fig{margin:3mm 0 0;text-align:center}
+.fig img{max-width:88%;max-height:84mm;object-fit:contain}
+.hint{font:11px/1.5 -apple-system,"PingFang SC",sans-serif;color:#8a8780;margin:3mm 0 0}
+
+.qs{margin-top:0}
+.q{margin:0 0 .72em;break-inside:avoid;page-break-inside:avoid}
+.q:last-child{margin-bottom:0}
+.q .no{font:700 .97em/1.4 -apple-system,Helvetica,sans-serif;color:var(--red);margin-right:.35em}
+.q .st{font-weight:600}
+.opts{display:grid;grid-template-columns:1fr 1fr;column-gap:1.5em;row-gap:.08em;
+  margin:.22em 0 0 1.5em;font-size:.97em;line-height:1.45}
+.opts span{white-space:normal}
+.opts b{font:600 .94em -apple-system,Helvetica,sans-serif;color:#444;margin-right:.35em}
+.opts.o4{grid-template-columns:repeat(4,1fr);column-gap:.55em;font-size:.88em;margin-left:.35em}
+.qs.cloze .q{display:flex;align-items:baseline;gap:.35em;margin:0 0 .32em}
+.qs.cloze .q .no{flex:0 0 auto;min-width:1.7em}
+.qs.cloze .q .st{display:none}
+.qs.cloze .q .opts{flex:1;margin:0}
+
+.answer{margin-top:auto;flex:0 0 auto;border-top:1px solid #a9a69e;padding-top:2.4mm}
+.ans-t{font:600 10px/1.4 -apple-system,"PingFang SC",sans-serif;letter-spacing:.14em;color:#6a6862;margin-bottom:2mm}
+.ans-t i{font-style:normal;font-weight:400;color:#aaa;letter-spacing:.16em;margin-left:6px}
+.bubbles{display:grid;grid-template-columns:repeat(10,1fr);gap:3px 6px;margin-bottom:2.5mm;
+  font:10px/1.4 -apple-system,sans-serif;color:#777}
+.bubbles span{display:flex;align-items:center;gap:3px}
+.bubbles i{font-style:normal;min-width:15px;text-align:right}
+.bubbles b{display:inline-block;width:13px;height:13px;border:1px solid #9a978f;border-radius:2px}
+.lines i{display:block;height:8.4mm;border-bottom:1px solid #dedbd3}
+.lines i:last-child{border-bottom:0}
+.answer .lines{margin-top:1mm}
+.slot.subj .answer{margin-top:5mm}
+
+.pf{position:absolute;left:13mm;right:13mm;bottom:3.2mm;display:flex;justify-content:space-between;
   font:9.5px/1.3 -apple-system,"PingFang SC",sans-serif;color:#999}
 .pf .fields i{font-style:normal;margin-right:5mm}
 .pf .fields i::after{content:"";display:inline-block;width:14mm;border-bottom:1px solid #bbb;margin-left:2mm}
-.page.raw{padding:8mm 10mm 11mm}
 
-.dir{font:italic .86em/1.35 Georgia,serif;color:#555;margin:0 0 .55em}
-.passage p{margin:0 0 .3em;text-align:justify;hyphens:auto}
-.passage .gap{text-decoration:none;border-bottom:1px solid #333;padding:0 .45em;color:#111}
-.qs{margin-top:.8em}
-.q{margin:0 0 .5em;break-inside:avoid;page-break-inside:avoid}
-.q:last-child{margin-bottom:0}
-.q .no{font:700 .95em/1.3 -apple-system,Helvetica,sans-serif;margin-right:.35em}
-.q .st{font-weight:600}
-.opts{display:grid;grid-template-columns:1fr 1fr;column-gap:1em;row-gap:0;
-  margin:.15em 0 0 1.4em;font-size:.95em}
-.opts.o1{grid-template-columns:1fr}
-.opts.o4{grid-template-columns:repeat(4,1fr);column-gap:.4em;font-size:.88em;margin-left:.3em}
-.opts span{white-space:normal}
-.fig{margin:.6em 0 0;text-align:center}
-.fig img{max-width:82%;max-height:78mm;object-fit:contain}
 .page-img{width:100%;height:100%;object-fit:contain;display:block}
 .page-img-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
 .keys{display:grid;grid-template-columns:repeat(10,1fr);border-top:.8px solid #bbb;border-left:.8px solid #bbb;

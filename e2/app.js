@@ -12,8 +12,7 @@
   const S = {
     y: D.years[D.years.length - 1] || 2025,
     sec: 'all',
-    sel: {},                 // uid -> Set(题号)
-    open: {},                // uid -> 展开小题
+    sel: {}, open: {},
     mode: 'unit', orig: false, ans: false
   };
   const paper = y => D.papers.find(p => p.y === y);
@@ -71,50 +70,93 @@
   }
 
   /* ───── A4 页 ───── */
+  const MIN = { cloze: 18, reading: 18, partb: 15, translation: 20, writing: 15 };
+  function titleOf(u) {
+    const n = u.qs.map(q => q.n), a = n[0], b = n[n.length - 1];
+    const range = a === b ? `${a}` : `${a}–${b}`;
+    const T = {
+      cloze: ['完形填空', 'Section I · Use of English', '10 分'],
+      partb: ['阅读理解 Part B', 'Section II · Part B', '10 分'],
+      translation: ['英译汉', 'Section III · Translation', '15 分'],
+      reading: [`阅读理解 ${u.label.split(' · ')[0]}`, 'Section II · Reading Comprehension', '10 分'],
+      writing: [u.label.startsWith('小作文') ? '写作 Part A · 小作文' : '写作 Part B · 大作文',
+                'Section IV · Writing', u.label.startsWith('小作文') ? '10 分' : '15 分']
+    }[u.sec];
+    return { h1: T[0], en: T[1], range, score: T[2], mins: MIN[u.sec] || 15 };
+  }
   function qHTML(q, u) {
     const opts = q.opts || [];
-    const cls = u.sec === 'cloze' ? 'o4' : (Math.max(...opts.map(o => o.length), 0) <= 26 ? '' : 'o1');
+    const cls = u.sec === 'cloze' ? 'o4' : '';
+    const cells = opts.map(o => {
+      const m = String(o).match(/^([A-G])\.\s*([\s\S]*)$/);
+      return `<span>${m ? `<b>${m[1]}</b>${esc(m[2])}` : esc(o)}</span>`;
+    }).join('');
     return `<div class="q"><span class="no">${q.n}.</span><span class="st">${esc(q.stem)}</span>
-      ${opts.length ? `<div class="opts ${cls}">${opts.map(o => `<span>${esc(o)}</span>`).join('')}</div>` : ''}</div>`;
+      ${opts.length ? `<div class="opts ${cls}">${cells}</div>` : ''}</div>`;
+  }
+  function answerHTML(u, qs) {
+    const subj = u.sec === 'translation' || u.sec === 'writing';
+    // 大作文要放图表,答题横线相应减少,保证一页装得下
+    const hasFig = (u.figs || []).length > 0;
+    const lines = subj ? (u.sec === 'writing' ? (hasFig ? 15 : 24) : 15) : 2;
+    const bubbles = subj ? '' :
+      `<div class="bubbles">${qs.map(q => `<span><i>${q.n}</i><b></b></span>`).join('')}</div>`;
+    return `<div class="answer ${subj ? 'fixed' : ''}">
+      <div class="ans-t">${subj ? '作答区' : '答题卡'}<i>ANSWER SHEET</i></div>
+      ${bubbles}
+      <div class="lines">${'<i></i>'.repeat(lines)}</div>
+    </div>`;
   }
   function bodyHTML(u, qs) {
-    // 完形/阅读的 Directions 是通用套话,Part B 的说明已在材料里;只保留翻译与写作的具体要求
-    const showDir = u.sec === 'translation' || u.sec === 'writing';
-    const dir = showDir ? (u.dir || '').replace(/^.*?Directions:\s*/i, 'Directions: ').slice(0, 420) : '';
+    const subj = u.sec === 'translation' || u.sec === 'writing';
     const passage = (u.passage || []).map(p => `<p>${p}</p>`).join('');
     const fig = (u.figs || []).map(f => `<div class="fig"><img src="${esc(f)}" alt="原题图表"></div>`).join('');
-    return `<div class="content">
-      ${dir ? `<div class="dir">${esc(dir)}</div>` : ''}
-      ${passage ? `<div class="passage">${passage}</div>` : ''}
-      <div class="qs">${qs.map(q => qHTML(q, u)).join('')}</div>
-      ${fig}
-    </div><div class="lines"></div>`;
+    const fullFig = (u.figs || []).some(f => f.includes('-full'));   // 整图里已含题目要求
+    let inner = '';
+    if (subj) {
+      if (!fullFig) inner += `<div class="dirbox">${esc(u.dir || '')}</div>`;
+      if (passage) inner += `<div class="sect">原文 <span>TEXT</span></div><div class="passage">${passage}</div>`;
+      inner += fig;
+      if (u.sec === 'writing' && u.qs[0].n === 48) {
+        inner += `<p class="hint">${fig ? '图表清晰版' : '本卷图表'}：勾选顶部「原题页」可一并打印原卷页。</p>`;
+      }
+    } else {
+      if (passage) inner += `<div class="sect">原文 <span>PASSAGE</span></div><div class="passage">${passage}</div>`;
+      inner += `<div class="sect q">题目 <span>QUESTIONS</span></div><div class="qs ${u.sec === 'cloze' ? 'cloze' : ''}">${qs.map(q => qHTML(q, u)).join('')}</div>`;
+    }
+    return `<div class="content">${inner}</div>${answerHTML(u, qs)}`;
   }
-  /* 横线用真实元素(不是 CSS 背景),浏览器不打印背景时也不会丢 */
-  function fillLines(page) {
-    const box = $('.lines', page);
-    if (!box) return;
-    const n = Math.max(1, Math.floor(box.getBoundingClientRect().height / 26.8));
-    box.innerHTML = '<i></i>'.repeat(Math.min(n, 60));
+  function headHTML(y, t, tail) {
+    return `<div class="ph"><span class="brand">e2</span><span>${y} 考研英语（二）</span>
+      <span class="meta">${esc(t)}</span></div>`;
   }
-  function pageHTML(inner, head, idx, total) {
-    return `<section class="page"><div class="ph"><span><b>e2</b> &nbsp; ${head.y} 考研英语（二）</span><span>${esc(head.label)}</span></div>
-      <div class="slot">${inner}</div>
-      <div class="pf"><span class="fields"><i>姓名</i><i>用时</i><i>得分</i></span><span>${idx} / ${total}</span></div></section>`;
+  function footHTML(idx, total) {
+    return `<div class="pf"><span class="fields"><i>姓名</i><i>用时</i><i>得分</i></span><span>${idx} / ${total}</span></div>`;
   }
-  function rawPage(pn, head, idx, total) {
-    return `<section class="page raw"><div class="ph"><span><b>e2</b> &nbsp; ${head.y} 考研英语（二）</span><span>原题页 · ${esc(head.label)}</span></div>
-      <div class="page-img-wrap"><img class="page-img" src="pages/${head.y}-p${String(pn).padStart(2, '0')}.webp" alt="原题页"></div>
-      <div class="pf"><span></span><span>${idx} / ${total}</span></div></section>`;
+  function pageHTML(u, qs, y, extra, idx, total) {
+    const t = titleOf(u);
+    const label = extra || `${t.h1} · ${qs[0].n}${qs.length > 1 ? '–' + qs[qs.length - 1].n : ''}`;
+    return `<section class="page">
+      ${headHTML(y, label)}
+      <div class="ttl"><h1>${esc(t.h1)}<small>${esc(t.en)}</small></h1>
+        <span class="sub">${t.range} · ${t.score} · 建议 ${t.mins} 分钟</span></div>
+      <div class="slot ${(u.sec === 'translation' || u.sec === 'writing') ? 'subj' : ''}">${bodyHTML(u, qs)}</div>
+      ${footHTML(idx, total)}</section>`;
+  }
+  function rawPage(pn, y, label, idx, total) {
+    return `<section class="page raw">${headHTML(y, '原题页 · ' + label)}
+      <div class="page-img-wrap"><img class="page-img" src="pages/${y}-p${String(pn).padStart(2, '0')}.webp" alt="原题页"></div>
+      <div class="pf"><span></span><span>原题页 ${idx} / ${total}</span></div></section>`;
   }
   function answerPage(p, idx, total) {
     const a = p.answers || {}, ks = Object.keys(a);
     const cells = ks.length ? ks.map(n => `<span><i>${n}</i>${esc(a[n])}</span>`).join('')
       : '<div style="grid-column:1/-1;padding:10px;color:#888">该年份原卷未附答案页</div>';
-    return `<section class="page"><div class="ph"><span><b>e2</b> &nbsp; ${p.y} 考研英语（二）</span><span>答案</span></div>
-      <div class="slot"><div class="content"><h2 class="ah">参考答案</h2><div class="keys">${cells}</div>
-      <p class="dir">仅列出原卷 PDF 自带的答案；主观题（翻译、写作）以原卷为准。</p></div><div class="lines"></div></div>
-      <div class="pf"><span></span><span>${idx} / ${total}</span></div></section>`;
+    return `<section class="page">${headHTML(p.y, '参考答案')}
+      <div class="ttl"><h1>参考答案<small>ANSWER KEY</small></h1><span class="sub">${p.y}</span></div>
+      <div class="slot"><div class="content"><div class="keys">${cells}</div>
+      <p class="dirbox" style="margin-top:6mm">仅列出原卷 PDF 自带的客观题答案；翻译与写作以原卷为准。</p></div></div>
+      ${footHTML(idx, total)}</section>`;
   }
 
   function collect() {
@@ -122,38 +164,39 @@
     units().filter(u => S.sec === 'all' || u.sec === S.sec).forEach(u => {
       const sel = ensure(u.id);
       const qs = u.qs.filter(q => sel.has(q.n));
-      if (!qs.length) return;
-      out.push({ u, qs });
+      if (qs.length) out.push({ u, qs });
     });
     return { p, out };
   }
   function buildPages() {
-    const { p, out } = collect();
-    let items = [];
+    const { p, out } = collect(), items = [];
     out.forEach(({ u, qs }) => {
-      if (S.mode === 'one') qs.forEach(q => items.push({ kind: 'q', u, qs: [q], label: `${u.label} · 第 ${q.n} 题` }));
-      else items.push({ kind: 'q', u, qs, label: u.label });
+      if (S.mode === 'one') qs.forEach(q => items.push({ kind: 'q', u, qs: [q], extra: `${u.label} · 第 ${q.n} 题` }));
+      else items.push({ kind: 'q', u, qs });
       if (S.orig) (u.src || []).forEach(pn => items.push({ kind: 'raw', u, pn, label: u.label }));
     });
     if (S.ans) items.push({ kind: 'ans' });
     const total = items.length;
     return items.map((it, i) => {
-      if (it.kind === 'raw') return rawPage(it.pn + 1, { y: p.y, label: it.label }, i + 1, total);
+      if (it.kind === 'raw') return rawPage(it.pn + 1, p.y, it.label, i + 1, total);
       if (it.kind === 'ans') return answerPage(p, i + 1, total);
-      return pageHTML(bodyHTML(it.u, it.qs), { y: p.y, label: it.label }, i + 1, total);
+      return pageHTML(it.u, it.qs, p.y, it.extra, i + 1, total);
     }).join('');
   }
 
-  /* 二分找最大字号,使内容不溢出;所有内部尺寸用 em,故高度随字号近似线性。
-     横线区 flex:1 自动吃掉剩余空间 —— 每页都刚好铺满一张 A4。 */
+  /* 二分找最大字号使「内容 + 答题区」不溢出;内部尺寸用 em,高度随字号近似线性。
+     答题区固定高度并用 margin-top:auto 贴底,中间自然留白 —— 每页版式稳定一致。 */
   function fit(page) {
-    const c = $('.content', page), slot = $('.slot', page);
+    const c = $('.content', page), slot = $('.slot', page), ans = $('.answer', page);
     if (!c || !slot) return;
-    const MIN = 26;
-    const avail = slot.getBoundingClientRect().height - MIN;
+    const ansH = ans ? ans.getBoundingClientRect().height : 0;
+    // 只有 .fixed 的 margin-top 是定值;auto 会把剩余空白算进去,不能计入
+    const mt = (ans && ans.classList.contains('fixed'))
+      ? (parseFloat(getComputedStyle(ans).marginTop) || 0) : 0;
+    const avail = slot.getBoundingClientRect().height - ansH - mt - 24;
     if (avail < 40) return;
-    let lo = 8.5, hi = 15, best = 8.5;
-    for (let i = 0; i < 11; i++) {
+    let lo = 8.8, hi = 13.6, best = 8.8;
+    for (let i = 0; i < 12; i++) {
       const fs = (lo + hi) / 2;
       c.style.fontSize = fs + 'px';
       if (c.getBoundingClientRect().height <= avail) { best = fs; lo = fs; } else hi = fs;
@@ -172,6 +215,23 @@
     }));
   }
 
+  /* 排版自检:给构建/校验脚本用 */
+  window.__E2_AUDIT__ = function () {
+    return $$('.page', $('#pvpages')).map((p, i) => {
+      const c = $('.content', p), slot = $('.slot', p), ans = $('.answer', p);
+      const cH = c ? c.getBoundingClientRect().height : 0;
+      const aH = ans ? ans.getBoundingClientRect().height : 0;
+      const aM = (ans && ans.classList.contains('fixed'))
+        ? (parseFloat(getComputedStyle(ans).marginTop) || 0) : 0;
+      const sH = slot ? slot.getBoundingClientRect().height : 0;
+      return {
+        i: i + 1, slotH: Math.round(sH), contentH: Math.round(cH), answerH: Math.round(aH),
+        fs: c ? c.style.fontSize : '',
+        over: Math.max(0, Math.round(cH + aH + aM - sH))
+      };
+    });
+  };
+
   let drawToken = 0;
   function drawPreview() {
     const my = ++drawToken, box = $('#pvpages');
@@ -181,42 +241,23 @@
       $('#pvn').textContent = '0 页'; window.__E2_PAGES__ = 0; window.__READY__ = true; return;
     }
     box.innerHTML = buildPages();
-    box.style.zoom = 1;                 // 测量必须在 1:1 下进行,屏幕缩放最后再套
+    box.style.zoom = 1;                 // 测量必须 1:1,屏幕缩放最后再套
     readyImages(box).then(() => {
       if (my !== drawToken) return;
-      $$('.page', box).forEach(p => { fit(p); fillLines(p); });
+      $$('.page', box).forEach(fit);
       fitScreen();
       $('#pvn').textContent = $$('.page', box).length + ' 页 A4';
       window.__E2_PAGES__ = $$('.page', box).length;
       window.__READY__ = true;
     });
   }
-  /* 排版自检:给构建/校验脚本用,逐页确认内容不溢出、横线区吃掉剩余空间 */
-  window.__E2_AUDIT__ = function () {
-    return $$('.page', $('#pvpages')).map((p, i) => {
-      const c = $('.content', p), slot = $('.slot', p), lines = $('.lines', p);
-      return {
-        i: i + 1,
-        pageH: Math.round(p.getBoundingClientRect().height),
-        slotH: Math.round(slot ? slot.getBoundingClientRect().height : 0),
-        contentH: Math.round(c ? c.getBoundingClientRect().height : 0),
-        contentScroll: c ? c.scrollHeight : 0,
-        linesH: Math.round(lines ? lines.getBoundingClientRect().height : 0),
-        fs: c ? c.style.fontSize : '',
-        over: c ? Math.max(0, c.scrollHeight - c.clientHeight) : 0
-      };
-    });
-  };
-
   function openPV() {
     $('#pv').hidden = false;
     document.body.style.overflow = 'hidden';
     $('#pvmode').value = S.mode; $('#pvorig').checked = S.orig; $('#pvans').checked = S.ans;
     drawPreview();
   }
-  function closePV() {
-    $('#pv').hidden = true; document.body.style.overflow = '';
-  }
+  function closePV() { $('#pv').hidden = true; document.body.style.overflow = ''; }
 
   /* ───── 事件 ───── */
   $('#go').onclick = openPV;
