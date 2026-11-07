@@ -398,19 +398,28 @@ function capText(pids, d, btn) {              // 图片彻底做不出来时的�
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => flashBtn(btn, '已复制文字'), () => flashBtn(btn, '复制失败'));
   else flashBtn(btn, '复制失败');
 }
+function capDownload(b, name, btn) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  flashBtn(btn, '已存为图片');
+}
+/* 剪贴板和分享面板都被浏览器拦下时(手机上常见):给一张图,长按「拷贝」或存到相册 */
+function capPreview(b, name, btn) {
+  const url = URL.createObjectURL(b);
+  const s = sheet('复制图片', '<p class="dim sm">长按图片选「拷贝」,再粘贴;也可以直接存下来。</p>' +
+    '<img class="cpv" src="' + url + '" alt="题目图片">',
+    '<button class="go sm" data-dl="1">存为图片</button>', () => URL.revokeObjectURL(url));
+  $('[data-dl]', s.node).onclick = () => { capDownload(b, name, btn); s.close(); };
+}
 function capSave(blob, pids, d, btn) {
   blob.then(function (b) {
-    const file = new File([b], capName(pids, d), { type: 'image/png' });
-    const save = function () {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(b); a.download = file.name; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      flashBtn(btn, '已存为图片');
-    };
+    const name = capName(pids, d), file = new File([b], name, { type: 'image/png' });
+    const last = () => { if (matchMedia('(pointer: coarse)').matches) capPreview(b, name, btn); else capDownload(b, name, btn); };
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file] }).then(() => flashBtn(btn, '已分享'),
-        e => { if (e && e.name === 'AbortError') flashBtn(btn, '已取消'); else save(); });
-    } else save();
+        e => { if (e && e.name === 'AbortError') flashBtn(btn, '已取消'); else last(); });
+    } else last();
   }).catch(() => capText(pids, d, btn));
 }
 function copyQImage(pids, btn) {
@@ -420,9 +429,10 @@ function copyQImage(pids, btn) {
   const blob = sheetBlob(node).finally(() => node.remove());
   const save = () => capSave(blob, pids, d, btn);
   if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
-    let item = null;
+    let item = null, wp = null;
     try { item = new ClipboardItem({ 'image/png': blob }); } catch (e) { item = null; }    // Safari 要求在点击时同步创建
-    if (item) { navigator.clipboard.write([item]).then(() => flashBtn(btn, '已复制 ✓'), save); return; }
+    if (item) { try { wp = navigator.clipboard.write([item]); } catch (e) { wp = null; } }
+    if (wp) { wp.then(() => flashBtn(btn, '已复制 ✓'), save); return; }
   }
   save();
 }
