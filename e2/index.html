@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f6f3">
+<title>e2</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="hd">
+    <div class="logo">e2<span>考研英语二 · 打印版</span></div>
+    <div class="hd-sub">历年真题拆成小题，一页 A4 一张</div>
+  </header>
+
+  <section class="pick">
+    <div class="row years" id="years"></div>
+    <div class="row secs" id="secs"></div>
+  </section>
+
+  <section class="list" id="list"></section>
+
+  <footer class="bar">
+    <label class="ck"><input type="checkbox" id="orig"> 附原题页</label>
+    <label class="ck"><input type="checkbox" id="ans"> 附答案</label>
+    <select id="mode" aria-label="版式">
+      <option value="unit">一单元一页</option>
+      <option value="one">一小题一页</option>
+    </select>
+    <button id="go">生成 A4 预览</button>
+  </footer>
+  <p class="tip" id="tip"></p>
+</div>
+
+<div id="pv" class="pv" hidden>
+  <div class="pv-bar">
+    <a href="#" class="pv-x" id="pvx">✕</a>
+    <span class="pv-n" id="pvn"></span>
+    <label class="ck"><input type="checkbox" id="pvorig"> 原题页</label>
+    <label class="ck"><input type="checkbox" id="pvans"> 答案</label>
+    <select id="pvmode" aria-label="版式">
+      <option value="unit">一单元一页</option>
+      <option value="one">一小题一页</option>
+    </select>
+    <button class="go" id="pgo">打印 / 存为 PDF</button>
+    <div class="pv-hint">打印设置：纸张 A4 · 边距「无」· 缩放 100% · 关闭页眉页脚。每页已按 210×297mm 固定排版，题目不跨页，剩余空间自动补答题横线。</div>
+  </div>
+  <div class="pv-scroll"><div class="pv-pages" id="pvpages"></div></div>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

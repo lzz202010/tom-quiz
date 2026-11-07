@@ -1,0 +1,134 @@
+*{box-sizing:border-box}
+:root{
+  --bg:#f7f6f3; --panel:#fff; --ink:#1c1b19; --mute:#8b8880;
+  --line:#dedbd4; --red:#a8322a;
+}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  -webkit-text-size-adjust:100%}
+button,select,input{font-family:inherit;font-size:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+
+/* ───── 选题页 ───── */
+#app{max-width:760px;margin:0 auto;padding:28px 18px 110px}
+.hd{margin-bottom:22px}
+.logo{font:600 30px/1 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;letter-spacing:-.04em}
+.logo span{font:400 12px/1 -apple-system,"PingFang SC",sans-serif;color:var(--mute);
+  letter-spacing:0;margin-left:12px;vertical-align:3px}
+.hd-sub{color:var(--mute);font-size:12px;margin-top:9px}
+.pick{margin-bottom:16px}
+.row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:11px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:7px;
+  padding:6px 11px;font-size:13px;cursor:pointer;white-space:nowrap;transition:.12s}
+.chip:active{transform:scale(.96)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.secs .chip{font-size:12px;padding:5px 10px;color:var(--mute)}
+.secs .chip.on{color:#fff}
+.list{border-top:1px solid var(--line)}
+.u{border-bottom:1px solid var(--line);background:var(--panel)}
+.u-h{display:flex;align-items:center;gap:11px;padding:11px 12px;cursor:pointer}
+.u-h:active{background:#faf9f7}
+.u-t{flex:1;min-width:0}
+.u-t b{font-weight:600;font-size:14px}
+.u-t i{font-style:normal;color:var(--mute);font-size:12px;margin-left:9px}
+.u-x{border:0;background:none;color:var(--mute);font-size:12px;padding:4px 2px;cursor:pointer;white-space:nowrap}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--red);cursor:pointer;flex:0 0 auto}
+.u-q{display:none;flex-wrap:wrap;gap:5px 12px;padding:2px 12px 13px 40px}
+.u.open .u-q{display:flex}
+.u-q label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mute);cursor:pointer}
+.u-q input{width:14px;height:14px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(247,246,243,.96);
+  backdrop-filter:blur(12px);border-top:1px solid var(--line);
+  padding:10px max(14px,calc((100vw - 760px)/2 + 18px));
+  padding-bottom:max(10px,env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;z-index:5}
+.bar .ck{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mute);white-space:nowrap;cursor:pointer}
+.bar select{border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 9px;font-size:13px}
+.bar button{margin-left:auto;border:0;background:var(--ink);color:#fff;border-radius:8px;
+  padding:9px 17px;font-size:14px;font-weight:600;cursor:pointer}
+.bar button:active{transform:scale(.97)}
+.tip{color:var(--mute);font-size:11px;text-align:center;margin:14px 0 0;line-height:1.7}
+
+/* ───── 预览层 ───── */
+.pv{position:fixed;inset:0;background:#e9e7e2;z-index:20;display:flex;flex-direction:column}
+.pv[hidden]{display:none}
+.pv-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;
+  padding-top:max(10px,env(safe-area-inset-top));background:var(--bg);border-bottom:1px solid var(--line);flex:0 0 auto}
+.pv-x{font-size:19px;color:var(--mute);padding:0 4px}
+.pv-n{font-size:12px;color:var(--mute)}
+.pv-bar .ck{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mute);cursor:pointer}
+.pv-bar select{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 8px;font-size:12px}
+.pv-bar .go{margin-left:auto;border:0;background:var(--ink);color:#fff;border-radius:7px;
+  padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.pv-hint{flex-basis:100%;font-size:11px;color:var(--mute);line-height:1.5}
+.pv-scroll{flex:1;overflow:auto;padding:20px 12px 60px}
+.pv-pages{width:794px;margin:0 auto;transform-origin:top center}
+.doc-empty{text-align:center;color:#888;padding-top:300px}
+
+/* ───── A4 纸面:尺寸写死,打印与屏幕完全一致 ───── */
+.page{position:relative;width:210mm;height:297mm;background:#fff;color:#141414;
+  margin:0 auto 18px;padding:10mm 12mm 9mm;overflow:hidden;
+  display:flex;flex-direction:column;
+  font-family:Georgia,"Times New Roman","Songti SC",serif;
+  box-shadow:0 2px 14px #0002}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;flex:0 0 auto;
+  border-bottom:.3mm solid #333;padding-bottom:1.4mm;margin-bottom:2.4mm;
+  font:10px/1.25 -apple-system,"PingFang SC",sans-serif;color:#666}
+.ph b{color:var(--red);font-weight:700;letter-spacing:.1em}
+.slot{flex:1;min-height:0;display:flex;flex-direction:column}
+.content{flex:0 0 auto;font-size:13px;line-height:1.36}
+.lines{flex:1;min-height:7mm;display:flex;flex-direction:column;
+  justify-content:flex-end;overflow:hidden}
+.lines i{display:block;height:7.1mm;border-bottom:1px solid #dcdad3;flex:0 0 auto}
+.pf{position:absolute;left:12mm;right:12mm;bottom:3.2mm;display:flex;justify-content:space-between;
+  font:9.5px/1.3 -apple-system,"PingFang SC",sans-serif;color:#999}
+.pf .fields i{font-style:normal;margin-right:5mm}
+.pf .fields i::after{content:"";display:inline-block;width:14mm;border-bottom:1px solid #bbb;margin-left:2mm}
+.page.raw{padding:8mm 10mm 11mm}
+
+.dir{font:italic .86em/1.35 Georgia,serif;color:#555;margin:0 0 .55em}
+.passage p{margin:0 0 .3em;text-align:justify;hyphens:auto}
+.passage .gap{text-decoration:none;border-bottom:1px solid #333;padding:0 .45em;color:#111}
+.qs{margin-top:.8em}
+.q{margin:0 0 .5em;break-inside:avoid;page-break-inside:avoid}
+.q:last-child{margin-bottom:0}
+.q .no{font:700 .95em/1.3 -apple-system,Helvetica,sans-serif;margin-right:.35em}
+.q .st{font-weight:600}
+.opts{display:grid;grid-template-columns:1fr 1fr;column-gap:1em;row-gap:0;
+  margin:.15em 0 0 1.4em;font-size:.95em}
+.opts.o1{grid-template-columns:1fr}
+.opts.o4{grid-template-columns:repeat(4,1fr);column-gap:.4em;font-size:.88em;margin-left:.3em}
+.opts span{white-space:normal}
+.fig{margin:.6em 0 0;text-align:center}
+.fig img{max-width:82%;max-height:78mm;object-fit:contain}
+.page-img{width:100%;height:100%;object-fit:contain;display:block}
+.page-img-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.keys{display:grid;grid-template-columns:repeat(10,1fr);border-top:.8px solid #bbb;border-left:.8px solid #bbb;
+  font:12px/1.5 -apple-system,sans-serif;margin-top:1em}
+.keys span{display:flex;justify-content:space-between;padding:3px 6px;
+  border-right:.8px solid #bbb;border-bottom:.8px solid #bbb;font-weight:600}
+.keys i{font-style:normal;font-weight:400;color:#aaa;margin-right:4px}
+.ah{font:600 16px/1.4 -apple-system,"PingFang SC",sans-serif;margin:0 0 .6em}
+
+@media print{
+  @page{size:A4;margin:0}
+  html,body{background:#fff !important;margin:0 !important;padding:0 !important}
+  body>*:not(.pv){display:none !important}
+  .pv{position:static;display:block !important;background:#fff}
+  .pv-bar{display:none !important}
+  .pv-scroll{padding:0 !important;overflow:visible !important}
+  .pv-pages{zoom:1 !important;width:auto !important;margin:0 !important}
+  .page{width:210mm;height:297mm;margin:0 !important;box-shadow:none !important;
+    break-after:page;page-break-after:always}
+  .page:last-child{break-after:auto;page-break-after:auto}
+  .doc-empty{display:none}
+}
+@media(max-width:600px){
+  #app{padding:20px 14px 130px}
+  .logo{font-size:26px}
+  .bar{gap:8px;padding:9px 12px;padding-bottom:max(9px,env(safe-area-inset-bottom))}
+  .bar .ck{font-size:11px}
+  .bar button{padding:8px 12px;font-size:13px}
+  .pv-bar{gap:8px}
+  .pv-n{display:none}
+}
