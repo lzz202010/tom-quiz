@@ -315,6 +315,117 @@ function loadWriting(cb) {
 
 const idle = f => (window.requestIdleCallback || (g => setTimeout(g, 300)))(f);
 function html(s) { app.innerHTML = s; typeset(app); window.scrollTo(0, 0); }
+
+/* ───────────── 复制题目图片:排成一张白纸卷面,截图后直接粘贴到别的 AI ─────────────
+   html2canvas 只在第一次点「复制图片」时加载(200KB);先写剪贴板,不行退分享面板,再不行存文件,最后退纯文本 */
+let h2cP = null;
+function loadH2C() {
+  if (window.html2canvas) return Promise.resolve();
+  return h2cP || (h2cP = new Promise(function (ok, bad) {
+    const sc = document.createElement('script');
+    sc.src = 'vendor/katex/html2canvas.min.js';
+    sc.onload = ok;
+    sc.onerror = function () { h2cP = null; bad(new Error('html2canvas')); };
+    document.head.append(sc);
+  }));
+}
+function flashBtn(btn, text) {
+  if (!btn || !btn.dataset) { toast(text); return; }
+  clearTimeout(btn._t);
+  btn.dataset.label = btn.dataset.label || btn.textContent;
+  btn.textContent = text;
+  btn.classList.add('on');
+  btn._t = setTimeout(function () { btn.textContent = btn.dataset.label; btn.classList.remove('on'); }, 1800);
+}
+/* 一页几问(共用题干)时合成一张:题干只出现一次,每问各带选项 */
+function captureSheet(pids, d) {
+  const first = d.byId[pids[0]], multi = pids.length > 1;
+  const box = el('div', 'capture');
+  box.append(el('div', 'cap-src', esc(multi ? first.src.replace(/ 第 \d+ 题$/, '') + ' · 共 ' + pids.length + ' 问' : first.src)));
+  box.append(el('div', 'cap-stem', multi ? first.stem.slice(0, first.stem.length - (first.ask || '').length).replace(/(<br>)+$/, '') : first.stem));
+  if (!multi && first.fig) { const im = el('img', 'cap-fig'); im.src = first.fig; box.append(im); }
+  const putOpts = q => {
+    if (q.kind === 'cond') {
+      box.append(el('div', 'cap-cond', '(1) ' + q.c1));
+      box.append(el('div', 'cap-cond', '(2) ' + q.c2));
+      const o = el('div', 'cap-opts');
+      COND_OPTS.forEach(function (t, i) { o.append(el('div', 'cap-opt', '<b>' + LET[i] + '</b><span>' + t + '</span>')); });
+      box.append(o);
+      return;
+    }
+    const o = el('div', 'cap-opts');
+    (q.opts || []).forEach(function (t, i) { o.append(el('div', 'cap-opt', '<b>' + LET[i] + '</b><span>' + t + '</span>')); });
+    box.append(o);
+  };
+  if (!multi) putOpts(first);
+  else pids.forEach(function (x, k) {
+    const q = d.byId[x];
+    box.append(el('div', 'cap-sub', '<div class="cap-subh">第 ' + (k + 1) + ' 问</div><div class="cap-stem">' + q.ask + '</div>'));
+    putOpts(q);
+  });
+  return typeset(box);
+}
+/* 截成 PNG:等图片解码完再画;材料页很长时降到 1 倍,免得超过 iOS 的 canvas 面积上限 */
+function imgReady(i) {
+  if (i.complete) return i.decode ? i.decode().catch(function () {}) : Promise.resolve();
+  return new Promise(function (r) {
+    const done = function () { i.onload = i.onerror = null; r(); };
+    i.onload = i.onerror = done;
+    setTimeout(done, 5000);                 // 图挂了也不能一直等,超时就照常截
+  });
+}
+function sheetBlob(node) {
+  const imgs = [...node.querySelectorAll('img')].map(imgReady);
+  return Promise.all([loadH2C()].concat(imgs)).then(function () {
+    const h = node.offsetHeight || 900;
+    return window.html2canvas(node, { backgroundColor: '#ffffff', scale: h * 2 * 720 > 1.2e7 ? 1 : 2, logging: false });
+  }).then(function (c) { return new Promise(function (r) { c.toBlob(r, 'image/png'); }); });
+}
+function capName(pids, d) { return (d.byId[pids[0]].src || '题目').replace(/[\\/:*?"<>|\s·]+/g, '_') + '.png'; }
+function capText(pids, d, btn) {              // 图片彻底做不出来时的退路:纯文本(公式保留 LaTeX 写法,AI 也看得懂)
+  const plain = s => String(s).replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|tr|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"').replace(/\n{3,}/g, '\n\n').trim();
+  const first = d.byId[pids[0]];
+  let t = '【' + first.src + '】\n' + plain(first.stem);
+  const put = q => {
+    if (q.kind === 'cond') t += '\n(1) ' + plain(q.c1) + '\n(2) ' + plain(q.c2);
+    else (q.opts || []).forEach(function (o, i) { t += '\n' + LET[i] + '. ' + plain(o); });
+  };
+  if (pids.length < 2) put(first);
+  else pids.forEach(function (x, k) { t += '\n\n第 ' + (k + 1) + ' 问\n' + plain(d.byId[x].ask); put(d.byId[x]); });
+  if (first.fig) t += '\n(原题附有图形,见刷题页面)';
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => flashBtn(btn, '已复制文字'), () => flashBtn(btn, '复制失败'));
+  else flashBtn(btn, '复制失败');
+}
+function capSave(blob, pids, d, btn) {
+  blob.then(function (b) {
+    const file = new File([b], capName(pids, d), { type: 'image/png' });
+    const save = function () {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b); a.download = file.name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      flashBtn(btn, '已存为图片');
+    };
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).then(() => flashBtn(btn, '已分享'),
+        e => { if (e && e.name === 'AbortError') flashBtn(btn, '已取消'); else save(); });
+    } else save();
+  }).catch(() => capText(pids, d, btn));
+}
+function copyQImage(pids, btn) {
+  const d = DATA[S.cur.subj];
+  const node = captureSheet(pids, d);
+  document.body.append(node);
+  const blob = sheetBlob(node).finally(() => node.remove());
+  const save = () => capSave(blob, pids, d, btn);
+  if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+    let item = null;
+    try { item = new ClipboardItem({ 'image/png': blob }); } catch (e) { item = null; }    // Safari 要求在点击时同步创建
+    if (item) { navigator.clipboard.write([item]).then(() => flashBtn(btn, '已复制 ✓'), save); return; }
+  }
+  save();
+}
 /* ───────────── 浮层(弹窗、打印预览)统一管理 ─────────────
    打开时往浏览器历史里压一条记录:手机边缘滑动返回 / 浏览器后退 / Esc / 点 ✕ / 点空白处,都只关掉最上面的浮层,不离开当前页面。
    layer(节点, 关闭时回调) → close(),可多层叠放 */
@@ -565,14 +676,14 @@ function viewSession() {
         <div class="sol">${qx.sol || ''}</div>` : '';
     let bodyL, bodyR;
     if (!multi) {
-      bodyL = `<div class="meta"><span>${q.src}</span>${tools(id)}</div>
+      bodyL = `<div class="meta"><span>${q.src}</span><a href="#" class="cp" data-cpimg="1" title="把整道题截成图片复制,可直接粘贴到别的 AI(X)">复制图片</a>${tools(id)}</div>
       <div class="stem">${q.stem}</div>
       ${q.fig ? `<img class="fig" src="${q.fig}" alt="">` : ''}
       ${q.kind === 'cond' ? `<div class="conds"><p>(1) ${q.c1}</p><p>(2) ${q.c2}</p></div>` : ''}`;
       bodyR = `${optsOf(id, q, a)}${verdictOf(id, q, a)}`;
     } else {                               // 一页多问:共用题干只出现一次
       const shared = q.stem.slice(0, q.stem.length - q.ask.length).replace(/(<br>)+$/, '');
-      bodyL = `<div class="meta"><span>${q.src.replace(/ 第 \d+ 题$/, '')} · 共 ${pids.length} 问</span></div>
+      bodyL = `<div class="meta"><span>${q.src.replace(/ 第 \d+ 题$/, '')} · 共 ${pids.length} 问</span><a href="#" class="cp" data-cpimg="1" title="把整页(题干 + 各问)截成图片复制(X)">复制图片</a></div>
       <div class="stem">${shared}</div>`;
       bodyR = `${pids.map((x, k) => { const qx = d.byId[x]; return `<section class="sub"><div class="subh"><b>第 ${k + 1} 问</b>${tools(x)}</div>
         <div class="stem ask">${qx.ask}</div>${optsOf(x, qx, cur.ans[x])}${verdictOf(x, qx, cur.ans[x])}</section>`; }).join('')}`;
@@ -605,6 +716,7 @@ function viewSession() {
     }
     app.querySelectorAll('[data-rmw]').forEach(el => el.onclick = ev => { ev.preventDefault(); removeWrong(el.dataset.rmw); el.remove(); toast('已移出错题本'); });
     app.querySelectorAll('[data-fav]').forEach(el => el.onclick = ev => { ev.preventDefault(); const x = el.dataset.fav; toggleFav(x, cur.subj); el.classList.toggle('on', !!S.fav[x]); el.textContent = S.fav[x] ? '★ 已收藏' : '☆ 收藏'; });
+    app.querySelectorAll('[data-cpimg]').forEach(a => a.onclick = ev => { ev.preventDefault(); copyQImage(pids, a); });
     app.querySelectorAll('.opt').forEach(b => b.onclick = () => answer(b.dataset.p, b.dataset.id));
     app.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { cur.i = +b.dataset.go; cur.qt = 0; save(); viewSession(); });
     $('#prev').onclick = () => { cur.i = pageRange(cur, d, ps - 1)[0]; cur.qt = 0; save(); viewSession(); };
@@ -1782,6 +1894,7 @@ document.addEventListener('keydown', function (ev) {
   const idx = LET.indexOf(k) >= 0 ? LET.indexOf(k) : '12345'.indexOf(k);
   if (idx >= 0) { const b = app.querySelectorAll('.opt')[idx]; if (b && !b.disabled) b.click(); }
   else if (ev.key === 'Enter' || ev.key === 'ArrowRight') { const n = $('#next'); if (n) n.click(); }
+  else if (k === 'X') { const a = app.querySelector('[data-cpimg]'); if (a) a.click(); }
   else if (ev.key === 'ArrowLeft') { const p = $('#prev'); if (p && !p.disabled) p.click(); }
 });
 /* 做题页左右滑动换题(手机):左滑下一题、右滑上一题;从屏幕左边缘起手的留给 iOS 的返回手势 */

@@ -759,6 +759,28 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .meta .fav.on { color: var(--acc); }
 .meta .fav + .fav, .meta #rmw { margin-left: auto; }
 .meta #rmw + .fav { margin-left: 8px; }
+.meta .cp { margin-left: auto; color: var(--mute); text-decoration: none; padding: 2px 4px; }
+.meta .fav + .cp { margin-left: 8px; }
+.meta .cp.on { color: var(--acc); }
+
+/* 复制图片:屏幕外排一张白纸卷面,截图后放进剪贴板(深色模式下也是白底黑字) */
+.capture { position: fixed; left: -10000px; top: 0; width: 700px; padding: 32px 36px 36px; background: #fff; color: #17171a;
+  font: 16.5px/1.9 -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; overflow-wrap: anywhere; }
+.capture .cap-src { font-size: 12.5px; color: #8a8a8a; letter-spacing: .2px; margin-bottom: 12px; }
+.capture .cap-stem { font-size: 17.5px; line-height: 1.95; }
+.capture .cap-fig { display: block; max-width: 100%; margin: 16px auto 4px; filter: none; }
+.capture .cap-cond { font-size: 17px; margin: 10px 0 0; }
+.capture .cap-opts { margin-top: 16px; }
+.capture .cap-opt { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
+.capture .cap-opt b { flex: none; width: 18px; font-weight: 400; color: #6a6a6a; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.capture .cap-opt span { flex: 1; min-width: 0; }
+.capture .cap-sub { margin-top: 22px; }
+.capture .cap-subh { font-size: 13px; color: #8a8a8a; margin-bottom: 4px; }
+.capture img { max-width: 100%; }
+.capture .gk-img { background: none; }
+.capture .gk-t { display: block; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+.capture .gk-t td, .capture .gk-t th, .capture table td, .capture table th { border: 1px solid #c8c8c8; padding: 4px 10px; }
+.capture .katex-display { margin: 10px 0; }
 .wlist { display: flex; flex-direction: column; }
 .wrow { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line, rgba(128,128,128,.15)); }
 .wrow .wt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
