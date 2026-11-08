@@ -17,6 +17,11 @@
   <section class="pick">
     <div class="row years" id="years"></div>
     <div class="row secs" id="secs"></div>
+    <div class="row acts">
+      <button class="chip mini" id="allY">全选本年</button>
+      <button class="chip mini" id="clrY">清空</button>
+      <span class="acts-tip">想要整卷打印，直接点右下「整套 PDF」最稳</span>
+    </div>
   </section>
 
   <section class="list" id="list"></section>
@@ -28,6 +33,7 @@
       <option value="unit">一单元一页</option>
       <option value="one">一小题一页</option>
     </select>
+    <a class="dl" id="dl" href="pdf/e2-2025.pdf" download>整套 PDF</a>
     <button id="go">生成 A4 预览</button>
   </footer>
   <p class="tip" id="tip"></p>
@@ -43,8 +49,9 @@
       <option value="unit">一单元一页</option>
       <option value="one">一小题一页</option>
     </select>
-    <button class="go" id="pgo">打印 / 存为 PDF</button>
-    <div class="pv-hint">打印设置：纸张 A4 · 边距「无」· 缩放 100% · 关闭页眉页脚。每页已按 210×297mm 固定排版，题目不跨页，剩余空间自动补答题横线。</div>
+    <a class="dl" id="pvdl" href="pdf/e2-2025.pdf" download>下载 A4 PDF</a>
+    <button class="go" id="pgo">打印当前选择</button>
+    <div class="pv-hint">最稳的方式：点「下载 A4 PDF」，再用 PDF 阅读器按「实际大小 / A4」打印。直接打印本页请设：纸张 A4 · 边距「无」· 缩放 100% · 关闭页眉页脚。</div>
   </div>
   <div class="pv-scroll"><div class="pv-pages" id="pvpages"></div></div>
 </div>

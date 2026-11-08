@@ -16,6 +16,10 @@
     mode: 'unit', orig: false, ans: false
   };
   const paper = y => D.papers.find(p => p.y === y);
+  function syncDL() {
+    const f = `pdf/e2-${S.y}.pdf`;
+    ['#dl', '#pvdl'].forEach(s => { const a = $(s); if (a) { a.href = f; a.textContent = `${S.y} 整套 PDF`; } });
+  }
   const units = () => (paper(S.y) ? paper(S.y).units : []);
   const shown = () => units().filter(u => S.sec === 'all' || u.sec === S.sec);
   function ensure(uid) {
@@ -32,7 +36,7 @@
       `<button class="chip${y === S.y ? ' on' : ''}" data-y="${y}">${y}</button>`).join('');
     $$('#years .chip').forEach(b => b.onclick = () => {
       S.y = +b.dataset.y; S.sel = {}; S.open = {};
-      units().forEach(u => ensure(u.id)); drawYears(); drawList();
+      units().forEach(u => ensure(u.id)); drawYears(); drawList(); syncDL();
     });
   }
   function drawSecs() {
@@ -67,6 +71,20 @@
       $('.u-h', row).onclick = e => { if (e.target === uc || e.target.closest('.u-x')) return; uc.checked = !uc.checked; uc.onchange(); };
     });
     $('#tip').textContent = `共 ${D.papers.length} 套真题 · ${D.papers.reduce((a, p) => a + p.units.reduce((b, u) => b + u.qs.length, 0), 0)} 道小题。勾选后生成，每个单元恰好一张 A4。`;
+    updateGo();
+  }
+
+  /* 生成按钮上直接标页数,免得点进去才发现是 0 页 */
+  function countPages() {
+    const { out } = collect();
+    let n = S.mode === 'one' ? out.reduce((a, o) => a + o.qs.length, 0) : out.length;
+    if (S.orig) n += out.reduce((a, o) => a + (o.u.src || []).length, 0);
+    if (S.ans) n += 1;
+    return n;
+  }
+  function updateGo() {
+    const n = countPages(), b = $('#go');
+    b.textContent = n ? `生成 A4 预览（${n} 页）` : '生成 A4 预览';
   }
 
   /* ───── A4 页 ───── */
@@ -96,14 +114,11 @@
   }
   function answerHTML(u, qs) {
     const subj = u.sec === 'translation' || u.sec === 'writing';
+    if (!subj) return '';                       // 客观题直接写在题号旁,不再占空间放答题卡
     // 大作文要放图表,答题横线相应减少,保证一页装得下
-    const hasFig = (u.figs || []).length > 0;
-    const lines = subj ? (u.sec === 'writing' ? (hasFig ? 15 : 24) : 15) : 2;
-    const bubbles = subj ? '' :
-      `<div class="bubbles">${qs.map(q => `<span><i>${q.n}</i><b></b></span>`).join('')}</div>`;
-    return `<div class="answer ${subj ? 'fixed' : ''}">
-      <div class="ans-t">${subj ? '作答区' : '答题卡'}<i>ANSWER SHEET</i></div>
-      ${bubbles}
+    const lines = u.sec === 'writing' ? ((u.figs || []).length ? 16 : 24) : 15;
+    return `<div class="answer fixed">
+      <div class="ans-t">作答区<i>ANSWER SHEET</i></div>
       <div class="lines">${'<i></i>'.repeat(lines)}</div>
     </div>`;
   }
@@ -263,9 +278,11 @@
   $('#go').onclick = openPV;
   $('#pvx').onclick = e => { e.preventDefault(); closePV(); };
   $('#pgo').onclick = () => window.print();
-  $('#mode').onchange = e => S.mode = e.target.value;
-  $('#orig').onchange = e => S.orig = e.target.checked;
-  $('#ans').onchange = e => S.ans = e.target.checked;
+  $('#mode').onchange = e => { S.mode = e.target.value; updateGo(); };
+  $('#orig').onchange = e => { S.orig = e.target.checked; updateGo(); };
+  $('#ans').onchange = e => { S.ans = e.target.checked; updateGo(); };
+  $('#allY').onclick = () => { units().forEach(u => { const s = ensure(u.id); u.qs.forEach(q => s.add(q.n)); }); drawList(); };
+  $('#clrY').onclick = () => { units().forEach(u => ensure(u.id).clear()); drawList(); };
   $('#pvmode').onchange = e => { S.mode = e.target.value; $('#mode').value = S.mode; drawPreview(); };
   $('#pvorig').onchange = e => { S.orig = e.target.checked; $('#orig').checked = S.orig; drawPreview(); };
   $('#pvans').onchange = e => { S.ans = e.target.checked; $('#ans').checked = S.ans; drawPreview(); };
@@ -279,7 +296,7 @@
   if (q.has('orig')) S.orig = q.get('orig') === '1';
   if (q.has('ans')) S.ans = q.get('ans') === '1';
   if (q.has('sec')) S.sec = q.get('sec');
-  drawYears(); drawSecs(); drawList();
+  drawYears(); drawSecs(); drawList(); syncDL();
   if (q.get('all') === '1') units().forEach(u => ensure(u.id));
   if (q.get('print') === '1') openPV();
 })();

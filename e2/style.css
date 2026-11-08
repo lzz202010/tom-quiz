@@ -47,6 +47,10 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--red);cursor:point
 .bar button{margin-left:auto;border:0;background:var(--ink);color:#fff;border-radius:8px;
   padding:9px 17px;font-size:14px;font-weight:600;cursor:pointer}
 .bar button:active{transform:scale(.97)}
+.dl{display:inline-flex;align-items:center;border:1px solid var(--red);color:var(--red);
+  border-radius:7px;padding:6px 11px;font-size:12px;white-space:nowrap;cursor:pointer}
+.dl:active{background:#a8322a12}
+.pv-bar .dl{padding:5px 10px;font-size:12px}
 .tip{color:var(--mute);font-size:11px;text-align:center;margin:14px 0 0;line-height:1.7}
 
 /* ───── 预览层 ───── */
@@ -66,7 +70,9 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--red);cursor:point
 .doc-empty{text-align:center;color:#888;padding-top:300px}
 
 /* ───── A4 纸面:尺寸写死,屏幕与打印一致 ───── */
-.page{position:relative;width:210mm;height:297mm;background:#fff;color:#141414;
+/* @page 放在全局:Safari 对嵌套在 @media print 里的 @page 支持不稳 */
+@page{size:A4;margin:0}
+.page{position:relative;width:210mm;height:296.5mm;background:#fff;color:#141414;
   margin:0 auto 18px;padding:11mm 13mm 10mm;overflow:hidden;
   display:flex;flex-direction:column;
   font-family:Georgia,"Times New Roman","Songti SC",serif;
@@ -103,12 +109,13 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--red);cursor:point
 .hint{font:11px/1.5 -apple-system,"PingFang SC",sans-serif;color:#8a8780;margin:3mm 0 0}
 
 .qs{margin-top:0}
-.q{margin:0 0 .72em;break-inside:avoid;page-break-inside:avoid}
+.q{margin:0 0 .9em;break-inside:avoid;page-break-inside:avoid}
 .q:last-child{margin-bottom:0}
 .q .no{font:700 .97em/1.4 -apple-system,Helvetica,sans-serif;color:var(--red);margin-right:.35em}
 .q .st{font-weight:600}
-.opts{display:grid;grid-template-columns:1fr 1fr;column-gap:1.5em;row-gap:.08em;
-  margin:.22em 0 0 1.5em;font-size:.97em;line-height:1.45}
+/* 选项像原卷一样一项一行,与题干明确分开 */
+.opts{display:grid;grid-template-columns:1fr;row-gap:.16em;
+  margin:.34em 0 0 1.5em;font-size:.97em;line-height:1.5}
 .opts span{white-space:normal}
 .opts b{font:600 .94em -apple-system,Helvetica,sans-serif;color:#444;margin-right:.35em}
 .opts.o4{grid-template-columns:repeat(4,1fr);column-gap:.55em;font-size:.88em;margin-left:.35em}
@@ -145,15 +152,15 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--red);cursor:point
 .ah{font:600 16px/1.4 -apple-system,"PingFang SC",sans-serif;margin:0 0 .6em}
 
 @media print{
-  @page{size:A4;margin:0}
-  html,body{background:#fff !important;margin:0 !important;padding:0 !important}
+  html,body{background:#fff !important;margin:0 !important;padding:0 !important;height:auto !important}
   body>*:not(.pv){display:none !important}
-  .pv{position:static;display:block !important;background:#fff}
+  .pv{position:static;display:block !important;background:#fff;height:auto !important}
   .pv-bar{display:none !important}
-  .pv-scroll{padding:0 !important;overflow:visible !important}
-  .pv-pages{zoom:1 !important;width:auto !important;margin:0 !important}
-  .page{width:210mm;height:297mm;margin:0 !important;box-shadow:none !important;
-    break-after:page;page-break-after:always}
+  .pv-scroll{padding:0 !important;overflow:visible !important;height:auto !important;flex:none !important}
+  .pv-pages{zoom:1 !important;width:auto !important;margin:0 !important;transform:none !important}
+  /* 296.5mm 而非 297mm:留 0.5mm 舍入余量,避免在 Safari/部分打印机上多出一页空白 */
+  .page{width:210mm;height:296.5mm;margin:0 !important;box-shadow:none !important;
+    break-after:page;page-break-after:always;break-inside:avoid}
   .page:last-child{break-after:auto;page-break-after:auto}
   .doc-empty{display:none}
 }
@@ -166,3 +173,8 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--red);cursor:point
   .pv-bar{gap:8px}
   .pv-n{display:none}
 }
+
+/* 选题页的快捷操作 */
+.acts{align-items:center;gap:9px;margin-top:2px}
+.chip.mini{font-size:12px;padding:4px 10px;color:var(--mute)}
+.acts-tip{font-size:11px;color:#a8a49b;margin-left:2px}
