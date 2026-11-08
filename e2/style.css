@@ -46,7 +46,8 @@ a{color:inherit;text-decoration:none}
 /* ───── A4 纸面:尺寸写死,屏幕与打印一致 ───── */
 /* @page 放全局:Safari 对嵌套在 @media print 里的 @page 支持不稳 */
 @page{size:A4;margin:0}
-.page{position:relative;width:210mm;height:296.5mm;background:#fff;color:#141414;
+/* 297mm 是纸高;纸面留 1mm 余量,避免浏览器舍入后把最后一行挤到下一张 */
+.page{position:relative;width:210mm;height:296mm;background:#fff;color:#141414;
   margin:0 auto 18px;padding:11mm 13mm 10mm;overflow:hidden;
   display:flex;flex-direction:column;
   font-family:Georgia,"Times New Roman","Songti SC",serif;
@@ -136,17 +137,30 @@ a{color:inherit;text-decoration:none}
 .pf .fields i{font-style:normal;margin-right:5mm}
 .pf .fields i::after{content:"";display:inline-block;width:14mm;border-bottom:1px solid #bbb;margin-left:2mm}
 
+/* 打印根:平时藏在屏幕外,排版/等图都在这儿完成 */
+#printroot{position:absolute;left:-10000px;top:0;width:210mm;height:auto;
+  visibility:hidden;pointer-events:none;z-index:-1}
+
+/* 单页 / 单题打印按钮:只给屏幕看 */
+.pbtn{border:1px solid var(--line);background:#fff;color:var(--mute);border-radius:5px;
+  padding:2px 7px;font:10.5px/1.4 -apple-system,"PingFang SC",sans-serif;
+  cursor:pointer;white-space:nowrap;margin-left:6px;align-self:center}
+.pbtn:hover{border-color:var(--red);color:var(--red)}
+button.no{border:0;background:none;padding:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+button.no:hover{text-decoration:underline}
+
 @media print{
-  html,body{background:#fff !important;margin:0 !important;padding:0 !important;height:auto !important}
-  body>*:not(.pv){display:none !important}
-  .pv{position:static;display:block !important;background:#fff;height:auto !important}
-  .pv-bar{display:none !important}
-  .pv-scroll{padding:0 !important;overflow:visible !important;height:auto !important;flex:none !important}
-  .pv-pages{zoom:1 !important;width:auto !important;margin:0 !important;transform:none !important}
-  /* 296.5mm 而非 297mm:留 0.5mm 舍入余量,避免多出一页空白 */
-  .page{width:210mm;height:296.5mm;margin:0 !important;box-shadow:none !important;
-    break-after:page;page-break-after:always;break-inside:avoid}
-  .page:last-child{break-after:auto;page-break-after:auto}
+  html,body{background:#fff !important;margin:0 !important;padding:0 !important;
+    height:auto !important;min-height:0 !important;overflow:visible !important}
+  /* 只印独立纸面,不印带 fixed/flex 的预览层 */
+  body>*:not(#printroot){display:none !important}
+  #printroot{display:block !important;position:static !important;left:auto !important;
+    top:auto !important;width:auto !important;height:auto !important;
+    visibility:visible !important;pointer-events:auto !important;z-index:auto !important}
+  /* 296mm 高的块本身就会各占一页;不写 break-after,
+     iOS Safari 里强制分页容易在末尾多吐一张空白页 */
+  #printroot .page{width:210mm;height:296mm;margin:0 !important;box-shadow:none !important}
+  .pbtn{display:none !important}
   .doc-empty{display:none}
 }
 @media(max-width:600px){

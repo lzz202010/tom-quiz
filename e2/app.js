@@ -43,7 +43,8 @@
       const m = String(o).match(/^([A-G])\.\s*([\s\S]*)$/);
       return `<span>${m ? `<b>${m[1]}</b>${esc(m[2])}` : esc(o)}</span>`;
     }).join('');
-    return `<div class="q"><span class="no">${q.n}.</span><span class="st">${esc(q.stem)}</span>
+    return `<div class="q"><button class="no qbtn" type="button" data-print-q="${q.n}"
+      title="单独打印第 ${q.n} 题">${q.n}.</button><span class="st">${esc(q.stem)}</span>
       ${opts.length ? `<div class="opts${u.sec === 'cloze' ? ' o4' : ''}">${cells}</div>` : ''}</div>`;
   }
 
@@ -62,7 +63,8 @@
       qh = `<div class="bgrid">${u.qs.map(q => `<span>${q.n}<b></b></span>`).join('')}</div>`;
     } else {
       const tf = u.type === 'tf';
-      qh = u.qs.map(q => `<div class="pq"><span class="no">${q.n}.</span><span class="st">${esc(q.stem)}</span>
+      qh = u.qs.map(q => `<div class="pq"><button class="no qbtn" type="button" data-print-q="${q.n}"
+        title="单独打印第 ${q.n} 题">${q.n}.</button><span class="st">${esc(q.stem)}</span>
         <span class="pick${tf ? ' tf' : ''}"></span></div>`).join('');
     }
     return `<div class="dirbox">${esc(u.dir || '')}</div>${poolBox}
@@ -94,13 +96,14 @@
     return `<div class="content">${inner}</div>${ans}`;
   }
 
-  function pageHTML(u, y, idx, total) {
+  function pageHTML(u, y, idx, total, single) {
     const t = titleOf(u);
-    return `<section class="page">
+    return `<section class="page" data-unit="${esc(u.id)}">
       <div class="ph"><span class="brand">e2</span><span>${y} 考研英语（二）</span>
         <span class="meta">${esc(t.h1)} · ${t.range}</span></div>
       <div class="ttl"><h1>${esc(t.h1)}<small>${esc(t.en)}</small></h1>
-        <span class="sub">${t.range} · ${t.score} · 建议 ${t.mins} 分钟</span></div>
+        <span class="sub">${single ? `${t.range} · 单题打印` : `${t.range} · ${t.score} · 建议 ${t.mins} 分钟`}</span>
+        <button class="pbtn" type="button" data-print-page="${idx - 1}" title="只打印这一页">打印本页</button></div>
       <div class="slot${(u.sec === 'translation' || u.sec === 'writing') ? ' subj' : ''}">${bodyHTML(u)}</div>
       <div class="pf"><span class="fields"><i>姓名</i><i>用时</i><i>得分</i></span><span>${idx} / ${total}</span></div></section>`;
   }
@@ -134,6 +137,80 @@
     }));
   }
 
+  /* ───── 打印 ─────
+     不再直接打印预览层(它带 position:fixed / flex / overflow,浏览器分页时
+     容易在末尾多吐一张空白页)。先把要印的纸面渲染进 body 下独立的
+     #printroot,它没有任何固定/弹性祖先,打印时只显示它。 */
+  let printing = false;
+
+  function withQ(u, qn) {
+    if (!qn) return u;
+    return Object.assign({}, u, { qs: u.qs.filter(q => q.n === qn) });
+  }
+  function pagesHTML(units, qn) {
+    return units.map((u, i) => pageHTML(withQ(u, qn), S.y, i + 1, units.length, !!qn)).join('');
+  }
+  function paintRoot(html) {
+    const root = $('#printroot');
+    root.innerHTML = html;
+    const pages = () => $$('.page', root);
+    pages().forEach(fit);
+    return readyImages(root).then(() => {
+      pages().forEach(fit);
+      return document.fonts && document.fonts.ready ? document.fonts.ready : null;
+    }).then(() => {
+      pages().forEach(fit);
+      // 两帧后再调打印,确保字号/图片已经落到布局里
+      return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+  }
+  function printUnits(units, qn) {
+    if (!units || !units.length || printing) return;
+    printing = true;
+    const root = $('#printroot');
+    root.innerHTML = pagesHTML(units, qn);
+    // 整套/整页:沿用预览里已经排好的字号,图片不会因刚插入还没布局而顶版
+    // 单题:内容变了,重新二分
+    $$('.page', root).forEach(p => {
+      const dst = $('.content', p);
+      const src = qn ? null : $(`.page[data-unit="${p.dataset.unit}"] .content`, $('#pvpages'));
+      if (src && src.style.fontSize) dst.style.fontSize = src.style.fontSize;
+      else fit(p);
+    });
+    // 必须在点击事件里同步调 print():iOS Safari 对延后的 window.print() 不可靠
+    try { window.print(); } finally { printing = false; }
+  }
+  function printOne(u, qn) {
+    if (!u) return;
+    // Part B / 写作 / 翻译本身是一整块,不能拆开印
+    if (u.sec === 'partb' || u.sec === 'writing' || u.sec === 'translation') qn = null;
+    printUnits([u], qn);
+  }
+
+  /* 构建脚本用:把整套(或单页/单题)放进打印根,返回纸数 */
+  window.__E2_PREPARE_PRINT__ = function (unitIndex, qn) {
+    const p = paper(S.y);
+    if (!p || !p.units.length) return Promise.resolve(0);
+    const units = unitIndex == null ? p.units : [p.units[unitIndex]];
+    return paintRoot(pagesHTML(units, qn || null))
+      .then(() => $$('.page', $('#printroot')).length);
+  };
+
+  /* 供校验脚本查看真正会打印的那几张纸 */
+  window.__E2_PRINT_AUDIT__ = function () {
+    return $$('.page', $('#printroot')).map((p, i) => {
+      const c = $('.content', p), slot = $('.slot', p), ans = $('.answer', p);
+      const cH = c ? c.getBoundingClientRect().height : 0;
+      const aH = ans ? ans.getBoundingClientRect().height : 0;
+      const aM = (ans && ans.classList.contains('fixed'))
+        ? (parseFloat(getComputedStyle(ans).marginTop) || 0) : 0;
+      const sH = slot ? slot.getBoundingClientRect().height : 0;
+      return { i: i + 1, slotH: Math.round(sH), contentH: Math.round(cH),
+        answerH: Math.round(aH), fs: c ? c.style.fontSize : '',
+        over: Math.max(0, Math.round(cH + aH + aM - sH)) };
+    });
+  };
+
   /* 排版自检:构建/校验脚本用 */
   window.__E2_AUDIT__ = function () {
     return $$('.page', $('#pvpages')).map((p, i) => {
@@ -165,7 +242,7 @@
       if (my !== token) return;
       $$('.page', box).forEach(fit);
       fitScreen();
-      $('#pvn').textContent = `${S.y} · ${units.length} 页 A4`;
+      $('#pvn').textContent = `${S.y} · ${units.length} 页 A4 · 点题号可单题打印`;
       window.__E2_PAGES__ = units.length;
       window.__READY__ = true;
     });
@@ -188,7 +265,33 @@
   }
 
   $('#pvx').onclick = closePV;
-  $('#pgo').onclick = () => window.print();
+  $('#pgo').onclick = () => {
+    const p = paper(S.y);
+    if (p) printUnits(p.units);
+  };
+  $('#pvpages').addEventListener('click', e => {
+    const p = paper(S.y);
+    if (!p) return;
+    const qb = e.target.closest('.qbtn');
+    if (qb) {
+      const u = p.units.find(x => x.id === qb.closest('.page').dataset.unit);
+      printOne(u, +qb.dataset.printQ);
+      return;
+    }
+    const pb = e.target.closest('[data-print-page]');
+    if (pb) printUnits([p.units[+pb.dataset.printPage]]);
+  });
+  /* 直接按 Cmd/Ctrl+P 时,把当前整套塞进打印根,避免印出空白 */
+  window.addEventListener('beforeprint', () => {
+    if (printing) return;
+    const p = paper(S.y), root = $('#printroot');
+    if (!p || !p.units.length || root.innerHTML.trim()) return;
+    root.innerHTML = pagesHTML(p.units, null);
+    $$('.page', root).forEach(fit);
+  });
+  window.addEventListener('afterprint', () => {
+    if (!printing) $('#printroot').innerHTML = '';
+  });
   window.addEventListener('resize', fitScreen);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#pv').hidden) closePV(); });
 
