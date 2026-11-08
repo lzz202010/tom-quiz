@@ -100,12 +100,12 @@
     const t = titleOf(u);
     return `<section class="page" data-unit="${esc(u.id)}">
       <div class="ph"><span class="brand">e2</span><span>${y} 考研英语（二）</span>
-        <span class="meta">${esc(t.h1)} · ${t.range}</span></div>
+        <span class="meta">${esc(t.h1)} · ${t.range}</span>
+        <span class="pn">${idx}/${total}</span></div>
       <div class="ttl"><h1>${esc(t.h1)}<small>${esc(t.en)}</small></h1>
         <span class="sub">${single ? `${t.range} · 单题打印` : `${t.range} · ${t.score} · 建议 ${t.mins} 分钟`}</span>
         <button class="pbtn" type="button" data-print-page="${idx - 1}" title="只打印这一页">打印本页</button></div>
-      <div class="slot${(u.sec === 'translation' || u.sec === 'writing') ? ' subj' : ''}">${bodyHTML(u)}</div>
-      <div class="pf"><span class="fields"><i>姓名</i><i>用时</i><i>得分</i></span><span>${idx} / ${total}</span></div></section>`;
+      <div class="slot${(u.sec === 'translation' || u.sec === 'writing') ? ' subj' : ''}">${bodyHTML(u)}</div></section>`;
   }
 
   /* 二分找最大字号使内容不溢出;内部尺寸用 em,高度随字号近似线性 */
