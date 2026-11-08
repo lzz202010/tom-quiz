@@ -4,54 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f7f6f3">
-<title>e2</title>
+<title>e2 · 考研英语二真题 A4</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
   <header class="hd">
-    <div class="logo">e2<span>考研英语二 · 打印版</span></div>
-    <div class="hd-sub">历年真题拆成小题，一页 A4 一张</div>
+    <h1>e2</h1>
+    <p>考研英语（二）2010–2025 · 每年一套 9 张 A4 · 点年份查看或下载</p>
   </header>
 
-  <section class="pick">
-    <div class="row years" id="years"></div>
-    <div class="row secs" id="secs"></div>
-    <div class="row acts">
-      <button class="chip mini" id="allY">全选本年</button>
-      <button class="chip mini" id="clrY">清空</button>
-      <span class="acts-tip">想要整卷打印，直接点右下「整套 PDF」最稳</span>
-    </div>
-  </section>
+  <main class="years" id="years"></main>
 
-  <section class="list" id="list"></section>
-
-  <footer class="bar">
-    <label class="ck"><input type="checkbox" id="orig"> 附原题页</label>
-    <label class="ck"><input type="checkbox" id="ans"> 附答案</label>
-    <select id="mode" aria-label="版式">
-      <option value="unit">一单元一页</option>
-      <option value="one">一小题一页</option>
-    </select>
-    <a class="dl" id="dl" href="pdf/e2-2025.pdf" download>整套 PDF</a>
-    <button id="go">生成 A4 预览</button>
-  </footer>
-  <p class="tip" id="tip"></p>
+  <p class="tip">每套都排好了 A4：直接下载 PDF，用阅读器按「实际大小」打印；也可以在页面上直接打印。</p>
 </div>
 
 <div id="pv" class="pv" hidden>
   <div class="pv-bar">
-    <a href="#" class="pv-x" id="pvx">✕</a>
+    <button class="back" id="pvx">返回</button>
     <span class="pv-n" id="pvn"></span>
-    <label class="ck"><input type="checkbox" id="pvorig"> 原题页</label>
-    <label class="ck"><input type="checkbox" id="pvans"> 答案</label>
-    <select id="pvmode" aria-label="版式">
-      <option value="unit">一单元一页</option>
-      <option value="one">一小题一页</option>
-    </select>
-    <a class="dl" id="pvdl" href="pdf/e2-2025.pdf" download>下载 A4 PDF</a>
-    <button class="go" id="pgo">打印当前选择</button>
-    <div class="pv-hint">最稳的方式：点「下载 A4 PDF」，再用 PDF 阅读器按「实际大小 / A4」打印。直接打印本页请设：纸张 A4 · 边距「无」· 缩放 100% · 关闭页眉页脚。</div>
+    <a class="dl" id="pvdl" href="#" download>下载 PDF</a>
+    <button class="go" id="pgo">打印</button>
   </div>
   <div class="pv-scroll"><div class="pv-pages" id="pvpages"></div></div>
 </div>
