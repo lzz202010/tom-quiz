@@ -331,13 +331,21 @@
     const u = unitOf(unitId);
     const qEl = hit.block.closest('.q, .pq');
     const qn = qEl && qEl.querySelector('.no') ? parseInt(qEl.querySelector('.no').textContent, 10) : null;
-    const sentence = sentenceAround(hit.block.textContent, hit.at);
+    let sentence = sentenceAround(hit.block.textContent, hit.at);
+    // 完形原文的空格是 <u class="gap">5</u>:例句里换成 ____,别让它读成 "and 5 a low mood"
+    const gaps = Array.from(hit.block.querySelectorAll('u.gap')).map(g => g.textContent.trim());
+    gaps.forEach(n => {
+      if (/^\d{1,2}$/.test(n))
+        sentence = sentence.replace(new RegExp('(?<![\\d.])' + n + '(?![\\d.])'), '____');
+    });
     const src = {
       type: 'paper', year: S.y, section: u ? u.sec : '',
       label: u ? (u.label || '') : '', unitId: unitId || undefined,
       qn: qn || undefined
     };
-    const r = V.add({ word: hit.word, sentence, source: src });
+    const GL = window.E2GL;
+    const gloss = GL ? GL.lookup(hit.word, sentence) : '';   // 结合例句选定义项
+    const r = V.add({ word: hit.word, sentence, gloss, source: src });
     if (r.ok) { toast(`已收藏 ${r.item.word}`); markSaved($('#pvpages')); syncVbCount(); }
     else if (r.reason === 'dup') toast(`${r.item.word} 已在生词本`);
     else toast('没认出来这个词');
@@ -375,6 +383,32 @@
       node.parentNode.replaceChild(wrap, node);
     });
   }
+  /* ───── 生词本往返:记住年份与当前单元,不再一按返回就掉回首页 ───── */
+  const FROM_VOCAB = new URLSearchParams(location.search).get('from') === 'vocab';
+  function currentUnitId() {
+    const sc = $('.pv-scroll');
+    if (!sc) return '';
+    const top = sc.getBoundingClientRect().top + 90;
+    let id = '';
+    $$('#pvpages .page').forEach(p => { if (p.getBoundingClientRect().top <= top) id = p.dataset.unit; });
+    return id || ($('#pvpages .page') ? $('#pvpages .page').dataset.unit : '');
+  }
+  function vbQuery(from) {
+    const sp = new URLSearchParams();
+    sp.set('y', S.y);
+    const u = currentUnitId();
+    if (u) sp.set('u', u);
+    if (from) sp.set('from', from);
+    return sp.toString();
+  }
+  function syncVbLinks() {
+    const el = $('#vbEntry');
+    if (el) el.href = 'vocab.html?' + vbQuery('paper');
+  }
+  function backToVocab() {
+    location.replace('vocab.html?' + vbQuery('back'));
+  }
+
   function syncVbCount() {
     const n = V ? V.count() : 0;
     ['#vbCount', '#vbCount2'].forEach(sel => {
@@ -399,6 +433,7 @@
       fitScreen();
       markSaved(box);                          // 已收藏的词标出来,不改排版尺寸
       syncVbCount();
+      syncVbLinks();                           // 页面渲染完才有 data-unit,补齐 u
       $('#pvn').textContent = `${S.y} · ${units.length} 页 A4 · 点题号可单题打印`;
       window.__E2_PAGES__ = units.length;
       window.__READY__ = true;
@@ -413,7 +448,12 @@
     $('#pv').hidden = false;
     document.body.style.overflow = 'hidden';
     $('#pvpages').scrollIntoView({ block: 'start' });
-    history.replaceState(null, '', `?y=${S.y}${wantUnit ? '&u=' + encodeURIComponent(wantUnit) : ''}`);
+    const sp = new URLSearchParams();
+    sp.set('y', S.y);
+    if (wantUnit) sp.set('u', wantUnit);
+    if (FROM_VOCAB) sp.set('from', 'vocab');
+    history.replaceState(null, '', '?' + sp);
+    syncVbLinks();
     draw();
   }
   function closePV() {
@@ -422,7 +462,10 @@
     history.replaceState(null, '', location.pathname);
   }
 
-  $('#pvx').onclick = closePV;
+  /* 从生词本跳进原题时,顶栏「返回」应当回生词本,而不是关掉预览回首页 */
+  if (FROM_VOCAB) $('#pvx').textContent = '← 生词本';
+  $('#pvx').onclick = () => FROM_VOCAB ? backToVocab() : closePV();
+  $('.pv-scroll').addEventListener('scroll', () => { clearTimeout(syncVbLinks.t); syncVbLinks.t = setTimeout(syncVbLinks, 160); }, { passive: true });
   $('#pgo').onclick = () => {
     const p = paper(S.y);
     if (p) printUnits(p.units);
@@ -482,7 +525,9 @@
     if (!printing) $('#printroot').innerHTML = '';
   });
   window.addEventListener('resize', fitScreen);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#pv').hidden) closePV(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !$('#pv').hidden) FROM_VOCAB ? backToVocab() : closePV();
+  });
 
   const q = new URLSearchParams(location.search);
   if (q.has('y') && D.years.includes(+q.get('y'))) S.y = +q.get('y');

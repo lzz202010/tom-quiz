@@ -6,6 +6,8 @@
      word:      'reskilling',              // 原形(首字母大小写按原文)
      key:       'reskilling',              // 归一化小写,去重用
      sentence:  '...',                     // 真题语境例句(自动截取)
+     gloss:     'adj. 社交的',             // 中文释义(内置表给出,可手动改)
+     sentenceCn:'...',                    // 例句中文译文(可手动补充,默认空)
      source:    { type:'paper'|'manual', year:2021, section:'reading',
                   label:'阅读理解 Text 1', unitId:'2021-r1', qn:21 },
      note:      '',                        // 个人备注
@@ -56,6 +58,7 @@
       if (i >= 0) {
         list[i].hits = (list[i].hits || 1) + 1;
         if (!list[i].sentence && it.sentence) list[i].sentence = it.sentence;
+        if (!list[i].gloss && it.gloss) list[i].gloss = it.gloss;
         write(list);
         return { ok: false, reason: 'dup', item: list[i] };
       }
@@ -64,6 +67,8 @@
         word,
         key,
         sentence: String(it.sentence || '').trim(),
+        gloss: String(it.gloss || '').trim(),
+        sentenceCn: String(it.sentenceCn || '').trim(),
         source: it.source || { type: 'manual' },
         note: '',
         manual: !!it.manual || !it.source || it.source.type === 'manual',
@@ -123,7 +128,8 @@
     },
     sourceHref(src) {
       if (!src || src.type === 'manual' || !src.year) return '';
-      return 'index.html?y=' + src.year + (src.unitId ? '&u=' + encodeURIComponent(src.unitId) : '');
+      return 'index.html?y=' + src.year +
+        (src.unitId ? '&u=' + encodeURIComponent(src.unitId) : '') + '&from=vocab';
     }
   };
   global.E2V = api;

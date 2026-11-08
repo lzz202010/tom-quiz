@@ -77,21 +77,43 @@
   bindAC($('#vbW'), 1, 8);
   bindAC($('#vbS'), 2, 6);
 
-  function rowHTML(it) {
+  const GL = window.E2GL;
+  const opened = new Set();                 // 已点开的词条(render 后保持展开状态)
+  function glossOf(it) {
+    return it.gloss || (GL ? GL.lookup(it.word, it.sentence) : '') || '';
+  }
+
+  function rowHTML(it, firstWord) {
     const src = srcLine(it.source);
     const href = V.sourceHref(it.source);
     const srcTag = href
       ? `<a class="vb-src" href="${esc(href)}">${esc(src)}</a>`
       : `<span class="vb-src">${esc(src)}</span>`;
-    const eg = it.sentence
-      ? `<p class="vb-eg">${esc(it.sentence)}</p>`
-      : `<p class="vb-eg empty">暂无例句${it.manual ? '，可在备注里补充' : ''}</p>`;
     const when = new Date(it.createdAt).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+    const g = glossOf(it);
+    /* 同一句被多个词收藏时,只在第一条显示完整例句,其余指向它,避免整屏重复 */
+    const dup = it.sentence && firstWord && firstWord !== it.word;
+    const eg = !it.sentence
+      ? `<p class="vb-eg empty">暂无例句${it.manual ? '，可在备注里补充' : ''}</p>`
+      : dup ? `<p class="vb-eg dup">例句同上 · 见 <b>${esc(firstWord)}</b></p>`
+        : `<p class="vb-eg">${esc(it.sentence)}</p>`;
+    const cn = it.sentenceCn ? `<p class="vb-eg-cn">${esc(it.sentenceCn)}</p>` : '';
     return `<li class="vb-item" data-id="${esc(it.id)}">
       <div class="vb-row">
         <div class="vb-main">
-          <div class="vb-top"><b class="vb-wd">${esc(it.word)}</b>${srcTag}<i class="vb-date">${when}</i></div>
-          ${eg}
+          <div class="vb-top">
+            <button class="vb-wd" type="button" data-act="flip"
+              title="点一下显示中文释义与例句">${esc(it.word)}<i class="vb-hint">释义 ⌄</i></button>
+            ${srcTag}<i class="vb-date">${when}</i>
+          </div>
+          <div class="vb-detail" hidden>
+            <div class="vb-gloss${g ? '' : ' empty'}"><span>${g ? esc(g) : '暂无内置中文释义'}</span>
+              <button type="button" data-act="gloss">${g ? '改' : '补充'}</button></div>
+            <input class="vb-gloss-edit" type="text" hidden placeholder="中文释义，如 adj. 社交的">
+            ${eg}${cn}
+            <button class="vb-cn-b" type="button" data-act="sentcn">${it.sentenceCn ? '改例句译文' : '＋ 补例句译文'}</button>
+            <textarea class="vb-cn-edit" rows="2" hidden placeholder="例句的中文翻译（可留空）"></textarea>
+          </div>
           <p class="vb-note"${it.note ? '' : ' hidden'}>${esc(it.note || '')}</p>
           <textarea class="vb-note-edit" rows="2" hidden placeholder="写点备注，例如近义、易混、真题里的用法"></textarea>
           <div class="vb-act">
@@ -108,13 +130,24 @@
     const list = V.query(qEl.value, sortEl.value);
     const all = V.count();
     countEl.textContent = `${all} 个词`;
-    listEl.innerHTML = list.map(rowHTML).join('');
+    const first = new Map();
+    list.forEach(it => { if (it.sentence && !first.has(it.sentence)) first.set(it.sentence, it.word); });
+    listEl.innerHTML = list.map(it => rowHTML(it, first.get(it.sentence))).join('');
+    listEl.querySelectorAll('.vb-item').forEach(el => { if (opened.has(el.dataset.id)) setOpen(el, true); });
     if (!list.length) {
       emptyEl.hidden = false;
       emptyEl.textContent = all
         ? '没有匹配的词条，换个关键词试试。'
         : '还没有收藏。做题时点一下原文里的单词就能收进来，也可以在上面手动添加。';
     } else emptyEl.hidden = true;
+  }
+
+  function setOpen(item, on) {
+    const d = item.querySelector('.vb-detail');
+    if (!d) return;
+    d.hidden = !on;
+    item.classList.toggle('open', on);
+    if (on) opened.add(item.dataset.id); else opened.delete(item.dataset.id);
   }
 
   /* ── 删除(带撤销) ── */
@@ -138,6 +171,30 @@
     if (!act) return;
 
     if (act.dataset.act === 'del') { del(id); return; }
+    if (act.dataset.act === 'flip') {
+      const d = item.querySelector('.vb-detail');
+      setOpen(item, d.hidden);
+      return;
+    }
+    if (act.dataset.act === 'gloss' || act.dataset.act === 'sentcn') {
+      const isG = act.dataset.act === 'gloss';
+      const f = item.querySelector(isG ? '.vb-gloss-edit' : '.vb-cn-edit');
+      const rec = V.all().find(x => x.id === id) || {};
+      f.value = isG ? glossOf(rec) : (rec.sentenceCn || '');
+      f.hidden = false; f.focus();
+      const save = () => {
+        V.update(id, isG ? { gloss: f.value.trim() } : { sentenceCn: f.value.trim() });
+        render();
+      };
+      f.onblur = save;
+      f.onkeydown = ev => {
+        if (ev.key === 'Enter' && (f.tagName === 'INPUT' || ev.metaKey || ev.ctrlKey)) {
+          ev.preventDefault(); f.blur();
+        }
+        if (ev.key === 'Escape') { f.onblur = null; f.hidden = true; }
+      };
+      return;
+    }
     if (act.dataset.act === 'note') {
       const ta = item.querySelector('.vb-note-edit');
       const nt = item.querySelector('.vb-note');
@@ -210,7 +267,10 @@
     e.preventDefault();
     const w = $('#vbW').value.trim(), s = $('#vbS').value.trim();
     if (!w) return;
-    const r = V.add({ word: w, sentence: s, manual: true, source: { type: 'manual' } });
+    const r = V.add({
+      word: w, sentence: s, manual: true, source: { type: 'manual' },
+      gloss: GL ? GL.lookup(w, s) : ''          // 手动添加也能带出内置释义
+    });
     if (r.ok) {
       $('#vbW').value = ''; $('#vbS').value = '';
       qEl.value = '';
@@ -224,5 +284,18 @@
   qEl.addEventListener('input', render);
   sortEl.addEventListener('change', render);
   V.on(render);
+
+  /* ── 返回:记住从哪一卷、哪一单元进来的,不再一按就掉回首页 ── */
+  const P = new URLSearchParams(location.search);
+  const back = $('#vbBack');
+  if (P.get('y')) {
+    const sp = new URLSearchParams();
+    sp.set('y', P.get('y'));
+    if (P.get('u')) sp.set('u', P.get('u'));
+    sp.set('from', 'vocab');
+    back.href = 'index.html?' + sp;
+    back.textContent = '← 回到原题';
+  }
+
   render();
 })();
