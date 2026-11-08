@@ -116,7 +116,34 @@
     paper: 'n. 试卷；论文（此处指真题试卷，不指"纸"）',
     term: 'n. 术语；学期', context: 'n. 语境；上下文',
     sentence: 'n. 句子', meaning: 'n. 含义；意义',
-    note: 'n. 备注；笔记', source: 'n. 来源；出处', manual: 'adj. 手动的；手工的'
+    note: 'n. 备注；笔记', source: 'n. 来源；出处', manual: 'adj. 手动的；手工的',
+    /* 缩写与所有格:词典不收,真题里却很常见 */
+    "it's": "it is / it has 的缩写（它是；它有）",
+    "don't": 'do not 的缩写（不；别）',
+    "doesn't": 'does not 的缩写（不；并不）',
+    "didn't": 'did not 的缩写（没有；过去不）',
+    "isn't": 'is not 的缩写（不是）',
+    "aren't": 'are not 的缩写（不是）',
+    "can't": 'cannot 的缩写（不能；不可能）',
+    "won't": 'will not 的缩写（将不；不愿意）',
+    "you're": 'you are 的缩写（你是；你们是）',
+    "you'll": 'you will 的缩写（你将）',
+    "we're": 'we are 的缩写（我们是）',
+    "they're": 'they are 的缩写（他们是）',
+    "that's": 'that is 的缩写（那是；也就是说）',
+    "there's": 'there is 的缩写（有；存在）',
+    "people's": "people 的所有格（人们的）",
+    "children's": "children 的所有格（孩子们的）",
+    "author's": "author 的所有格（作者的）",
+    "child's": "child 的所有格（孩子的）",
+    "company's": "company 的所有格（公司的）",
+    "world's": "world 的所有格（世界的）",
+    ones: 'one 的复数（指代前文提到的复数名词）',
+    dominating: 'adj. 占主导地位的；主要的',
+    composed: 'v. 组成（be composed of 由……组成）',
+    wholly: 'adv. 完全地；统统',
+    issue: 'n. 议题；问题（此处不指"期号/发行"）',
+    address: 'v. 处理；应对（此处不指"地址"）'
   };
 
   /* 多义词:结合例句给出最贴切的一个义项（优先于通用义） */
@@ -158,20 +185,26 @@
     return out;
   }
 
+  const DATA = global.E2GLOSS_DATA || {};    // 8861 条,覆盖全部真题词
+
   function lookup(word, sentence) {
     const w = String(word || '').toLowerCase().replace(/[’']/g, "'");
     const s = String(sentence || '');
-    for (const r of CTX) {
+    const fs = forms(w);
+    for (const r of CTX) {                    // ① 结合例句选多义项
       if (r.w === w && r.re.test(s)) return r.t;
     }
-    for (const k of forms(w)) {
+    for (const k of fs) {                     // ② 人工校订过的真题语境释义
       if (G[k]) return G[k];
     }
-    for (const r of CTX) {                    // 变形词的语境规则(如 socialising)
-      if (forms(w).some(f => f.indexOf(r.w) === 0) && r.re.test(s)) return r.t;
+    for (const r of CTX) {                    // ③ 变形词也套语境规则
+      if (fs.some(f => f.indexOf(r.w) === 0) && r.re.test(s)) return r.t;
+    }
+    for (const k of fs) {                     // ④ 词典兜底,保证点哪个词都有中文
+      if (DATA[k]) return DATA[k];
     }
     return '';
   }
 
-  global.E2GL = { lookup, forms, table: G, rules: CTX };
+  global.E2GL = { lookup, forms, table: G, data: DATA, rules: CTX };
 })(window);

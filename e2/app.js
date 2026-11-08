@@ -237,11 +237,30 @@
       toastEl.className = 'toast';
       document.body.appendChild(toastEl);
     }
+    toastEl.classList.remove('word-card');
     toastEl.innerHTML = `<span></span>`;
     toastEl.firstChild.textContent = msg;
     toastEl.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { toastEl.hidden = true; }, 1900);
+  }
+  /* 点单词后弹出的中文释义卡:默认不显示,点一下才出现,顺带给出真题例句 */
+  function toastWord(word, gloss, sentence, added) {
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.className = 'toast';
+      document.body.appendChild(toastEl);
+    }
+    const g = gloss || '暂无中文释义，可在生词本里补充';
+    const cut = s => s.length > 120 ? s.slice(0, 118) + '…' : s;
+    toastEl.classList.add('word-card');
+    toastEl.innerHTML = `<div class="wc-h"><b>${esc(word)}</b>
+      <i>${added ? '已收藏' : '已在生词本'}</i></div>
+      <div class="wc-g">${esc(g)}</div>
+      ${sentence ? `<em>${esc(cut(sentence))}</em>` : ''}`;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; toastEl.classList.remove('word-card'); }, 3600);
   }
 
   function caretAt(x, y) {
@@ -315,7 +334,7 @@
     const node = r.startContainer;
     if (!node.parentElement) return null;
     if (node.parentElement.closest('button,a,img,.pbtn,.qbtn')) return null;
-    const block = node.parentElement.closest('.passage p, .dirbox, .q .st, .pq .st, .pool-g span, .passage p.pseg');
+    const block = node.parentElement.closest('.passage p, .dirbox, .q .st, .pq .st, .opts span, .pool-g span, .passage p.pseg');
     if (!block) return null;
     const w = wordAt(node, r.startOffset);
     if (!w) return null;
@@ -346,9 +365,9 @@
     const GL = window.E2GL;
     const gloss = GL ? GL.lookup(hit.word, sentence) : '';   // 结合例句选定义项
     const r = V.add({ word: hit.word, sentence, gloss, source: src });
-    if (r.ok) { toast(`已收藏 ${r.item.word}`); markSaved($('#pvpages')); syncVbCount(); }
-    else if (r.reason === 'dup') toast(`${r.item.word} 已在生词本`);
-    else toast('没认出来这个词');
+    toastWord(hit.word, gloss, sentence, r.ok);
+    if (r.ok) { markSaved($('#pvpages')); syncVbCount(); }
+    else if (r.reason === 'bad') toast('没认出来这个词');
     return true;
   }
   /* 已收藏的词在原文里标虚线,一眼看出哪些收过 */
