@@ -24,6 +24,59 @@
 
   const srcLine = s => V.sourceText(s);
 
+  /* ── 联想候选:全卷真题词表 + 自己收藏的词 + 备注/例句里的词 ──
+     相关度 = 完全匹配 > 前缀 > 包含;再叠加是否收藏、真题词频、越短越靠前。 */
+  const WORDS = window.E2WORDS || [];
+  function extras() {
+    const out = [];
+    V.all().forEach(it => {
+      out.push({ v: it.word, tag: '已收藏' });
+      String(it.note || '').split(/[\s,，;；。、()（）]+/).forEach(w => {
+        if (w && w.length <= 24 && /^[\p{L}\p{N}'’\-]+$/u.test(w)) out.push({ v: w, tag: '备注' });
+      });
+      (String(it.sentence || '').match(/[A-Za-z][A-Za-z'’\-]{2,}/g) || [])
+        .forEach(w => out.push({ v: w, tag: '例句' }));
+    });
+    return out;
+  }
+  function suggest(term) {
+    const q = String(term || '').toLowerCase();
+    if (!q) return [];
+    const cap = /^[A-Z]/.test(String(term));
+    const map = new Map();
+    const add = (v, score, meta) => {
+      const k = String(v || '').toLowerCase();
+      if (!k || k === q || score <= 0) return;      // 与输入完全相同不必补全
+      const old = map.get(k);
+      if (!old || old.score < score) map.set(k, { v: k, score, meta });
+    };
+    extras().forEach(({ v, tag }) => {
+      const l = v.toLowerCase();
+      let sc = l === q ? 360 : l.startsWith(q) ? 230 + (tag === '已收藏' ? 80 : 0)
+        : l.includes(q) ? 60 : 0;
+      if (!sc) return;
+      add(v, sc - (l.length - q.length) * 1.5 + (tag === '已收藏' ? 20 : 0), tag);
+    });
+    for (let i = 0; i < WORDS.length; i++) {
+      const w = WORDS[i][0], n = WORDS[i][1];
+      if (w[0] !== q[0]) continue;
+      if (w === q) continue;
+      let sc;
+      if (w.startsWith(q)) sc = 200 + Math.min(70, Math.log2(n + 1) * 8) - (w.length - q.length) * 2;
+      else if (q.length >= 2 && w.includes(q)) sc = 40 + Math.min(30, Math.log2(n + 1) * 4) - (w.length - q.length);
+      else continue;
+      add(w, sc + (cap ? 6 : 0), '真题 ' + n + ' 次');
+    }
+    return Array.from(map.values())
+      .map(x => ({ v: x.v, score: Math.round(x.score), meta: x.meta }));
+  }
+  function bindAC(el, minChars, max) {
+    if (window.E2AC && el) window.E2AC.attach(el, { source: suggest, minChars, max });
+  }
+  bindAC(qEl, 1, 8);
+  bindAC($('#vbW'), 1, 8);
+  bindAC($('#vbS'), 2, 6);
+
   function rowHTML(it) {
     const src = srcLine(it.source);
     const href = V.sourceHref(it.source);
@@ -91,6 +144,7 @@
       if (!ta.hidden) { ta.blur(); return; }
       ta.value = V.all().find(x => x.id === id)?.note || '';
       ta.hidden = false; nt.hidden = true;
+      bindAC(ta, 2, 6);
       ta.focus();
       const save = () => {
         V.update(id, { note: ta.value.trim() });
