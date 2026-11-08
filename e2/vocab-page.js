@@ -103,7 +103,7 @@
         <div class="vb-main">
           <div class="vb-top">
             <button class="vb-wd" type="button" data-act="flip"
-              title="点一下显示中文释义与例句">${esc(it.word)}<i class="vb-hint">释义 ⌄</i></button>
+              title="点一下显示中文释义与例句">${esc(it.word)}<i class="vb-hint">⌄</i></button>
             ${srcTag}<i class="vb-date">${when}</i>
           </div>
           <div class="vb-detail" hidden>
@@ -112,10 +112,10 @@
             <input class="vb-gloss-edit" type="text" hidden placeholder="中文释义，如 adj. 社交的">
             ${eg}${cn}
             <button class="vb-cn-b" type="button" data-act="sentcn">${it.sentenceCn ? '改例句译文' : '＋ 补例句译文'}</button>
-            <textarea class="vb-cn-edit" rows="2" hidden placeholder="例句的中文翻译（可留空）"></textarea>
+            <textarea class="vb-cn-edit" rows="2" hidden placeholder="例句中文译文（选填）"></textarea>
           </div>
           <p class="vb-note"${it.note ? '' : ' hidden'}>${esc(it.note || '')}</p>
-          <textarea class="vb-note-edit" rows="2" hidden placeholder="写点备注，例如近义、易混、真题里的用法"></textarea>
+          <textarea class="vb-note-edit" rows="2" hidden placeholder="备注：近义、易混、真题用法"></textarea>
           <div class="vb-act">
             <button type="button" data-act="note">${it.note ? '改备注' : '加备注'}</button>
             <button type="button" data-act="del" class="danger">删除</button>

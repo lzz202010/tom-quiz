@@ -151,12 +151,12 @@ a{color:inherit;text-decoration:none}
    变成一页「只有一行」的空白页。页码改到页眉右侧。 */
 
 /* ───── 输入框联想补全浮层(fixed,不改父容器布局) ───── */
-.ac-pop{position:fixed;z-index:70;max-height:min(280px,46vh);overflow-y:auto;
+.ac-pop{position:fixed;z-index:70;max-height:min(236px,40vh);overflow-y:auto;
   background:var(--panel);border:1px solid var(--line);border-radius:8px;
   box-shadow:0 10px 28px #00000016;
   font:13px/1.45 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
 .ac-pop[hidden]{display:none}
-.ac-item{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;
+.ac-item{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;
   white-space:nowrap;color:var(--ink)}
 .ac-item.on,.ac-item:hover{background:#a8322a0e}
 .ac-item .ac-v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -187,82 +187,107 @@ a{color:inherit;text-decoration:none}
 .pv-pages .w-saved{border-bottom:1px dashed #a8322a99;cursor:pointer}
 .pv-pages .w-saved:hover{background:#a8322a10}
 
-/* ───── 生词本页面 ───── */
+/* ───── 生词本页面(紧凑版,手机优先) ───── */
 .vb-body{background:var(--bg)}
-.vb{max-width:760px;margin:0 auto;padding:26px 18px 80px}
-.vb-hd{display:flex;align-items:baseline;gap:12px;margin-bottom:18px}
-.vb-hd h1{margin:0;font:600 26px/1.2 Georgia,serif;letter-spacing:-.01em}
-.vb-back{font-size:12.5px;color:var(--mute);border:1px solid var(--line);
-  background:#fff;border-radius:7px;padding:5px 10px;order:-1}
-.vb-n{margin-left:auto;color:var(--mute);font-size:12.5px}
-.vb-bar{display:flex;gap:10px;margin-bottom:10px}
-.vb-q{flex:1;min-width:0;border:1px solid var(--line);background:#fff;border-radius:8px;
-  padding:9px 12px;font-size:13px;outline:none}
-.vb-q:focus{border-color:#c9c5bc}
-.vb-sort{border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 10px;
-  font-size:12.5px;color:var(--ink)}
-.vb-add{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
-.vb-w{flex:0 0 180px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 12px;font-size:13px}
-.vb-s{flex:1;min-width:160px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 12px;font-size:13px}
-.vb-addb{border:0;background:var(--ink);color:#fff;border-radius:8px;padding:0 18px;
-  font-size:13px;font-weight:600;cursor:pointer}
+.vb{max-width:680px;margin:0 auto;padding:14px 12px 40px}
+
+/* 头部:返回做成纯文字,标题与计数同一行 */
+.vb-hd{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.vb-hd h1{margin:0;font:600 19px/1.2 Georgia,serif;letter-spacing:-.01em}
+.vb-back{font-size:12px;color:var(--mute);border:0;background:none;order:-1;
+  padding:6px 8px;margin-left:-8px;border-radius:4px;white-space:nowrap}
+.vb-back:hover{color:var(--red)}
+.vb-n{margin-left:auto;color:var(--mute);font-size:11px;white-space:nowrap}
+
+/* 搜索 + 排序:一行,控件高度统一 */
+.vb-bar{display:flex;gap:6px;margin-bottom:6px}
+.vb-q,.vb-sort{height:32px;border:1px solid var(--line);background:#fff;border-radius:5px;
+  font-size:12.5px;outline:none}
+.vb-q{flex:1;min-width:0;padding:0 10px}
+.vb-q:focus,.vb-w:focus,.vb-s:focus{border-color:#c6c2b9}
+.vb-sort{flex:0 0 auto;padding:0 5px;color:var(--mute)}
+
+/* 手动添加:桌面/手机都压成一行 */
+.vb-add{display:flex;gap:6px;margin-bottom:12px;flex-wrap:nowrap}
+.vb-w,.vb-s{height:32px;min-width:0;border:1px solid var(--line);background:#fff;
+  border-radius:5px;padding:0 9px;font-size:12.5px}
+.vb-w{flex:0 0 132px}
+.vb-s{flex:1}
+.vb-addb{flex:0 0 auto;border:0;background:var(--ink);color:#fff;border-radius:5px;
+  padding:0 12px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
 .vb-addb:active{transform:scale(.97)}
 
-.vb-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
-.vb-item{position:relative;border-bottom:1px solid var(--line);overflow:hidden;background:var(--bg)}
+/* 列表:细分隔线,不要卡片、不要额外底色 */
+.vb-list{list-style:none;margin:0;padding:0;border-top:1px solid #e7e4dd}
+.vb-item{position:relative;border-bottom:1px solid #e7e4dd;overflow:hidden;background:var(--bg)}
 .vb-row{position:relative;display:flex;background:var(--bg);will-change:transform}
-.vb-main{flex:1;min-width:0;padding:14px 2px 12px}
-.vb-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.vb-wd{font:600 17px/1.3 Georgia,"Times New Roman",serif;letter-spacing:.01em}
+.vb-main{flex:1;min-width:0;padding:8px 1px 7px}
+.vb-top{display:flex;align-items:baseline;gap:6px;flex-wrap:nowrap;min-width:0}
+.vb-wd{font:600 16px/1.3 Georgia,"Times New Roman",serif;letter-spacing:.01em}
 button.vb-wd{border:0;background:none;padding:0;color:var(--ink);cursor:pointer;
-  display:inline-flex;align-items:baseline;gap:8px}
-button.vb-wd:hover{color:var(--red)}
-.vb-hint{font:400 10px/1 -apple-system,"PingFang SC",sans-serif;color:#b3b0a8;
+  display:inline-flex;align-items:baseline;gap:5px;flex:0 0 auto}
+button.vb-wd:active{opacity:.55}
+.vb-hint{font:400 11px/1 -apple-system,"PingFang SC",sans-serif;color:#b8b5ad;
   font-style:normal;letter-spacing:0;white-space:nowrap}
 .vb-item.open .vb-hint{color:var(--red)}
-.vb-detail{margin:8px 0 2px;padding:9px 11px;border:1px solid #e7e3dc;border-radius:8px;
-  background:#fcfbf9}
+.vb-src{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:10.5px;color:var(--mute);text-decoration:none;border-bottom:1px dotted #cbc7bf}
+.vb-src:hover{color:var(--red);border-bottom-color:var(--red)}
+.vb-date{flex:0 0 auto;margin-left:auto;font-style:normal;font-size:10px;color:#b8b5ad}
+
+/* 展开区:去掉卡片框,只用一根浅竖线分层 */
+.vb-detail{margin:5px 0 2px;padding:1px 0 2px 9px;border-left:2px solid #e2ded6;background:none}
 .vb-detail[hidden]{display:none}
-.vb-gloss{display:flex;align-items:baseline;gap:10px;font:600 13.5px/1.6 -apple-system,"PingFang SC",sans-serif;
+.vb-gloss{display:flex;align-items:baseline;gap:8px;font:600 13px/1.5 -apple-system,"PingFang SC",sans-serif;
   color:var(--red)}
 .vb-gloss.empty{color:var(--mute);font-weight:400}
 .vb-gloss span{flex:1}
 .vb-gloss button,.vb-cn-b{border:0;background:none;padding:0;color:var(--mute);
-  font-size:11px;cursor:pointer;white-space:nowrap}
+  font-size:10.5px;cursor:pointer;white-space:nowrap}
 .vb-gloss button:hover,.vb-cn-b:hover{color:var(--red)}
-.vb-gloss-edit{display:block;width:100%;margin:6px 0;border:1px solid var(--line);
-  border-radius:6px;padding:6px 9px;font:13px/1.5 inherit;background:#fff}
+.vb-gloss-edit,.vb-cn-edit{display:block;width:100%;margin:4px 0;border:1px solid var(--line);
+  border-radius:4px;padding:5px 8px;background:#fff;resize:vertical}
+.vb-gloss-edit{font:12.5px/1.5 inherit}
+.vb-cn-edit{font:12px/1.5 inherit}
 .vb-gloss-edit[hidden],.vb-cn-edit[hidden]{display:none}
-.vb-cn-edit{display:block;width:100%;margin:6px 0;border:1px solid var(--line);
-  border-radius:6px;padding:6px 9px;font:12.5px/1.6 inherit;background:#fff;resize:vertical}
-.vb-cn-b{margin:4px 0 0;font-size:10.5px;color:#b3b0a8}
-.vb-eg-cn{margin:5px 0 0;font:12.5px/1.65 -apple-system,"PingFang SC",sans-serif;color:#6a6862}
-.vb-src{font-size:11.5px;color:var(--red);text-decoration:none}
-.vb-src:hover{text-decoration:underline}
-.vb-date{margin-left:auto;font-style:normal;font-size:11px;color:#b3b0a8}
-.vb-eg{margin:6px 0 0;font:12.5px/1.65 Georgia,"Songti SC",serif;color:#3c3a36}
+.vb-cn-b{margin:3px 0 0;color:#b8b5ad}
+.vb-eg{margin:3px 0 0;font:12.5px/1.5 Georgia,"Songti SC",serif;color:#45433f}
 .vb-eg.empty{color:#b3b0a8;font-style:italic}
-.vb-eg.dup{color:var(--mute);font:italic 12px/1.6 -apple-system,"PingFang SC",sans-serif}
+.vb-eg.dup{color:var(--mute);font:italic 11.5px/1.5 -apple-system,"PingFang SC",sans-serif}
 .vb-eg.dup b{color:var(--red);font-weight:600;font-style:normal}
-.vb-note{margin:8px 0 0;padding:7px 10px;border-left:2px solid var(--line);
-  background:#fff;font-size:12.5px;line-height:1.6;color:#4a4844;white-space:pre-wrap}
-.vb-note-edit{display:block;width:100%;margin-top:8px;border:1px solid var(--line);
-  border-radius:7px;padding:8px 10px;font:12.5px/1.6 inherit;background:#fff;resize:vertical}
+.vb-eg-cn{margin:3px 0 0;font:12px/1.5 -apple-system,"PingFang SC",sans-serif;color:#6a6862}
+.vb-note{margin:4px 0 0;padding:0;background:none;border:0;
+  font-size:12px;line-height:1.5;color:#6a6862;white-space:pre-wrap}
+.vb-note::before{content:"备注 · ";color:#a8a49c;font-size:11px}
+.vb-note-edit{display:block;width:100%;margin-top:5px;border:1px solid var(--line);
+  border-radius:4px;padding:6px 8px;font:12px/1.5 inherit;background:#fff;resize:vertical}
 .vb-note-edit[hidden]{display:none}
-.vb-act{display:flex;gap:14px;margin-top:9px}
-.vb-act button{border:0;background:none;padding:0;font-size:11.5px;color:var(--mute);cursor:pointer}
+.vb-act{display:flex;gap:12px;margin-top:5px}
+.vb-act button{border:0;background:none;padding:0;font-size:11px;color:#9c9991;cursor:pointer}
 .vb-act button:hover{color:var(--ink)}
 .vb-act .danger:hover{color:var(--red)}
 .vb-swipe-del{flex:0 0 96px;margin-right:-96px;border:0;background:var(--red);color:#fff;
   font-size:13px;font-weight:600;cursor:pointer}
-.vb-empty{color:var(--mute);font-size:12.5px;line-height:1.9;text-align:center;padding:40px 10px}
+.vb-empty{color:var(--mute);font-size:12px;line-height:1.7;text-align:center;padding:26px 10px}
 .vb-empty[hidden]{display:none}
 
+/* 触屏没有 hover:别让点过的单词一直泛红,减少视觉噪音 */
+@media(hover:none){
+  .vb-src:hover{color:var(--mute);border-bottom-color:#cbc7bf}
+}
+
 @media(max-width:600px){
-  .vb{padding:20px 14px 70px}
-  .vb-hd h1{font-size:22px}
-  .vb-w{flex:1 1 100%}
-  .vb-addb{padding:10px 16px}
+  .vb{padding:10px 11px 32px}
+  .vb-hd{gap:7px;margin-bottom:8px}
+  .vb-hd h1{font-size:17px}
+  .vb-back{font-size:11.5px;padding:6px 6px;margin-left:-6px}
+  .vb-w{flex:0 0 88px}
+  .vb-addb{padding:0 10px}
+  .vb-main{padding:7px 0 6px}
+  .vb-wd{font-size:15.5px}
+  .vb-src{font-size:10px}
+  .vb-top{gap:5px}
+  .vb-act{margin-top:4px}
 }
 
 /* 打印根:平时藏在屏幕外,排版/等图都在这儿完成 */
