@@ -228,6 +228,161 @@
     });
   };
 
+  /* ───── 生词收藏:点词即收,不打断做题 ───── */
+  const V = window.E2V;
+  let toastEl = null, toastTimer = 0;
+  function toast(msg) {
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.className = 'toast';
+      document.body.appendChild(toastEl);
+    }
+    toastEl.innerHTML = `<span></span>`;
+    toastEl.firstChild.textContent = msg;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; }, 1900);
+  }
+
+  function caretAt(x, y) {
+    if (document.caretRangeFromPoint) {
+      const r = document.caretRangeFromPoint(x, y);
+      if (r && r.startContainer && r.startContainer.nodeType === 3) return r;
+    }
+    if (document.caretPositionFromPoint) {
+      const p = document.caretPositionFromPoint(x, y);
+      if (p && p.offsetNode && p.offsetNode.nodeType === 3)
+        return { startContainer: p.offsetNode, startOffset: p.offset };
+    }
+    return null;
+  }
+  function wordAt(node, off) {
+    const t = node.nodeValue || '';
+    const re = /[A-Za-z][A-Za-z’'-]*/g;
+    let m;
+    while ((m = re.exec(t))) {
+      const a = m.index, b = a + m[0].length;
+      if (off >= a && off <= b) {
+        const w = m[0].replace(/^[-’']+|[-’']+$/g, '');
+        return w.length > 1 ? { word: w, start: a, end: b } : null;
+      }
+      if (a > off) break;
+    }
+    return null;
+  }
+  /* 文本节点内偏移 → 整个块内的偏移 */
+  function offsetIn(block, node, off) {
+    const w = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+    let n, pos = 0;
+    while ((n = w.nextNode())) {
+      if (n === node) return pos + off;
+      pos += n.nodeValue.length;
+    }
+    return pos + off;
+  }
+  /* 截取包含该词的句子:到上一个 .!? 之后、到下一个 .!? 之前 */
+  function sentenceAround(text, at) {
+    const isEnd = c => c === '.' || c === '!' || c === '?';
+    let s = at;
+    while (s > 0) {
+      if (isEnd(text[s - 1]) && /\s/.test(text[s] || ' ')) break;
+      s--;
+    }
+    let e = at;
+    while (e < text.length) {
+      if (isEnd(text[e])) {
+        let k = e + 1;
+        while (k < text.length && /["”’')]/.test(text[k])) k++;
+        if (k >= text.length || /\s/.test(text[k])) { e = k; break; }
+        e = k; continue;
+      }
+      e++;
+    }
+    let out = text.slice(s, e).replace(/\s+/g, ' ').trim();
+    if (out.length > 320) {
+      const cut = out.lastIndexOf(',', 300);
+      out = out.slice(0, cut > 120 ? cut + 1 : 300).trim() + ' …';
+    }
+    return out;
+  }
+  function unitOf(id) {
+    const p = paper(S.y);
+    return p ? p.units.find(u => u.id === id) : null;
+  }
+  function pickWord(x, y) {
+    const r = caretAt(x, y);
+    if (!r) return null;
+    const node = r.startContainer;
+    if (!node.parentElement) return null;
+    if (node.parentElement.closest('button,a,img,.pbtn,.qbtn')) return null;
+    const block = node.parentElement.closest('.passage p, .dirbox, .q .st, .pq .st, .pool-g span, .passage p.pseg');
+    if (!block) return null;
+    const w = wordAt(node, r.startOffset);
+    if (!w) return null;
+    const at = offsetIn(block, node, w.start);
+    return { word: w.word, block, at };
+  }
+  function collectFrom(x, y) {
+    if (!V) return false;
+    const hit = pickWord(x, y);
+    if (!hit) return false;
+    const page = hit.block.closest('.page');
+    const unitId = page ? page.dataset.unit : '';
+    const u = unitOf(unitId);
+    const qEl = hit.block.closest('.q, .pq');
+    const qn = qEl && qEl.querySelector('.no') ? parseInt(qEl.querySelector('.no').textContent, 10) : null;
+    const sentence = sentenceAround(hit.block.textContent, hit.at);
+    const src = {
+      type: 'paper', year: S.y, section: u ? u.sec : '',
+      label: u ? (u.label || '') : '', unitId: unitId || undefined,
+      qn: qn || undefined
+    };
+    const r = V.add({ word: hit.word, sentence, source: src });
+    if (r.ok) { toast(`已收藏 ${r.item.word}`); markSaved($('#pvpages')); syncVbCount(); }
+    else if (r.reason === 'dup') toast(`${r.item.word} 已在生词本`);
+    else toast('没认出来这个词');
+    return true;
+  }
+  /* 已收藏的词在原文里标虚线,一眼看出哪些收过 */
+  function markSaved(root) {
+    if (!V || !root) return;
+    const keys = new Set(V.all().map(x => x.key));
+    if (!keys.size) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => {
+        if (n.parentElement && n.parentElement.closest('.w-saved')) return NodeFilter.FILTER_REJECT;
+        return /[A-Za-z]/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    const nodes = [];
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(node => {
+      const txt = node.nodeValue, re = /[A-Za-z][A-Za-z’'-]*/g;
+      let last = 0, html = '', hit = false, m;
+      while ((m = re.exec(txt))) {
+        const k = V.norm(m[0]);
+        if (!keys.has(k)) continue;
+        hit = true;
+        html += esc(txt.slice(last, m.index)) +
+          `<span class="w-saved" data-w="${esc(k)}">${esc(m[0])}</span>`;
+        last = m.index + m[0].length;
+      }
+      if (!hit) return;
+      html += esc(txt.slice(last));
+      const wrap = document.createElement('span');
+      wrap.innerHTML = html;
+      node.parentNode.replaceChild(wrap, node);
+    });
+  }
+  function syncVbCount() {
+    const n = V ? V.count() : 0;
+    ['#vbCount', '#vbCount2'].forEach(sel => {
+      const el = $(sel);
+      if (el) el.textContent = n ? String(n) : '';
+    });
+  }
+
   let token = 0;
   function draw() {
     const my = ++token, box = $('#pvpages'), p = paper(S.y), units = p ? p.units : [];
@@ -242,9 +397,12 @@
       if (my !== token) return;
       $$('.page', box).forEach(fit);
       fitScreen();
+      markSaved(box);                          // 已收藏的词标出来,不改排版尺寸
+      syncVbCount();
       $('#pvn').textContent = `${S.y} · ${units.length} 页 A4 · 点题号可单题打印`;
       window.__E2_PAGES__ = units.length;
       window.__READY__ = true;
+      jumpToUnit();
     });
   }
   function openPV(y) {
@@ -255,7 +413,7 @@
     $('#pv').hidden = false;
     document.body.style.overflow = 'hidden';
     $('#pvpages').scrollIntoView({ block: 'start' });
-    history.replaceState(null, '', `?y=${S.y}`);
+    history.replaceState(null, '', `?y=${S.y}${wantUnit ? '&u=' + encodeURIComponent(wantUnit) : ''}`);
     draw();
   }
   function closePV() {
@@ -279,8 +437,39 @@
       return;
     }
     const pb = e.target.closest('[data-print-page]');
-    if (pb) printUnits([p.units[+pb.dataset.printPage]]);
+    if (pb) { printUnits([p.units[+pb.dataset.printPage]]); return; }
+    if (suppressWordClick) { suppressWordClick = false; return; }
+    collectFrom(e.clientX, e.clientY);         // 点单词 → 收藏
   });
+
+  /* 移动端长按也能收,免得手指点不准 */
+  let pressT = 0, suppressWordClick = false;
+  $('#pvpages').addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    clearTimeout(pressT);
+    pressT = setTimeout(() => {
+      if (collectFrom(t.clientX, t.clientY)) {
+        suppressWordClick = true;
+        if (navigator.vibrate) navigator.vibrate(10);
+      }
+    }, 480);
+  }, { passive: true });
+  ['touchend', 'touchmove', 'touchcancel'].forEach(ev =>
+    $('#pvpages').addEventListener(ev, () => clearTimeout(pressT), { passive: true }));
+
+  /* 从生词本跳回原题:?y=2024&u=2024-r3 */
+  let wantUnit = null;
+  function jumpToUnit() {
+    if (!wantUnit) return;
+    const id = wantUnit;
+    wantUnit = null;
+    const el = document.querySelector(`#pvpages .page[data-unit="${CSS.escape(id)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start' });
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 1400);
+  }
   /* 直接按 Cmd/Ctrl+P 时,把当前整套塞进打印根,避免印出空白 */
   window.addEventListener('beforeprint', () => {
     if (printing) return;
@@ -297,6 +486,8 @@
 
   const q = new URLSearchParams(location.search);
   if (q.has('y') && D.years.includes(+q.get('y'))) S.y = +q.get('y');
+  if (q.get('u')) wantUnit = q.get('u');
   drawYears();
+  syncVbCount();
   if (q.has('y') || q.get('print') === '1') openPV(S.y);
 })();

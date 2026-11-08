@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f6f3">
+<title>生词本 · e2</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="vb-body">
+<div id="vb" class="vb">
+  <header class="vb-hd">
+    <a class="vb-back" href="index.html">← 做题</a>
+    <h1>生词本</h1>
+    <span class="vb-n" id="vbCount">0 个词</span>
+  </header>
+
+  <div class="vb-bar">
+    <input id="vbQ" class="vb-q" type="search" placeholder="搜索单词、例句或备注" autocomplete="off">
+    <select id="vbSort" class="vb-sort" aria-label="排序">
+      <option value="new">最新收藏</option>
+      <option value="old">最早收藏</option>
+      <option value="az">字母顺序</option>
+    </select>
+  </div>
+
+  <form class="vb-add" id="vbAdd" autocomplete="off">
+    <input id="vbW" class="vb-w" type="text" placeholder="手动添加单词" spellcheck="false" required>
+    <input id="vbS" class="vb-s" type="text" placeholder="例句（可留空）">
+    <button class="vb-addb" type="submit">添加</button>
+  </form>
+
+  <ul class="vb-list" id="vbList"></ul>
+  <p class="vb-empty" id="vbEmpty" hidden></p>
+</div>
+<div id="vbToast" class="toast" hidden></div>
+<script src="vocab.js"></script>
+<script src="vocab-page.js"></script>
+</body>
+</html>
