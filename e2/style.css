@@ -22,6 +22,14 @@ a{color:inherit;text-decoration:none}
 .yr:active{transform:scale(.985)}
 .yr b{font:600 20px/1.2 Georgia,serif;letter-spacing:-.01em}
 .yr i{font-style:normal;color:var(--mute);font-size:11.5px}
+.yr .ymeta{display:flex;align-items:center;gap:6px;margin-top:3px}
+.yr .yd{font-size:10.5px;color:var(--mute)}
+/* 难度徽标(首页与纸面标题条共用) */
+.lv{border:1px solid var(--line);background:#fff;border-radius:20px;
+  padding:0 8px;font-size:10.5px;line-height:1.6;color:#8b8880}
+.lv1,.lv2{color:#8b8880}
+.lv3{color:#5d5a54;border-color:#cbc7bf}
+.lv4,.lv5{color:var(--red);border-color:#e6c3bf}
 .tip{color:var(--mute);font-size:11.5px;text-align:center;margin:34px 0 0;line-height:1.8}
 /* 首页右上角的生词本入口 */
 .hd{position:relative}
@@ -52,40 +60,102 @@ a{color:inherit;text-decoration:none}
 .go{border:0;background:var(--ink);color:#fff;border-radius:7px;
   padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
 .go:active{transform:scale(.97)}
+/* 答案校对开关 */
+.tg{border:1px solid var(--line);background:#fff;color:var(--mute);border-radius:7px;
+  padding:6px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.tg:hover{border-color:var(--red);color:var(--red)}
+.tg.on{background:var(--red);border-color:var(--red);color:#fff}
+.tg.on:hover{color:#fff}
 .pv-scroll{flex:1;overflow:auto;padding:20px 12px 60px}
 .pv-pages{width:794px;margin:0 auto;transform-origin:top center}
 .doc-empty{text-align:center;color:#888;padding-top:280px}
 
+/* ───── 阅读模式:手机上单栏重排,不把 A4 缩成 52% ───── */
+.rv{flex:1;overflow:auto;padding:14px 14px 60px;-webkit-overflow-scrolling:touch}
+.rv[hidden]{display:none}
+.rv-head{display:flex;align-items:center;gap:10px;max-width:680px;margin:0 auto 14px}
+.rv-nav{border:1px solid var(--line);background:#fff;border-radius:8px;width:34px;height:32px;
+  font-size:19px;line-height:1;color:var(--ink);cursor:pointer;flex:0 0 auto}
+.rv-nav:active{background:#f0eee9}
+.rv-nav.off{opacity:.25;pointer-events:none}
+.rv-t{flex:1;min-width:0;display:flex;align-items:baseline;gap:9px;justify-content:center}
+.rv-t b{font-weight:600;font-size:14px;color:var(--ink)}
+.rv-t .pm{font-size:11px;color:var(--mute)}
+.rv-t .pm.ok{color:var(--ink);font-weight:600}
+.rv-body{max-width:680px;margin:0 auto;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:16px 15px 22px}
+.rv-body .sect{margin:14px 0 8px}
+.rv-body .sect:first-child{margin-top:0}
+.rv-body .passage p{font:16px/1.85 Georgia,"Times New Roman","Songti SC",serif;
+  margin:0 0 .95em;text-align:justify}
+.rv-body .passage .gap{border-bottom:1px solid #444;color:#111;padding:0 .25em}
+.rv-body .dirbox{font:13.5px/1.75 Georgia,"Songti SC",serif;margin:0 0 12px}
+.rv-body .pool{margin:0 0 14px}
+.rv-body .pool-g{font-size:13px;line-height:1.7}
+.rv-body .q{margin:0 0 14px}
+.rv-body .q .st{font-size:15px;line-height:1.7}
+.rv-body .rv-stem{display:flex;align-items:baseline;gap:.45em;margin-bottom:.3em}
+.rv-body .rv-stem .no{font:700 13px/1.5 -apple-system,Helvetica,sans-serif;color:var(--red);flex:0 0 auto}
+.rv-body .rv-stem .st{flex:1;font-weight:600}
+.rv-body .opts{grid-template-columns:1fr;row-gap:.3em;margin:.2em 0 0;
+  font-size:14.5px;line-height:1.6}
+.rv-body .opts.o4{grid-template-columns:repeat(4,1fr);column-gap:.5em;font-size:13.5px}
+.rv-body .opts.o4 .o{display:block}
+.rv-body .opts.o4 .o > b{display:inline;min-width:0;margin-right:.25em}
+.rv-body .opts.o4 .mk{display:block}
+.rv-body .opts .o{display:flex;align-items:baseline;gap:.4em;padding:.12em 0}
+.rv-body .opts .o > b{flex:0 0 auto;min-width:1.6em;margin-left:0;padding:.15em .4em .15em 0}
+.rv-body .ck{margin-top:.5em;padding-left:.6em}
+.rv-body .ck-w{gap:.1em .9em}
+
+/* 单元标题条(纸面之外):难度 + 自己的正确率 */
+.pcap{display:flex;align-items:baseline;gap:9px;max-width:794px;margin:0 auto 7px;
+  padding:0 2px;font:12px/1.4 -apple-system,"PingFang SC",sans-serif;color:var(--mute)}
+.pcap:first-child{margin-top:0}
+.pcap b{font-weight:600;color:var(--ink);font-size:12.5px}
+.pcap .lv{cursor:pointer}
+.pcap .lv:hover{border-color:var(--red);color:var(--red)}
+.pcap .pm{margin-left:auto;font-size:11px;color:var(--mute)}
+.pcap .pm.ok{color:var(--ink);font-weight:600}
+
 /* ───── A4 纸面:尺寸写死,屏幕与打印一致 ───── */
 /* @page 放全局:Safari 对嵌套在 @media print 里的 @page 支持不稳 */
 @page{size:A4;margin:0}
-/* 297mm 是纸高;纸面留 1mm 余量,避免浏览器舍入后把最后一行挤到下一张 */
-.page{position:relative;width:210mm;height:296mm;background:#fff;color:#141414;
-  margin:0 auto 18px;padding:11mm 13mm 10mm;overflow:hidden;
+/* --u = 一个「设计毫米」在当前渲染里的长度。
+   屏幕:1mm = 96/25.4 px,和写死 mm/px 完全等价。
+   打印:改成「按可打印区等比缩放」,见 @media print。
+   所有纸面内部尺寸都写成 calc(值 * var(--u)) / calc(值 * var(--upx)),
+   这样整张纸(含 fit() 二分出来的字号)会一起缩放,排版比例不变。 */
+:root{--upx:1px;--u:calc(var(--upx) * 3.779527)}
+/* --upx = 1 个「设计像素」;--u = 1 个「设计毫米」= 3.7795 设计像素。
+   纸面内部所有绝对尺寸都写成 calc(设计值 * var(--upx)) / calc(设计值 * var(--u)),
+   于是整张纸(含 fit() 二分出来的字号)是一个等比整体:
+   屏幕 --upx=1px → 与写死 px/mm 逐像素相同;
+   打印 --upx 随可打印区缩小 → 纸面永不超出可打印高度,末尾不会被挤出一张空白页。 */
+/* 297mm 是纸高;纸面留 13mm 安全余量,浏览器默认边距/页眉页脚也不易挤到下一张 */
+.page{position:relative;width:calc(210 * var(--u));height:calc(284 * var(--u));
+  background:#fff;color:#141414;
+  margin:0 auto 18px;padding:calc(11 * var(--u)) calc(13 * var(--u)) calc(10 * var(--u));
+  overflow:hidden;
   display:flex;flex-direction:column;
   font-family:Georgia,"Times New Roman","Songti SC",serif;
   box-shadow:0 2px 14px #0002}
 
-.ph{display:flex;align-items:baseline;flex:0 0 auto;gap:9px;
-  border-bottom:1.2px solid #2a2a28;padding-bottom:1.8mm;margin-bottom:4mm;
-  font:10.5px/1.3 -apple-system,"PingFang SC",sans-serif;color:#6a6862}
-.ph .brand{font:700 15px/1 Georgia,serif;color:var(--red);letter-spacing:.05em}
-.ph .meta{margin-left:auto}
-.ph .pn{font:600 10.5px/1.3 -apple-system,"PingFang SC",sans-serif;color:#b3b0a8;
-  letter-spacing:.02em;padding-left:8px;border-left:1px solid #dcd9d2}
-
-.ttl{display:flex;align-items:baseline;gap:10px;flex:0 0 auto;margin-bottom:3.5mm}
-.ttl h1{margin:0;font:600 18px/1.25 "Songti SC","Noto Serif SC",Georgia,serif;letter-spacing:.02em}
-.ttl h1 small{font:400 11.5px/1 -apple-system,sans-serif;color:#8a8780;margin-left:8px;letter-spacing:0}
-.ttl .sub{margin-left:auto;font:11px/1.3 -apple-system,"PingFang SC",sans-serif;color:#8a8780;white-space:nowrap}
+.ttl{display:flex;align-items:baseline;gap:calc(10 * var(--upx));flex:0 0 auto;
+  margin-bottom:calc(3 * var(--u))}
+.ttl h1{margin:0;font:600 calc(18 * var(--upx))/1.25 "Songti SC","Noto Serif SC",Georgia,serif;letter-spacing:.02em}
+.ttl h1 small{font:400 calc(11.5 * var(--upx))/1 -apple-system,sans-serif;color:#8a8780;
+  margin-left:calc(8 * var(--upx));letter-spacing:0}
+.ttl .sub{margin-left:auto;font:calc(11 * var(--upx))/1.3 -apple-system,"PingFang SC",sans-serif;
+  color:#8a8780;white-space:nowrap}
 
 .slot{flex:1;min-height:0;display:flex;flex-direction:column}
-.content{flex:0 0 auto;font-size:13px;line-height:1.55}
-.sect{display:flex;align-items:center;gap:8px;margin:0 0 2mm;
-  font:600 10px/1.4 -apple-system,"PingFang SC",sans-serif;letter-spacing:.14em;color:var(--red)}
+.content{flex:0 0 auto;font-size:calc(13 * var(--upx));line-height:1.55}
+.sect{display:flex;align-items:center;gap:calc(8 * var(--upx));margin:0 0 calc(2 * var(--u));
+  font:600 calc(10 * var(--upx))/1.4 -apple-system,"PingFang SC",sans-serif;letter-spacing:.14em;color:var(--red)}
 .sect::after{content:"";flex:1;border-top:1px solid #e4e1da}
 .sect span{font-weight:400;color:#aaa;letter-spacing:.16em}
-.sect.q{margin-top:4mm}
+.sect.q{margin-top:calc(4 * var(--u))}
 
 .passage p{margin:0 0 .62em;text-align:justify;hyphens:auto;line-height:1.55}
 .passage p:last-child{margin-bottom:0}
@@ -94,17 +164,19 @@ a{color:inherit;text-decoration:none}
 .passage p.pseg em{font:700 .92em/1 -apple-system,sans-serif;font-style:normal;color:var(--red);
   display:inline-block;width:4.2em;text-indent:0}
 
-.dirbox{font:12px/1.62 Georgia,"Songti SC",serif;color:#222;
-  border-left:2px solid var(--red);padding:1mm 0 1mm 3.5mm;margin:0 0 3.4mm}
-.fig{margin:3mm 0 0;text-align:center}
-.fig img{max-width:88%;max-height:84mm;object-fit:contain}
-.hint{font:11px/1.5 -apple-system,"PingFang SC",sans-serif;color:#8a8780;margin:3mm 0 0}
+.dirbox{font:calc(12 * var(--upx))/1.62 Georgia,"Songti SC",serif;color:#222;
+  border-left:calc(2 * var(--upx)) solid var(--red);
+  padding:calc(1 * var(--u)) 0 calc(1 * var(--u)) calc(3.5 * var(--u));margin:0 0 calc(3.4 * var(--u))}
+.fig{margin:calc(3 * var(--u)) 0 0;text-align:center}
+.fig img{max-width:88%;max-height:calc(84 * var(--u));object-fit:contain}
+.hint{font:calc(11 * var(--upx))/1.5 -apple-system,"PingFang SC",sans-serif;color:#8a8780;
+  margin:calc(3 * var(--u)) 0 0}
 
 /* 备选项(A–G):框起来,和正文明显分开 */
-.pool{border:1px solid #c9c5bc;background:#fcfbf9;border-radius:3px;
-  padding:2mm 3mm 2.4mm;margin:0 0 3.4mm}
-.pool-h{font:600 9.5px/1.4 -apple-system,"PingFang SC",sans-serif;
-  letter-spacing:.14em;color:var(--red);margin-bottom:1.4mm}
+.pool{border:calc(1 * var(--upx)) solid #c9c5bc;background:#fcfbf9;border-radius:calc(3 * var(--upx));
+  padding:calc(2 * var(--u)) calc(3 * var(--u)) calc(2.4 * var(--u));margin:0 0 calc(3.4 * var(--u))}
+.pool-h{font:600 calc(9.5 * var(--upx))/1.4 -apple-system,"PingFang SC",sans-serif;
+  letter-spacing:.14em;color:var(--red);margin-bottom:calc(1.4 * var(--u))}
 .pool-h i{font-style:normal;font-weight:400;color:#aaa;letter-spacing:.16em;margin-left:6px}
 .pool-g{display:grid;grid-template-rows:repeat(4,auto);grid-auto-flow:column;
   gap:.14em 2em;font-size:.95em;line-height:1.45}
@@ -129,23 +201,60 @@ a{color:inherit;text-decoration:none}
 .opts span{white-space:normal}
 .opts b{font:600 .94em -apple-system,Helvetica,sans-serif;color:#444;margin-right:.35em}
 .opts.o4{grid-template-columns:repeat(4,1fr);column-gap:.55em;font-size:.88em;margin-left:.35em}
-.qs.cloze .q{display:flex;align-items:baseline;gap:.35em;margin:0 0 .32em}
-.qs.cloze .q .no{flex:0 0 auto;min-width:1.7em}
-.qs.cloze .q .st{display:none}
-.qs.cloze .q .opts{flex:1;margin:0}
+/* 选项字母可点:记下我的作答 */
+.opts .o > b{display:inline-block;min-width:1.5em;margin-left:-.35em;padding:.1em .35em .1em 0;
+  border-radius:3px;cursor:pointer;text-align:left}
+.opts .o > b:hover{background:#a8322a14;color:var(--red)}
+/* 校对模式:正确项打勾,自己的选择标出来 */
+.opts .o.ok > b{color:var(--red)}
+.opts .o.ok .mk{font-style:normal;font-weight:700;color:var(--red);margin-left:.4em}
+.opts .o.mine{background:#a8322a0f;border-radius:3px}
+.opts .o.bad > b{color:#a8a49c;text-decoration:line-through}
+.qs.cloze .q{display:block;margin:0 0 .32em}
+.qs.cloze .crow{display:flex;align-items:baseline;gap:.35em}
+.qs.cloze .crow .no{flex:0 0 auto;min-width:1.7em}
+.qs.cloze .crow .opts{flex:1;margin:0}
+.qs.cloze .crow .dq{flex:0 0 auto}
+
+/* ───── 答案校对(只在屏幕上看,打印时整块隐藏) ───── */
+.ck{display:flex;align-items:baseline;gap:.45em;flex-wrap:wrap;
+  margin:calc(.7 * var(--u)) 0 0 calc(1.5 * var(--u));
+  padding-left:calc(.7 * var(--u));border-left:calc(2 * var(--upx)) solid #e7e1d2;
+  font:calc(10.5 * var(--upx))/1.5 -apple-system,"PingFang SC",sans-serif;color:#5d5a54}
+.ck-l{font-weight:600;color:var(--red);white-space:nowrap;
+  border:1px solid #e3c9c5;border-radius:4px;padding:0 .35em;background:#fdf6f5}
+.ck-k{color:#4a4844}
+.ck-w{display:flex;flex-wrap:wrap;gap:.1em .95em;margin:calc(.2 * var(--u)) 0 0 calc(1.5 * var(--u));
+  font:calc(9.8 * var(--upx))/1.45 -apple-system,"PingFang SC",sans-serif;color:#a19d94}
+.ck-w b{font-weight:600;color:#847f76;margin-right:.25em}
+.cknotes{margin-top:calc(1 * var(--u))}
+.cknotes .ck:first-child{margin-top:0}
+/* 题目难度:五个点 */
+.dq{font-style:normal;font-size:.7em;letter-spacing:.05em;color:#d5d1c9;
+  vertical-align:.2em;margin-left:.15em;white-space:nowrap}
+.dq b{font-weight:400;color:#8a8780}
+/* 原文定位高亮:整句压一道浅色 */
+.sn.hl{background:linear-gradient(transparent 56%,#f7e2a2 56%,#f7e2a2 94%,transparent 94%)}
+.passage p.pseg.hl{background:#fdf6e3;border-radius:3px}
+/* Part B 作答位上的答案字母 */
+.bgrid .ans{font-style:normal;font-weight:700;color:var(--red);font-size:.9em}
+.bgrid .ans.ok{color:var(--red)}
+.pq .pick.mine{color:var(--red);font-weight:700;text-align:center}
 
 /* Part B 小标题型:五个作答位一行 */
-.bgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:2.2mm;margin-top:1mm}
+.bgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:calc(2.2 * var(--u));margin-top:calc(1 * var(--u))}
 .bgrid span{display:flex;align-items:flex-end;gap:.5em;font:700 .95em/1 -apple-system,sans-serif;color:var(--red)}
 .bgrid b{flex:1;height:1.35em;border-bottom:1px solid #555}
 
-.answer{margin-top:auto;flex:0 0 auto;border-top:1px solid #a9a69e;padding-top:2.4mm}
-.ans-t{font:600 10px/1.4 -apple-system,"PingFang SC",sans-serif;letter-spacing:.14em;color:#6a6862;margin-bottom:2mm}
+.answer{margin-top:auto;flex:0 0 auto;border-top:calc(1 * var(--upx)) solid #a9a69e;
+  padding-top:calc(2.4 * var(--u))}
+.ans-t{font:600 calc(10 * var(--upx))/1.4 -apple-system,"PingFang SC",sans-serif;letter-spacing:.14em;
+  color:#6a6862;margin-bottom:calc(2 * var(--u))}
 .ans-t i{font-style:normal;font-weight:400;color:#aaa;letter-spacing:.16em;margin-left:6px}
-.lines i{display:block;height:8.4mm;border-bottom:1px solid #dedbd3}
+.lines i{display:block;height:calc(8.4 * var(--u));border-bottom:calc(1 * var(--upx)) solid #dedbd3}
 .lines i:last-child{border-bottom:0}
-.answer .lines{margin-top:1mm}
-.slot.subj .answer{margin-top:5mm}
+.answer .lines{margin-top:calc(1 * var(--u))}
+.slot.subj .answer{margin-top:calc(5 * var(--u))}
 
 /* 页脚(姓名/用时/得分)已移除:它绝对定位贴纸底,打印时容易溢出到下一张,
    变成一页「只有一行」的空白页。页码改到页眉右侧。 */
@@ -310,13 +419,25 @@ button.no:hover{text-decoration:underline}
   #printroot{display:block !important;position:static !important;left:auto !important;
     top:auto !important;width:auto !important;height:auto !important;
     visibility:visible !important;pointer-events:auto !important;z-index:auto !important}
-  /* 296mm 高的块本身就会各占一页;只在第二张起加「另起一页」,
-     最后一张后面不加断页,避免末尾再多吐一张空白纸 */
-  #printroot .page{width:210mm;height:296mm;margin:0 !important;box-shadow:none !important;
-    overflow:hidden}
+
+  /* 关键:纸面按「浏览器实际可打印区」等比缩放。
+     打印时 100vw/100vh = 可打印区(已扣掉对话框的边距和页眉页脚),
+     793.7px×1073.4px = 210mm×284mm 的设计尺寸。
+     取两个方向里更小的缩放比 → 纸面宽高都不会超出可打印区,
+     末尾就不会被挤出一张「只有上一页底部残渣」的空白页。
+     设计尺寸是 210×284mm(A4 210×297 留 13mm 余量),正常无边距时缩放比 = 1,
+     打印结果与直接下载 PDF 完全一致。 */
+  :root{--upx:min(calc(100vw / 793.7), calc(100vh / 1073.4))}
+
+  /* 断页:每张纸面自己占一页;末尾不多吐空白纸 */
+  #printroot .page{width:calc(210 * var(--u));height:calc(284 * var(--u));
+    margin:0 !important;box-shadow:none !important;
+    overflow:hidden;break-inside:avoid;page-break-inside:avoid}
   #printroot .page + .page{break-before:page;page-break-before:always}
   .pbtn{display:none !important}
   .doc-empty{display:none}
+  /* 校对标记只属于屏幕:印出来的仍是干净的空白卷子 */
+  .ck,.cknotes,.dq,.mk,.opts .o.mine,.opts .o.bad,.sn.hl,.bgrid .ans,.pq .pick.mine{display:none !important}
 }
 @media(max-width:600px){
   #app{padding:28px 14px 60px}

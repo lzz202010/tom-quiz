@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f7f6f3">
 <title>e2 · 考研英语二真题 A4</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 <div id="app">
@@ -26,19 +26,21 @@
     <span class="pv-n" id="pvn"></span>
     <a class="dl" id="pvdl" href="#" download>下载 PDF</a>
     <a class="dl vb-entry" id="vbEntry" href="vocab.html">生词本<b id="vbCount2"></b></a>
-    <button class="go" id="pgo">打印</button>
+    <button class="tg" id="pvchk" title="答案校对:标出正确项、原文定位、决策关键与干扰项错因(打印时不带)">校对</button>
+    <button class="tg" id="pvrv" title="阅读模式:单栏重排,适合手机细读">读</button>
+    <button class="go" id="pgo" title="建议直接下载 PDF 打印。若用浏览器打印：纸张选 A4、边距选「无」、取消「页眉和页脚」、缩放 100%">打印</button>
   </div>
   <div class="pv-scroll"><div class="pv-pages" id="pvpages"></div></div>
+  <div class="rv" id="rv" hidden></div>
 </div>
 
 <div id="printroot" aria-hidden="true"></div>
 
-<script src="vocab.js?v=7"></script>
-<script src="gloss-data.js?v=7"></script>
-<script src="gloss.js?v=7"></script>
-<script src="words.js?v=7"></script>
-<script src="autocomplete.js?v=7"></script>
-<script src="data.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<!-- 做题页只要这几个:题库索引、站点逻辑、生词本。
+     词表(words.js)、联想补全只在生词本页用;释义词典(gloss-data.js)在点词时才取。 -->
+<script src="vocab.js?v=9"></script>
+<script src="gloss.js?v=9"></script>
+<script src="data.js?v=9"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

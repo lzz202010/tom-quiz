@@ -185,9 +185,12 @@
     return out;
   }
 
-  const DATA = global.E2GLOSS_DATA || {};    // 8861 条,覆盖全部真题词
+  // 词典(8861 条,覆盖全部真题词)可以晚到:做题页按需再取,
+  // 所以这里每次现取,不要在脚本加载时就把空对象抓在手里。
+  function dict() { return global.E2GLOSS_DATA || {}; }
 
   function lookup(word, sentence) {
+    const DATA = dict();
     const w = String(word || '').toLowerCase().replace(/[’']/g, "'");
     const s = String(sentence || '');
     const fs = forms(w);
@@ -206,5 +209,5 @@
     return '';
   }
 
-  global.E2GL = { lookup, forms, table: G, data: DATA, rules: CTX };
+  global.E2GL = { lookup, forms, table: G, get data() { return dict(); }, rules: CTX };
 })(window);
