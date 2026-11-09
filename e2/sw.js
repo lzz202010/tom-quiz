@@ -1,6 +1,6 @@
 /* e2 离线缓存:地铁上没信号也能做题。
    壳(HTML/CSS/JS)在安装时缓存,题库按年份用到哪年缓存哪年。 */
-const CACHE = 'e2-v9';
+const CACHE = 'e2-v10';
 const CORE = ['./', './index.html', './style.css', './app.js', './data.js', './vocab.js', './gloss.js'];
 
 self.addEventListener('install', e => {

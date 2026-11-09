@@ -22,7 +22,8 @@ a{color:inherit;text-decoration:none}
 .yr:active{transform:scale(.985)}
 .yr b{font:600 20px/1.2 Georgia,serif;letter-spacing:-.01em}
 .yr i{font-style:normal;color:var(--mute);font-size:11.5px}
-.yr .ymeta{display:flex;align-items:center;gap:6px;margin-top:3px}
+.yr .ymeta{display:flex;align-items:center;gap:7px;margin-top:4px}
+.yr .ymeta .dq{font-size:9px;margin-left:0;letter-spacing:.08em}
 .yr .yd{font-size:10.5px;color:var(--mute)}
 /* 难度徽标(首页与纸面标题条共用) */
 .lv{border:1px solid var(--line);background:#fff;border-radius:20px;
@@ -99,14 +100,15 @@ a{color:inherit;text-decoration:none}
 .rv-body .rv-stem .st{flex:1;font-weight:600}
 .rv-body .opts{grid-template-columns:1fr;row-gap:.3em;margin:.2em 0 0;
   font-size:14.5px;line-height:1.6}
-.rv-body .opts.o4{grid-template-columns:repeat(4,1fr);column-gap:.5em;font-size:13.5px}
-.rv-body .opts.o4 .o{display:block}
-.rv-body .opts.o4 .o > b{display:inline;min-width:0;margin-right:.25em}
-.rv-body .opts.o4 .mk{display:block}
-.rv-body .opts .o{display:flex;align-items:baseline;gap:.4em;padding:.12em 0}
+/* 完形四个词:手机上排 2×2,一行四个太挤 */
+.rv-body .opts.o4{grid-template-columns:repeat(2,1fr);column-gap:.7em;font-size:14px}
+.rv-body .opts.o4 .o > b{min-width:1.35em;margin-right:.3em}
+/* ✓ 跟在字母后面,不另起一行 */
+.rv-body .opts .mk{display:inline;font-style:normal;font-weight:700;color:var(--red);margin-left:.35em}
+.rv-body .opts .o{display:flex;align-items:baseline;gap:.4em;padding:.12em 0;flex-wrap:wrap}
 .rv-body .opts .o > b{flex:0 0 auto;min-width:1.6em;margin-left:0;padding:.15em .4em .15em 0}
+.rv-body .ow{font-size:12px;line-height:1.4}
 .rv-body .ck{margin-top:.5em;padding-left:.6em}
-.rv-body .ck-w{gap:.1em .9em}
 
 /* 单元标题条(纸面之外):难度 + 自己的正确率 */
 .pcap{display:flex;align-items:baseline;gap:9px;max-width:794px;margin:0 auto 7px;
@@ -221,12 +223,15 @@ a{color:inherit;text-decoration:none}
   margin:calc(.7 * var(--u)) 0 0 calc(1.5 * var(--u));
   padding-left:calc(.7 * var(--u));border-left:calc(2 * var(--upx)) solid #e7e1d2;
   font:calc(10.5 * var(--upx))/1.5 -apple-system,"PingFang SC",sans-serif;color:#5d5a54}
-.ck-l{font-weight:600;color:var(--red);white-space:nowrap;
+/* 定位胶囊:点一下跳到原文那句 */
+.ck-l{font:600 calc(10 * var(--upx))/1.5 -apple-system,"PingFang SC",sans-serif;
+  color:var(--red);white-space:nowrap;cursor:pointer;
   border:1px solid #e3c9c5;border-radius:4px;padding:0 .35em;background:#fdf6f5}
+.ck-l:hover{background:#f8e7e4}
 .ck-k{color:#4a4844}
-.ck-w{display:flex;flex-wrap:wrap;gap:.1em .95em;margin:calc(.2 * var(--u)) 0 0 calc(1.5 * var(--u));
-  font:calc(9.8 * var(--upx))/1.45 -apple-system,"PingFang SC",sans-serif;color:#a19d94}
-.ck-w b{font-weight:600;color:#847f76;margin-right:.25em}
+/* 选项后面的短标:正确项 = 决策关键,干扰项 = 一句错因 */
+.ow{font-style:normal;margin-left:.7em;font-size:.92em;line-height:1.45;color:#a8a49c}
+.ow.ok{color:var(--red);font-weight:600}
 .cknotes{margin-top:calc(1 * var(--u))}
 .cknotes .ck:first-child{margin-top:0}
 /* 题目难度:五个点 */
@@ -236,6 +241,9 @@ a{color:inherit;text-decoration:none}
 /* 原文定位高亮:整句压一道浅色 */
 .sn.hl{background:linear-gradient(transparent 56%,#f7e2a2 56%,#f7e2a2 94%,transparent 94%)}
 .passage p.pseg.hl{background:#fdf6e3;border-radius:3px}
+/* 点定位胶囊跳过去时闪一下 */
+.loc-flash{animation:lflash 1.6s ease}
+@keyframes lflash{0%,100%{background-color:transparent}18%,60%{background-color:#ffe9a8}}
 /* Part B 作答位上的答案字母 */
 .bgrid .ans{font-style:normal;font-weight:700;color:var(--red);font-size:.9em}
 .bgrid .ans.ok{color:var(--red)}
@@ -437,7 +445,7 @@ button.no:hover{text-decoration:underline}
   .pbtn{display:none !important}
   .doc-empty{display:none}
   /* 校对标记只属于屏幕:印出来的仍是干净的空白卷子 */
-  .ck,.cknotes,.dq,.mk,.opts .o.mine,.opts .o.bad,.sn.hl,.bgrid .ans,.pq .pick.mine{display:none !important}
+  .ck,.cknotes,.ck-l,.ow,.dq,.mk,.opts .o.mine,.opts .o.bad,.sn.hl,.loc-flash,.bgrid .ans,.pq .pick.mine{display:none !important}
 }
 @media(max-width:600px){
   #app{padding:28px 14px 60px}

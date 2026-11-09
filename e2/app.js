@@ -15,7 +15,7 @@
     if (PAPERS[y]) return Promise.resolve(PAPERS[y]);
     return new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = `d/${y}.js?v=9`;
+      s.src = `d/${y}.js?v=10`;
       s.onload = () => {
         const p = (window.E2DATA || {})[y];
         if (!p) return rej(new Error('该年数据缺失'));
@@ -72,20 +72,28 @@
       if (m) { done++; if (m === p.answers[String(q.n)]) right++; }
     });
     let lv = base;
-    if (done) {
-      const r = right / done;
-      if (r >= 0.8) lv -= 1; else if (r <= 0.4) lv += 1;
-    }
+    /* 个人校准:做得越顺,这个单元对你就越容易(全对 −0.8,常错 +2.4),
+       样本少于 3 题不动 —— 免得两题定生死。 */
+    if (done >= 3) lv = base + (0.75 - right / done) * 3.2;
     const man = MARK.read()[u.id] || '';
     if (man === 'easy') lv = 1; else if (man === 'hard') lv = 5;
     lv = Math.max(1, Math.min(5, Math.round(lv)));
     const mastered = done >= 3 && right / done >= 0.8;
     return { lv, tag: DIFF_TAGS[lv], done, right, n: qs.length, mastered, manual: man };
   }
+  /* 题级难度:基线 + 你这一次的作答(做错就往上抬一档) */
+  function qDiff(q) {
+    let dl = q.dl || 3;
+    if (PAP) {
+      const mine = mineOf(q), ans = ansOf(q);
+      if (mine && ans) dl += (mine === ans) ? 0 : 1;
+    }
+    return Math.max(1, Math.min(5, dl));
+  }
 
   /* ───── 首页:只列年份 ───── */
   function yearStat(y) {
-    /* 难度取该年各单元的平均;正确率按本机作答记录算 */
+    /* 难度取该年各单元的平均,再按你自己的正确率校准;正确率按本机作答记录算 */
     const ix = (D.index || {})[y] || {};
     const mine = MY.get(y);
     const ans = ix.key ? ix.key.split(',') : null;
@@ -94,7 +102,10 @@
       done++;
       if (ans && ans[+k - 1] && ans[+k - 1] === mine[k]) right++;
     });
-    return { ix, done, right, lv: Math.round(ix.diff || 3) };
+    let lv = ix.diff || 3;
+    if (done >= 3) lv = lv + (0.75 - right / done) * 3.2;
+    lv = Math.max(1, Math.min(5, Math.round(lv)));
+    return { ix, done, right, lv };
   }
   function drawYears() {
     $('#years').innerHTML = D.years.slice().reverse().map(y => {
@@ -102,8 +113,9 @@
       const st = yearStat(y);
       const n = ix.qs || 0;
       const mine = st.done ? `<span class="yd">你 ${st.right}/${st.done}</span>` : '';
+      const dots = `<i class="dq" title="难度 ${st.lv}/5 · ${DIFF_TAGS[st.lv]}"><b>${'●'.repeat(st.lv)}</b>${'○'.repeat(5 - st.lv)}</i>`;
       return `<button class="yr" data-y="${y}"><b>${y}</b><i>${n} 题 · ${ix.units || 0} 页</i>
-        <span class="ymeta"><span class="lv lv${st.lv}">${DIFF_TAGS[st.lv]}</span>${mine}</span></button>`;
+        <span class="ymeta">${dots}${mine}</span></button>`;
     }).join('');
     $$('#years .yr').forEach(b => b.onclick = () => openPV(+b.dataset.y));
   }
@@ -124,22 +136,47 @@
     return { h1: T[0], en: T[1], range, score: T[2], mins: MIN[u.sec] || 15 };
   }
 
-  /* ───── 答案校对:用尽可能短的标记 ─────
-     正确项打勾、给出原文定位(⌖段·句)、决策关键一句、每个干扰项一句错因。
-     只在屏幕上看得到,打印时整块隐藏 —— 印出来的仍是空白卷子。 */
+  /* ───── 答案校对:标记尽量短 ─────
+     · 定位胶囊「¶3·5」:点一下跳到原文那句并高亮
+     · 决策关键「→ 一句话」:为什么是这个答案
+     · 干扰项错因:挂在选项后面,不另起三行中文
+     全是屏幕增强层,打印时整块隐藏 —— 印出来的仍是空白卷子。 */
   const CK = { on: false, key: 'e2.ckmode' };
   try { CK.on = localStorage.getItem(CK.key) === '1'; } catch (e) {}
   const ansOf = q => (PAP && PAP.answers[String(q.n)]) || (q.note && q.note.a) || '';
   const mineOf = q => (PAP ? (MY.get(PAP.y)[String(q.n)] || '') : '');
 
-  function noteHTML(q) {
+  /* 选项后面的短标:正确项写「决策关键」,干扰项写「错因」 */
+  function whyOf(q, L) {
     const n = q.note;
-    if (!CK.on || !n) return '';
-    const w = Object.keys(n.w || {}).map(k =>
-      `<span><b>${esc(k)}</b>${esc(n.w[k])}</span>`).join('');
-    return `<div class="ck"><span class="ck-l">${esc(n.loc)}</span>` +
-      `<span class="ck-k">⟶ ${esc(n.key)}</span></div>` +
-      (w ? `<div class="ck-w">${w}</div>` : '');
+    if (!n) return '';
+    if (L === n.a) return n.key || '';
+    return (n.w || {})[L] || '';
+  }
+  function locPill(n) {
+    return `<button class="ck-l" type="button" data-loc="${esc(n.loc)}" title="跳到原文那句">${esc(n.loc)}</button>`;
+  }
+  /* 完形 20 题挤在一起,只给一行:定位 + 决策关键 */
+  function ckLine(q) {
+    const n = q.note;
+    if (!n) return '';
+    return `<div class="ck">${locPill(n)}<span class="ck-k">⟶ ${esc(n.key)}</span></div>`;
+  }
+  function optCells(q, inlineWhy, showAns) {
+    const ans = showAns ? ansOf(q) : '';
+    const mine = mineOf(q);
+    return (q.opts || []).map(o => {
+      const m = String(o).match(/^([A-G])\.\s*([\s\S]*)$/);
+      const L = m ? m[1] : '';
+      const ok = !!(ans && L && L === ans);
+      const isMine = !!(mine && L === mine);
+      const bad = !!(ans && isMine && L !== ans);
+      const why = (showAns && inlineWhy) ? whyOf(q, L) : '';
+      return `<span class="o${ok ? ' ok' : ''}${isMine ? ' mine' : ''}${bad ? ' bad' : ''}">` +
+        `${m ? `<b>${m[1]}</b>${esc(m[2])}` : esc(o)}` +
+        `${ok ? '<i class="mk">✓</i>' : ''}` +
+        `${why ? `<i class="ow${L === ans ? ' ok' : ''}">${esc(why)}</i>` : ''}</span>`;
+    }).join('');
   }
 
   /* 段落按句切开:构建期存了每句的字符偏移(pcut),这里按偏移切片,
@@ -160,28 +197,19 @@
     }).join('');
   }
 
+  /* 纸面模式 = 打印的样子:不带任何校对标记,屏幕看到的和印出来的一致。
+     校对、难度点这些只在阅读模式出现(手机上是主战场)。 */
   function qHTML(q, u) {
     const opts = q.opts || [];
-    const ans = CK.on ? ansOf(q) : '';
-    const mine = mineOf(q);
-    const cells = opts.map(o => {
-      const m = String(o).match(/^([A-G])\.\s*([\s\S]*)$/);
-      const L = m ? m[1] : '';
-      const ok = !!(ans && L && L === ans);
-      const isMine = !!(mine && L === mine);
-      const bad = !!(ans && isMine && L !== ans);
-      return `<span class="o${ok ? ' ok' : ''}${isMine ? ' mine' : ''}${bad ? ' bad' : ''}">` +
-        `${m ? `<b>${m[1]}</b>${esc(m[2])}` : esc(o)}` +
-        `${ok ? '<i class="mk">✓</i>' : ''}</span>`;
-    }).join('');
-    const dq = (CK.on && q.dl) ? `<i class="dq" title="难度 ${q.dl}/5"><b>${'●'.repeat(q.dl)}</b>${'○'.repeat(5 - q.dl)}</i>` : '';
+    const cells = optCells(q, false, false);
+    const dq = '';   // 纸面不放难度点:纸面要和打印一模一样(难度在纸面外的标题条上)
     if (u.sec === 'cloze') {
       return `<div class="q"><span class="crow"><button class="no qbtn" type="button" data-print-q="${q.n}"
-        title="单独打印第 ${q.n} 题">${q.n}.</button>${dq}<span class="opts o4">${cells}</span></span>${noteHTML(q)}</div>`;
+        title="单独打印第 ${q.n} 题">${q.n}.</button>${dq}<span class="opts o4">${cells}</span></span></div>`;
     }
     return `<div class="q"><button class="no qbtn" type="button" data-print-q="${q.n}"
       title="单独打印第 ${q.n} 题">${q.n}.</button>${dq}<span class="st">${esc(q.stem)}</span>
-      ${opts.length ? `<div class="opts">${cells}</div>` : ''}${noteHTML(q)}</div>`;
+      ${opts.length ? `<div class="opts">${cells}</div>` : ''}</div>`;
   }
 
   /* Part B:小标题匹配 / 信息匹配 / 正误判断,共用一套 A–G 备选项 */
@@ -200,7 +228,7 @@
         const mine = mineOf(q);
         return `<span>${q.n}<b>${ans || mine ? `<i class="ans${mine && mine === ans ? ' ok' : ''}">${ans || mine}</i>` : ''}</b></span>`;
       }).join('')}</div>`;
-      qh += `<div class="cknotes">${u.qs.map(q => noteHTML(q)).join('')}</div>`;
+      qh += `<div class="cknotes">${u.qs.map(q => ckLine(q)).join('')}</div>`;
     } else {
       const tf = u.type === 'tf';
       qh = u.qs.map(q => {
@@ -208,7 +236,7 @@
         const mine = mineOf(q);
         return `<div class="pq"><button class="no qbtn" type="button" data-print-q="${q.n}"
           title="单独打印第 ${q.n} 题">${q.n}.</button><span class="st">${esc(q.stem)}</span>
-          <span class="pick${tf ? ' tf' : ''}${mine ? ' mine' : ''}">${ans || mine}</span></div>${noteHTML(q)}`;
+          <span class="pick${tf ? ' tf' : ''}${mine ? ' mine' : ''}">${ans || mine}</span></div>${ckLine(q)}`;
       }).join('');
     }
     return `<div class="dirbox">${esc(u.dir || '')}</div>${poolBox}
@@ -268,10 +296,14 @@
     }
     c.style.fontSize = 'calc(' + best.toFixed(2) + ' * var(--upx))';
   }
+  /* 纸面预览在窄屏上要缩到屏幕宽度内 —— 不然右侧整列选项被切掉。
+     阅读模式下预览层是隐藏的,这时 clientWidth = 0,不能拿它算缩放比。 */
   function fitScreen() {
     const box = $('.pv-scroll'), pages = $('#pvpages');
     if (!box || !pages) return;
-    pages.style.zoom = Math.min(1, (box.clientWidth - 24) / 794);
+    if (box.hidden) { pages.style.zoom = 1; return; }
+    const z = (box.clientWidth - 16) / 794;
+    pages.style.zoom = z > 0.25 ? Math.min(1, z) : 1;
   }
   function readyImages(root) {
     return Promise.all($$('img', root).map(i => {
@@ -493,7 +525,7 @@
     if (window.E2GLOSS_DATA) return Promise.resolve();
     if (!glossP) glossP = new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = 'gloss-data.js?v=9';
+      s.src = 'gloss-data.js?v=10';
       s.onload = () => res();
       s.onerror = () => rej(new Error('释义词典加载失败'));
       document.head.appendChild(s);
@@ -641,34 +673,31 @@
         u.qs.map(q => rvQ(q, u)).join('') + '</div>';
     }
     return `<div class="rv-head">${prev}<div class="rv-t"><b>${esc(u.label)}</b>${st}</div>${next}</div>
-      <div class="rv-body">${body}</div>`;
+      <div class="rv-body" data-unit="${esc(u.id)}">${body}</div>`;
   }
   function rvQ(q, u) {
-    const ans = CK.on ? ansOf(q) : '';
-    const mine = mineOf(q);
-    const opts = (q.opts || []).map(o => {
-      const m = String(o).match(/^([A-G])\.\s*([\s\S]*)$/);
-      const L = m ? m[1] : '';
-      const ok = !!(ans && L && L === ans);
-      const isMine = !!(mine && L === mine);
-      const bad = !!(ans && isMine && L !== ans);
-      return `<span class="o${ok ? ' ok' : ''}${isMine ? ' mine' : ''}${bad ? ' bad' : ''}">` +
-        `${m ? `<b>${m[1]}</b>${esc(m[2])}` : esc(o)}${ok ? '<i class="mk">✓</i>' : ''}</span>`;
-    }).join('');
-    const dq = (CK.on && q.dl) ? `<i class="dq" title="难度 ${q.dl}/5"><b>${'●'.repeat(q.dl)}</b>${'○'.repeat(5 - q.dl)}</i>` : '';
+    const inlineWhy = CK.on && (!u || u.sec !== 'cloze');
+    const opts = optCells(q, inlineWhy, CK.on);
+    const dl = qDiff(q);
+    const dq = q.dl ? `<i class="dq" title="难度 ${dl}/5${(q.note && q.note.dwhy) ? ' · ' + q.note.dwhy : ''}"><b>${'●'.repeat(dl)}</b>${'○'.repeat(5 - dl)}</i>` : '';
     const stem = (q.stem || '').trim();
     const four = u && u.sec === 'cloze' ? ' o4' : '';   // 完形四个词排一行,省地方
+    const pill = (CK.on && inlineWhy && q.note && q.note.loc) ? locPill(q.note) : '';
     return `<div class="q rv-q"><div class="rv-stem"><span class="no">${q.n}.</span>` +
-      (stem ? `<span class="st">${esc(stem)}</span>` : '') + dq + '</div>' +
-      (opts ? `<div class="opts rv-opts${four}">${opts}</div>` : '') + noteHTML(q) + '</div>';
+      (stem ? `<span class="st">${esc(stem)}</span>` : '') + dq + pill + '</div>' +
+      (opts ? `<div class="opts rv-opts${four}">${opts}</div>` : '') +
+      (inlineWhy ? '' : ckLine(q)) + '</div>';
   }
-  function drawRV() {
+  /* keepTop:记完作答重绘时保持滚动位置(否则一点选项就跳回单元开头) */
+  function drawRV(keepTop) {
     const box = $('#rv'), p = paper(S.y), units = p ? p.units : [];
     if (!units.length) { box.innerHTML = ''; return; }
     RV.idx = Math.max(0, Math.min(units.length - 1, RV.idx));
     const u = units[RV.idx];
+    const top = keepTop ? box.scrollTop : 0;
     box.innerHTML = rvUnit(u, RV.idx, units.length);
     markLocs(box, units);
+    box.scrollTop = top;
     $('#pvn').textContent = `${S.y} · ${RV.idx + 1}/${units.length} · ${u.label}`;
   }
   function setRV(on) {
@@ -678,7 +707,7 @@
     $('.pv-scroll').hidden = on;
     $('#rv').hidden = !on;
     document.body.classList.toggle('rv-mode', on);
-    if (on) drawRV();
+    if (on) drawRV(); else fitScreen();
   }
 
   /* 单元标题条:难度 + 自己的正确率。放在纸面之外,打印不带走。 */
@@ -750,6 +779,27 @@
     });
   }
 
+  /* 点定位胶囊:跳到原文那句并闪一下(纸面和阅读模式都管用) */
+  function jumpLoc(loc) {
+    const box = RV.on ? $('#rv') : $('#pvpages');
+    if (!box) return;
+    let first = null;
+    String(loc || '').split('+').forEach(part => {
+      const pm = /^¶(\d+)(?:·(\d+))?$/.exec(part.trim());
+      if (!pm) return;
+      const sel = pm[2]
+        ? `.sn[data-p="${pm[1]}"][data-s="${pm[2]}"]`
+        : `.passage [data-p="${pm[1]}"]`;
+      const el = box.querySelector(sel);
+      if (!el) return;
+      el.classList.add('hl', 'loc-flash');
+      if (!first) first = el;
+    });
+    if (!first) return;
+    first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setTimeout(() => first.classList.remove('loc-flash'), 1800);
+  }
+
   let token = 0;
   function draw() {
     const my = ++token, box = $('#pvpages'), p = paper(S.y), units = p ? p.units : [];
@@ -807,6 +857,7 @@
     $('#pv').hidden = true;
     document.body.style.overflow = '';
     history.replaceState(null, '', location.pathname);
+    drawYears();                              // 回首页时把成绩和难度刷出来
   }
 
   /* 从生词本跳进原题时,顶栏「返回」应当回生词本,而不是关掉预览回首页 */
@@ -817,10 +868,13 @@
     const p = paper(S.y);
     if (p) printUnits(p.units);
   };
-  /* 答案校对模式:标出正确项、原文定位、决策关键与干扰项错因(打印时隐藏) */
+  /* 答案校对模式:标出正确项、原文定位、决策关键与干扰项错因。
+     校对只活在阅读模式 —— 纸面永远是打印的样子(空白卷)。 */
   $('#pvchk').onclick = () => {
     CK.on = !CK.on;
     try { localStorage.setItem(CK.key, CK.on ? '1' : '0'); } catch (e) {}
+    $('#pvchk').classList.toggle('on', CK.on);
+    if (CK.on && !RV.on) { setRV(true); return; }
     draw();
   };
   /* 阅读模式 ↔ A4 纸面 */
@@ -828,6 +882,8 @@
   $('#rv').addEventListener('click', e => {
     const nav = e.target.closest('[data-rv]');
     if (nav) { RV.idx += +nav.dataset.rv; drawRV(); return; }
+    const pl = e.target.closest('[data-loc]');
+    if (pl) { jumpLoc(pl.dataset.loc); return; }
     const ob = e.target.closest('.opts .o > b');
     if (ob) {
       const qEl = ob.closest('.q');
@@ -835,7 +891,7 @@
       const n = no ? parseInt(no.textContent, 10) : NaN;
       if (n && PAP && PAP.answers[String(n)]) {
         MY.toggle(PAP.y, String(n), ob.textContent.trim());
-        drawRV();
+        drawRV(true);
       }
       return;
     }
@@ -844,6 +900,8 @@
   $('#pvpages').addEventListener('click', e => {
     const p = paper(S.y);
     if (!p) return;
+    const pl = e.target.closest('[data-loc]');
+    if (pl) { jumpLoc(pl.dataset.loc); return; }
     const qb = e.target.closest('.qbtn');
     if (qb) {
       const u = p.units.find(x => x.id === qb.closest('.page').dataset.unit);
