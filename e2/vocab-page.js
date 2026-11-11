@@ -160,7 +160,7 @@
   }
 
   /* ── 事件:点击 / 长按 / 左滑 ── */
-  let pressTimer = 0, pressItem = null, suppressClick = false;
+  let pressTimer = 0, pressItem = null, suppressClick = false, suppressTimer = 0;
 
   listEl.addEventListener('click', e => {
     const item = e.target.closest('.vb-item');
@@ -221,9 +221,12 @@
     const item = e.target.closest('.vb-item');
     if (!item) return;
     pressItem = item;
+    suppressClick = false;              // 每次新触摸先重置,免得上次长按吞掉这次点击
     clearTimeout(pressTimer);
     pressTimer = setTimeout(() => {
       suppressClick = true;
+      clearTimeout(suppressTimer);
+      suppressTimer = setTimeout(() => { suppressClick = false; }, 800);
       if (navigator.vibrate) navigator.vibrate(12);
       del(item.dataset.id);
     }, 620);
@@ -281,7 +284,11 @@
     $('#vbW').focus();
   });
 
-  qEl.addEventListener('input', render);
+  let searchT = 0;
+  qEl.addEventListener('input', () => {   // 输入法连打时不要每键重绘整张表
+    clearTimeout(searchT);
+    searchT = setTimeout(render, 120);
+  });
   sortEl.addEventListener('change', render);
   V.on(render);
 
@@ -295,6 +302,14 @@
     sp.set('from', 'vocab');
     back.href = 'index.html?' + sp;
     back.textContent = '← 回到原题';
+    /* 「回到原题」进的是 from=vocab 页面,那边顶栏又只能回生词本,形成闭环;
+       补一个直达主页的出口(复用 .vb-back 样式,只在带 y 参数时出现)。 */
+    const home = document.createElement('a');
+    home.className = 'vb-back';
+    home.style.order = '0';            // .vb-back 默认 order:-1,让它排到标题右侧
+    home.href = 'index.html';
+    home.textContent = '主页';
+    back.parentNode.appendChild(home);
   }
 
   render();

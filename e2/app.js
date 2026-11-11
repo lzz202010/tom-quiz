@@ -15,7 +15,7 @@
     if (PAPERS[y]) return Promise.resolve(PAPERS[y]);
     return new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = `d/${y}.js?v=10`;
+      s.src = `d/${y}.js?v=16`;
       s.onload = () => {
         const p = (window.E2DATA || {})[y];
         if (!p) return rej(new Error('该年数据缺失'));
@@ -156,8 +156,13 @@
   function locPill(n) {
     return `<button class="ck-l" type="button" data-loc="${esc(n.loc)}" title="跳到原文那句">${esc(n.loc)}</button>`;
   }
+  /* 校对只活在阅读模式:纸面预览与打印永远是干净的空白卷(见 docs/e2.md)。
+     以前纸面也按 CK.on 渲染,从「读」切回「纸」时答案/校对笔记会留在卷面上。 */
+  function ckOn() { return !!(CK.on && RV.on); }
+
   /* 完形 20 题挤在一起,只给一行:定位 + 决策关键 */
   function ckLine(q) {
+    if (!ckOn()) return '';
     const n = q.note;
     if (!n) return '';
     return `<div class="ck">${locPill(n)}<span class="ck-k">⟶ ${esc(n.key)}</span></div>`;
@@ -224,7 +229,7 @@
     if (u.type === 'sub') {
       // 小标题型:正文里已带 41–45 段号,这里只留五个作答位
       qh = `<div class="bgrid">${u.qs.map(q => {
-        const ans = CK.on ? ansOf(q) : '';
+        const ans = ckOn() ? ansOf(q) : '';
         const mine = mineOf(q);
         return `<span>${q.n}<b>${ans || mine ? `<i class="ans${mine && mine === ans ? ' ok' : ''}">${ans || mine}</i>` : ''}</b></span>`;
       }).join('')}</div>`;
@@ -232,7 +237,7 @@
     } else {
       const tf = u.type === 'tf';
       qh = u.qs.map(q => {
-        const ans = CK.on ? ansOf(q) : '';
+        const ans = ckOn() ? ansOf(q) : '';
         const mine = mineOf(q);
         return `<div class="pq"><button class="no qbtn" type="button" data-print-q="${q.n}"
           title="单独打印第 ${q.n} 题">${q.n}.</button><span class="st">${esc(q.stem)}</span>
@@ -525,7 +530,7 @@
     if (window.E2GLOSS_DATA) return Promise.resolve();
     if (!glossP) glossP = new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = 'gloss-data.js?v=10';
+      s.src = 'gloss-data.js?v=16';
       s.onload = () => res();
       s.onerror = () => rej(new Error('释义词典加载失败'));
       document.head.appendChild(s);
@@ -676,13 +681,13 @@
       <div class="rv-body" data-unit="${esc(u.id)}">${body}</div>`;
   }
   function rvQ(q, u) {
-    const inlineWhy = CK.on && (!u || u.sec !== 'cloze');
-    const opts = optCells(q, inlineWhy, CK.on);
+    const inlineWhy = ckOn() && (!u || u.sec !== 'cloze');
+    const opts = optCells(q, inlineWhy, ckOn());
     const dl = qDiff(q);
     const dq = q.dl ? `<i class="dq" title="难度 ${dl}/5${(q.note && q.note.dwhy) ? ' · ' + q.note.dwhy : ''}"><b>${'●'.repeat(dl)}</b>${'○'.repeat(5 - dl)}</i>` : '';
     const stem = (q.stem || '').trim();
     const four = u && u.sec === 'cloze' ? ' o4' : '';   // 完形四个词排一行,省地方
-    const pill = (CK.on && inlineWhy && q.note && q.note.loc) ? locPill(q.note) : '';
+    const pill = (ckOn() && inlineWhy && q.note && q.note.loc) ? locPill(q.note) : '';
     return `<div class="q rv-q"><div class="rv-stem"><span class="no">${q.n}.</span>` +
       (stem ? `<span class="st">${esc(stem)}</span>` : '') + dq + pill + '</div>' +
       (opts ? `<div class="opts rv-opts${four}">${opts}</div>` : '') +
@@ -704,9 +709,14 @@
     RV.on = on;
     $('#pvrv').textContent = on ? '纸' : '读';
     $('#pvrv').title = on ? '切回 A4 纸面预览' : '阅读模式:单栏重排,适合手机细读';
+    $('#pvrv').setAttribute('aria-label', on ? '切回 A4 纸面预览' : '阅读模式');
+    $('#pvrv').setAttribute('aria-pressed', on ? 'true' : 'false');
     $('.pv-scroll').hidden = on;
     $('#rv').hidden = !on;
     document.body.classList.toggle('rv-mode', on);
+    const ck = ckOn();
+    $('#pvchk').classList.toggle('on', ck);
+    $('#pvchk').setAttribute('aria-pressed', ck ? 'true' : 'false');
     if (on) drawRV(); else fitScreen();
   }
 
@@ -758,7 +768,7 @@
 
   /* 校对模式:按「¶段·句」把原文里支撑答案的那句高亮出来 */
   function markLocs(root, units) {
-    if (!CK.on) return;
+    if (!ckOn()) return;
     units.forEach(u => {
       const page = root.querySelector(`[data-unit="${CSS.escape(u.id)}"]`);
       if (!page) return;
@@ -821,7 +831,8 @@
       syncVbCount();
       syncVbLinks();                           // 页面渲染完才有 data-unit,补齐 u
       $('#pvn').textContent = `${S.y} · ${units.length} 页 A4 · 点题号可单题打印`;
-      $('#pvchk').classList.toggle('on', CK.on);
+      $('#pvchk').classList.toggle('on', ckOn());
+      $('#pvchk').setAttribute('aria-pressed', ckOn() ? 'true' : 'false');
       window.__E2_PAGES__ = units.length;
       window.__READY__ = true;
       if (sc) sc.scrollTop = keepTop;          // 重绘后回到原来的位置
@@ -841,7 +852,7 @@
     sp.set('y', S.y);
     if (wantUnit) sp.set('u', wantUnit);
     if (FROM_VOCAB) sp.set('from', 'vocab');
-    history.replaceState(null, '', '?' + sp);
+    history.pushState({ e2pv: 1 }, '', '?' + sp);
     syncVbLinks();
     if (!PAPERS[S.y]) {
       $('#pvpages').innerHTML = '<section class="page"><p class="doc-empty">正在加载…</p></section>';
@@ -853,20 +864,34 @@
     }
     draw();
   }
-  function closePV() {
+  function closePV(fromPop) {
     $('#pv').hidden = true;
     document.body.style.overflow = '';
-    history.replaceState(null, '', location.pathname);
+    if (!fromPop) history.replaceState(null, '', location.pathname);
     drawYears();                              // 回首页时把成绩和难度刷出来
   }
+  /* 手机/浏览器返回键:先关预览露出年份列表,不要直接退出整个站点 */
+  window.addEventListener('popstate', () => {
+    if (!$('#pv').hidden) closePV(true);
+  });
 
-  /* 从生词本跳进原题时,顶栏「返回」应当回生词本,而不是关掉预览回首页 */
-  if (FROM_VOCAB) $('#pvx').textContent = '← 生词本';
+  /* 从生词本跳进原题时,顶栏「返回」应当回生词本,而不是关掉预览回首页。
+     但「原题 ↔ 生词本」会形成闭环(生词本的返回链接又带回 y 参数),所以补一个
+     直达主页的出口;只在 from=vocab 时出现,普通预览层外观不变。 */
+  if (FROM_VOCAB) {
+    $('#pvx').textContent = '← 生词本';
+    const home = document.createElement('a');
+    home.className = 'back';
+    home.href = 'index.html';
+    home.textContent = '主页';
+    $('#pvx').parentNode.insertBefore(home, $('#pvx').nextSibling);
+  }
   $('#pvx').onclick = () => FROM_VOCAB ? backToVocab() : closePV();
   $('.pv-scroll').addEventListener('scroll', () => { clearTimeout(syncVbLinks.t); syncVbLinks.t = setTimeout(syncVbLinks, 160); }, { passive: true });
   $('#pgo').onclick = () => {
     const p = paper(S.y);
     if (p) printUnits(p.units);
+    else toast('题目还在加载，稍等一下再打印');
   };
   /* 答案校对模式:标出正确项、原文定位、决策关键与干扰项错因。
      校对只活在阅读模式 —— 纸面永远是打印的样子(空白卷)。 */
@@ -874,6 +899,7 @@
     CK.on = !CK.on;
     try { localStorage.setItem(CK.key, CK.on ? '1' : '0'); } catch (e) {}
     $('#pvchk').classList.toggle('on', CK.on);
+    $('#pvchk').setAttribute('aria-pressed', CK.on ? 'true' : 'false');
     if (CK.on && !RV.on) { setRV(true); return; }
     draw();
   };
@@ -930,14 +956,17 @@
   });
 
   /* 移动端长按也能收,免得手指点不准 */
-  let pressT = 0, suppressWordClick = false;
+  let pressT = 0, suppressWordClick = false, suppressWTimer = 0;
   $('#pvpages').addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
+    suppressWordClick = false;              // 每次新触摸先重置
     clearTimeout(pressT);
     pressT = setTimeout(() => {
       if (collectFrom(t.clientX, t.clientY)) {
         suppressWordClick = true;
+        clearTimeout(suppressWTimer);
+        suppressWTimer = setTimeout(() => { suppressWordClick = false; }, 800);
         if (navigator.vibrate) navigator.vibrate(10);
       }
     }, 480);
@@ -981,12 +1010,7 @@
     }
   });
 
-  /* 离线:壳缓存下来,地铁上没信号也能做题 */
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    });
-  }
+  /* 离线壳由 sw-reg.js 在三个入口(真题/作文/生词本)统一注册,这里不再重复。 */
 
   const q = new URLSearchParams(location.search);
   if (q.has('y') && D.years.includes(+q.get('y'))) S.y = +q.get('y');

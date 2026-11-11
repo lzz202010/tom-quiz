@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f6f3">
+<title>作文模版 · e2</title>
+<meta name="description" content="e2 作文模块:大/小作文模版、核心句库、课后练习与批改预测题。">
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=16">
+<style>
+/* 自包含:作文模块只用自己的样式,不碰 style.css(色板与主站一致) */
+*{box-sizing:border-box}
+:root{
+  --bg:#f7f6f3; --panel:#fff; --ink:#1c1b19; --mute:#8b8880;
+  --line:#dedbd4; --red:#a8322a;
+  --blue:#3a6ea5; --blue-bg:#eef4fa; --blue-line:#cfdfef;
+  --green:#2f7d4f; --green-bg:#eef6f0; --green-line:#cfe5d6;
+}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  -webkit-text-size-adjust:100%}
+button,input,textarea{font-family:inherit;font-size:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+
+/* ───── 顶栏 ───── */
+.wtop{max-width:720px;margin:0 auto;padding:14px 20px 0;display:flex;align-items:center;gap:10px}
+.wtop a{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;
+  font-size:12.5px;transition:.13s}
+.wtop a:hover{border-color:var(--red);color:var(--red)}
+.wtop .wt-t{flex:1;text-align:center;font-weight:600;font-size:13px;color:var(--mute)}
+.wmain{max-width:720px;margin:0 auto;padding:18px 20px 90px}
+
+/* ───── 目录页 ───── */
+.whero h1{margin:26px 0 0;font:600 30px/1.2 Georgia,"PingFang SC",serif;letter-spacing:-.01em}
+.whero p{margin:10px 0 0;color:var(--mute);font-size:13px}
+.wsec{margin-top:30px}
+.wsec>h2{margin:0 0 12px;font-size:15.5px;font-weight:600}
+.wcards{display:flex;flex-direction:column;gap:10px}
+.wcard{display:flex;align-items:center;gap:12px;background:var(--panel);
+  border:1px solid var(--line);border-radius:11px;padding:15px 16px;transition:.13s}
+.wcard:hover{border-color:#c9c5bc;transform:translateY(-1px);box-shadow:0 3px 10px #0000000a}
+.wcard:active{transform:scale(.99)}
+.wcard .no{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--red);letter-spacing:.04em}
+.wcard .tt{flex:1;min-width:0}
+.wcard .tt b{display:block;font-size:15px;font-weight:600}
+.wcard .tt i{display:block;font-style:normal;color:var(--mute);font-size:11.5px;margin-top:2px}
+.wcard .tg{flex:0 0 auto;font-size:10.5px;color:var(--mute);border:1px solid var(--line);
+  border-radius:20px;padding:1px 8px}
+.wcard .ar{flex:0 0 auto;color:#b5b1a8;font-size:16px}
+/* 两张特卡(课后练习 / 批改) */
+.wcard.blue{background:var(--blue-bg);border-color:var(--blue-line)}
+.wcard.blue .no{color:var(--blue)}
+.wcard.blue .tt b{color:var(--blue)}
+.wcard.green{background:var(--green-bg);border-color:var(--green-line)}
+.wcard.green .no{color:var(--green)}
+.wcard.green .tt b{color:var(--green)}
+.wprog{margin-top:3px;height:5px;border-radius:3px;background:#00000010;overflow:hidden}
+.wprog b{display:block;height:100%;border-radius:3px}
+
+/* ───── 详情页 ───── */
+.wback{display:inline-block;margin-top:22px;color:var(--mute);font-size:12.5px}
+.wback:hover{color:var(--red)}
+.wd-hd{margin:10px 0 4px}
+.wd-hd h1{margin:0;font:600 24px/1.25 Georgia,"PingFang SC",serif}
+.wd-hd .tag{display:inline-block;margin-top:8px;font-size:11px;color:var(--mute);
+  border:1px solid var(--line);background:#fff;border-radius:20px;padding:2px 10px}
+.wd-hd .wd-meta{margin:12px 0 0;color:var(--mute);font-size:12px}
+.wdetail p,.wdetail li{font-size:13.8px}
+.wdetail h3{margin:30px 0 10px;font-size:16px;font-weight:700;
+  padding-left:10px;border-left:3px solid var(--red);line-height:1.35}
+.wlead{margin:16px 0 0;color:#5d5a54}
+.wlead b{color:var(--red)}
+.wnote{color:var(--mute);font-size:12.5px}
+.wbox{border:1px solid var(--line);background:#fff;border-radius:11px;padding:14px 16px;margin:14px 0}
+.wbox h4{margin:0 0 8px;font-size:13.5px}
+.wbox p{margin:6px 0;color:#5d5a54;font-size:13px}
+.wbox ol,.wbox ul{margin:6px 0;padding-left:20px}
+.wbox li{margin:5px 0}
+.wtable{width:100%;border-collapse:collapse;margin:12px 0;font-size:12.8px;background:#fff;
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
+.wtable th,.wtable td{border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:8px 10px;text-align:left;vertical-align:top;white-space:normal}
+.wtable tr:first-child th,.wtable tr:first-child td{border-top:0}
+.wtable tr:last-child td{border-bottom:0}
+.wtable th{color:var(--mute);font-weight:600;background:#faf9f6}
+.wtable-type th:first-child{width:64px}
+.wtable-type td b{color:var(--red)}
+/* 句型条目:英文在上,中文注释在下 */
+.wsent{list-style:none;margin:10px 0;padding:0}
+.wsent li{background:#fff;border:1px solid var(--line);border-radius:10px;
+  padding:11px 14px;margin:9px 0}
+.wsent .en{display:block;font-size:13.6px;line-height:1.55}
+.wsent .en i{font-style:italic;color:var(--red);padding:0 2px}
+.wsent .zh{display:block;color:var(--mute);font-size:12px;margin-top:4px}
+/* 格式框 */
+.wfmt{border:1px solid var(--line);background:#fbfaf7;border-radius:11px;
+  padding:14px 16px;margin:12px 0;font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
+.wfmt p{margin:7px 0}
+.wfmt i{color:var(--mute);font-family:inherit}
+/* 图表图 */
+.wfig{margin:14px 0;text-align:center}
+.wfig img{max-width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+.wfig figcaption{color:var(--mute);font-size:11.5px;margin-top:6px}
+/* 范文 */
+.wsample{border:1px solid var(--line);border-radius:12px;background:#fff;margin:12px 0;overflow:hidden}
+.wsample .ws-hd{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px dashed var(--line);
+  font-size:12px;color:var(--mute)}
+.wsample .ws-hd b{color:var(--ink);font-size:13px}
+.wsample .ws-en{padding:4px 17px 14px;white-space:pre-wrap;font:13.4px/1.75 Georgia,"Times New Roman",serif}
+.wsample .ws-zh{border-top:1px dashed var(--line);padding:12px 17px 14px;color:#5d5a54;
+  font-size:12.8px;white-space:pre-wrap}
+.wsample .ws-toggle{border:0;background:none;color:var(--red);font-size:12.5px;cursor:pointer;
+  padding:10px 15px 0;text-align:left}
+/* 数据表(练习/批改里的图表数据) */
+.wdata{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;
+  background:#fff;border:1px solid var(--line);border-radius:10px;display:block;overflow-x:auto}
+.wdata th,.wdata td{border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:7px 10px;text-align:center}
+.wdata tr:first-child th,.wdata tr:first-child td{border-top:0}
+.wdata tr:last-child td{border-bottom:0}
+.wdata th{background:#faf9f6;color:var(--mute);white-space:nowrap}
+
+/* ───── 练习页 ───── */
+.wsess{list-style:none;margin:14px 0;padding:0}
+.wsess details{background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  margin:10px 0}
+.wsess summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:11px;
+  padding:14px 15px}
+.wsess summary::-webkit-details-marker{display:none}
+.wsess .sn{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--red);
+  border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 8px}
+.wsess .sn.big{color:var(--blue)}
+.wsess .st{flex:1;min-width:0}
+.wsess .st b{display:block;font-size:14.5px}
+.wsess .st i{display:block;font-style:normal;color:var(--mute);font-size:11.5px;margin-top:1px}
+.wsess .sd{flex:0 0 auto;color:var(--mute);font-size:11px}
+.wsess .done-mark{color:var(--green);font-size:12px;font-weight:600}
+.wsess .bd{border-top:1px dashed var(--line);padding:13px 16px 16px}
+.wsess .bd .cn{margin:0 0 6px}
+.wsess .bd .en{margin:6px 0;color:#5d5a54;font:12.9px/1.6 Georgia,serif}
+.wsess .bd .tm{color:var(--mute);font-size:12px;margin:8px 0 0}
+.wsess .bd .golink{display:inline-block;margin-top:10px;font-size:12.5px;color:var(--red)}
+.wck{list-style:none;margin:12px 0 0;padding:12px 13px;border:1px solid var(--line);
+  border-radius:10px;background:#fbfaf7}
+.wck legend,.wck .wck-t{font-size:12.5px;font-weight:600;color:var(--mute);padding:0 2px 6px}
+.wck label{display:flex;align-items:flex-start;gap:9px;padding:6px 2px;font-size:13px;cursor:pointer}
+.wck input{margin:3px 0 0;width:15px;height:15px;accent-color:var(--red);flex:0 0 auto}
+.wprogbar{display:flex;align-items:center;gap:12px;margin:16px 0 4px}
+.wprogbar .bar{flex:1;height:6px;border-radius:3px;background:#00000010;overflow:hidden}
+.wprogbar .bar b{display:block;height:100%;border-radius:3px}
+.wprogbar span{font-size:12px;color:var(--mute);white-space:nowrap}
+
+/* ───── 批改页 ───── */
+.wpreds{display:flex;flex-direction:column;gap:0;margin-top:6px}
+.wpreds a.wp{display:flex;align-items:center;gap:11px;background:var(--panel);
+  border:1px solid var(--line);border-radius:0;padding:14px 16px}
+.wpreds a.wp:first-child{border-radius:11px 11px 0 0}
+.wpreds a.wp:last-child{border-radius:0 0 11px 11px}
+.wpreds a.wp:not(:first-child){margin-top:-1px}
+.wpreds .no{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--red);letter-spacing:.03em}
+.wpreds .tt{flex:1;min-width:0}
+.wpreds .tt b{font-size:14.5px;font-weight:600}
+.wpreds .tt i{font-style:normal;color:var(--mute);font-size:11.5px;margin-left:8px}
+.wpreds .st{flex:0 0 auto;font-size:10.5px;border-radius:20px;padding:1px 9px;border:1px solid var(--line)}
+.wpreds .st.s0{color:var(--mute)}
+.wpreds .st.s1{color:var(--blue);border-color:var(--blue-line);background:var(--blue-bg)}
+.wpreds .st.s2{color:var(--green);border-color:var(--green-line);background:var(--green-bg)}
+.wpreds .ar{flex:0 0 auto;color:#b5b1a8}
+.whero-sm h1{margin:26px 0 0;font:600 26px/1.2 Georgia,"PingFang SC",serif}
+.whero-sm p{margin:8px 0 0;color:var(--mute);font-size:12.5px}
+
+/* ───── 批改详情 ───── */
+.wtask{border:1px solid var(--line);background:#fff;border-radius:12px;padding:15px 16px;margin:14px 0}
+.wtask .cn{margin:0;font-size:13.6px}
+.wtask .dir{margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line);
+  font:12.7px/1.65 Georgia,serif;color:#5d5a54}
+.warea textarea{width:100%;min-height:240px;border:1px solid var(--line);border-radius:12px;
+  background:#fff;padding:13px 14px;resize:vertical;line-height:1.7;font-size:13.5px;
+  font-family:Georgia,"Times New Roman",serif}
+.warea textarea:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px #a8322a15}
+.warea .wcount{display:flex;justify-content:space-between;align-items:center;margin-top:6px;
+  color:var(--mute);font-size:11.5px}
+.warea .wcount b{color:var(--ink)}
+.wsteps{margin:6px 0}
+.wsteps details{background:#fff;border:1px solid var(--line);border-radius:11px;margin:10px 0}
+.wsteps summary{list-style:none;cursor:pointer;padding:12px 15px;font-size:13.5px;font-weight:600;
+  display:flex;align-items:center;gap:8px}
+.wsteps summary::-webkit-details-marker{display:none}
+.wsteps summary .hint{font-weight:400;color:var(--mute);font-size:11.5px;margin-left:auto}
+.wsteps .bd{border-top:1px dashed var(--line);padding:12px 16px 14px}
+.wsteps ol,.wsteps ul{margin:4px 0;padding-left:20px}
+.wsteps li{margin:6px 0;font-size:13.3px}
+.wsent-in{list-style:none;margin:8px 0;padding:0}
+.wsent-in li{padding:9px 12px;border-radius:9px;background:#fbfaf7;border:1px solid var(--line);margin:8px 0}
+.wsent-in .en{display:block;font:13.2px/1.6 Georgia,serif}
+.wsent-in .zh{display:block;color:var(--mute);font-size:11.8px;margin-top:3px}
+
+/* ───── 核心句库 ───── */
+.wcard.red{background:#faf1ef;border-color:#eccfca}
+.wcard.red .no{color:var(--red)}
+.wcard.red .tt b{color:var(--red)}
+.use-tag{display:inline-block;margin-left:7px;padding:0 7px;font-size:10px;font-weight:600;
+  color:var(--red);border:1px solid #eccfca;border-radius:9px;background:#faf1ef;vertical-align:1px}
+.wcard .tt a,.wdetail a.golink,.wsent a{color:var(--red)}
+/* 句库目录页的默写入口 */
+.drillcta{display:flex;align-items:center;gap:10px;border:1px solid #eccfca;background:#faf1ef;
+  border-radius:12px;padding:14px 16px;margin-top:16px;color:inherit}
+.drillcta b{margin-left:auto;flex:0 0 auto;color:var(--red);font-size:13px}
+.drillcta>span:first-child{font-weight:600;font-size:14px;color:var(--red)}
+.drillcta span{display:block}
+.drillcta span i{display:block;font-style:normal;color:var(--mute);font-size:11.5px;font-weight:400;margin-top:2px}
+
+/* ───── 句子循环练 ───── */
+.drill-hd{display:flex;align-items:center;gap:10px;margin-top:22px;flex-wrap:wrap}
+.drill-meta{flex:1;min-width:200px}
+.drill-meta b{display:block;font-size:15px}
+.drill-meta span{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.drill-card{border:1px solid var(--line);background:#fff;border-radius:14px;padding:22px 20px;margin-top:14px}
+.drill-sent{margin:0;font:16.5px/1.7 Georgia,"Times New Roman",serif}
+.drill-sent .blank{font-style:normal;color:var(--red);letter-spacing:.05em;border-bottom:2px solid var(--red);
+  padding:0 6px;font-weight:600}
+.drill-zh{margin:12px 0 0;color:var(--mute);font-size:12.5px}
+.drill-row{display:flex;gap:9px;margin-top:16px}
+.drill-row input{flex:1;border:1px solid var(--line);border-radius:10px;padding:11px 13px;
+  font-size:14.5px;font-family:Georgia,serif;min-width:0}
+.drill-row input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px #a8322a15}
+.drill-btn{border:0;background:var(--ink);color:#fff;border-radius:10px;padding:11px 18px;
+  font-size:13.5px;font-weight:600;cursor:pointer;text-align:center}
+.drill-btn:active{transform:scale(.97)}
+.drill-btn.ghost,.drill-ghost{border:1px solid var(--line);background:#fff;color:var(--mute);
+  border-radius:10px;padding:11px 14px;font-size:13px;cursor:pointer}
+.drill-fb{margin-top:12px;padding:11px 13px;border-radius:10px;font-size:13.5px}
+.drill-fb .no-x{color:var(--red)}
+.drill-fb .no-x b{border-bottom:2px solid var(--red)}
+.drill-ops{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap}
+.drill-done h2{margin:0 0 8px;color:var(--green);font-size:19px}
+.drill-done p{margin:0;color:#5d5a54;font-size:13.5px}
+.drill-done .drill-ops{margin-top:18px}
+
+/* 小屏 */
+@media (max-width:520px){
+  .wtop,.wmain{padding-left:15px;padding-right:15px}
+  .whero h1{font-size:26px}
+  .wcard .tg{display:none}
+  .wsent .en{font-size:13.2px}
+  .wsample .ws-en{font-size:13px}
+}
+</style>
+</head>
+<body>
+<div class="wtop">
+  <a href="index.html">← 真题</a>
+  <span class="wt-t" id="wtT">作文模版</span>
+  <a href="#/" id="wtH">目录</a>
+</div>
+<main class="wmain" id="wrMain"></main>
+
+<script src="writing-data.js?v=16"></script>
+<script src="writing.js?v=16"></script>
+<script src="sw-reg.js?v=16"></script>
+</body>
+</html>
