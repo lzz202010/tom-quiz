@@ -15,7 +15,7 @@
     if (PAPERS[y]) return Promise.resolve(PAPERS[y]);
     return new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = `d/${y}.js?v=16`;
+      s.src = `d/${y}.js?v=17`;
       s.onload = () => {
         const p = (window.E2DATA || {})[y];
         if (!p) return rej(new Error('该年数据缺失'));
@@ -530,7 +530,7 @@
     if (window.E2GLOSS_DATA) return Promise.resolve();
     if (!glossP) glossP = new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = 'gloss-data.js?v=16';
+      s.src = 'gloss-data.js?v=17';
       s.onload = () => res();
       s.onerror = () => rej(new Error('释义词典加载失败'));
       document.head.appendChild(s);

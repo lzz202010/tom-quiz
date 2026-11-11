@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  /* ═══════════ 小作文自查 / 大作文自查 ═══════════ */
+  /* ═══════════ 分题型自查:不要把书信的格式要求套到告示/纪要 ═══════════ */
   const CHECK_SMALL = [
     '首段 As a…, I am writing this email to + 目的(动词组照抄)',
     '题目任务点逐条覆盖,一条不漏(一般 2~3 点)',
@@ -14,13 +14,44 @@
     '落款 Li Ming / Zhang Wei(按题干),没写真名',
     '100 词左右(80~110)'
   ];
+  const CHECK_NOTICE = [
+    '标题 Notice 居中,日期写在标题下一行右侧',
+    '首段 This notice is written to + 通知目的,任务点齐全',
+    '活动三句齐全:时间地点 / 目的 / 流程;招募类再写志愿者要求',
+    '结尾有联系方式和 Come on and join us now!',
+    '落款写机构(如 The Student Union),不写 Li Ming,不写书信尾段',
+    '100 词左右(80~110)'
+  ];
+  const CHECK_MINUTES = [
+    'Subject / Date / Location / Present 顶格;题干没给出席者就不编',
+    'The minutes are as follows: 后至少写 3 个要点',
+    '流程 / 目的 / 其他要点均回应题干,不套书信称呼和尾段',
+    '要点用编号,句子主谓一致,时间地点与题干一致',
+    '100 词左右(80~110)'
+  ];
   const CHECK_BIG = [
-    '第一段只引 2~3 个数据:lion\'s share / take up the second / account for',
+    '第一段点图;静态按 lion\'s share / second largest / respectively 写清占比',
     '第二段 First and foremost 从中获益(3 个短语)+ In addition 原因二',
     '收尾 With due consideration… is projected to show an upward trend',
     '衔接词齐全:First and foremost / In addition / By contrast',
     '字数 150 左右(130~175 都安全)',
-    '把自己最容易写错的那句再抄一遍'
+    '占比、主谓一致和自己最易错的句再检查一遍'
+  ];
+  const CHECK_BIG_DYNAMIC = [
+    '第一段点图;动态数据写全 from…to…、年份和单位',
+    '上升/下降用词与图中趋势一致,没有把 billion 和「亿」混写',
+    '第二段 First and foremost 从中获益(3 个短语)+ In addition 原因二',
+    '收尾 With due consideration… is projected to show an upward trend',
+    '字数 150 左右(130~175 都安全)',
+    '数字、主谓一致和自己最易错的句再检查一遍'
+  ];
+  const CHECK_BIG_COMBO = [
+    '第一段先写漫画,再用 Meanwhile, there is a chart… 写图表',
+    '漫画人物、话语和图表数值都与题目一致,不另编信息',
+    '第二段 First and foremost 从中获益(3 个短语)+ In addition 原因二',
+    '收尾 With due consideration… is projected to show an upward trend',
+    '字数 150 左右(130~175 都安全)',
+    '倒装句主谓一致、数据单位和自己最易错的句再检查一遍'
   ];
 
   /* ═══════════ 核心句库(八哥背诵句,全站复现的母本) ═══════════ */
@@ -62,7 +93,7 @@
       ${sent('I really hope that you can accept my <i>suggestions / invitation / apology / recommendation / complaint</i>.', 'X 换成信型名词。', '尾段第 1 句')}
       ${sent('I am looking forward to your early reply.', '尾段第 2 句,原样背。', '尾段第 2 句')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「小作文骨架」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c1" class="golink">挖空默写「小作文骨架」›</a></p></div>` },
 
   { id: 'c2', no: '句库 02', title: '活动三句', tag: '题干有活动/事件就能用:邀请·告示·备忘录·介绍·欢迎', html: `
     <p class="wlead">八哥体系的<b>第一素材包</b>:只要题干出现会议/比赛/夏令营/文化节/义卖/毕业典礼,中间段就写这三句(+被邀人重要性一句)。时间地点从题干抄,目的和流程用短语库填。</p>
@@ -87,7 +118,7 @@
       ${sent('You have enjoyed popularity in our university, so your coming will be our great honor.', '对长辈/专家/教授用这句。', '邀请信专用')}
       ${sent('This is especially for you, so you will have a good time then.', '对同学/平辈用这句。', '邀请信专用')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「活动三句」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c2" class="golink">挖空默写「活动三句」›</a></p></div>` },
 
   { id: 'c3', no: '句库 03', title: '事物优点四句', tag: '推荐信/介绍信:推荐景点·美食·专业·歌曲·社团', html: `
     <p class="wlead">推荐<b>任何东西</b>(长城、北京烤鸭、临床医学、Faded、传统文化社团)都用这四句:总论 → 从中获益 → 有名 → 有意思。<b>「从中获益」就是大作文第二段的同一套短语</b>,背一遍两边用。</p>
@@ -97,7 +128,7 @@
       ${sent('In addition, <i>the Palace Museum</i> is quite famous, enjoying a great reputation all over the world.', '有名句:enjoying 现在分词拖尾。', '事物·城市·大学都行')}
       ${sent('Last but not least, it is so <i>splendid</i> that I never fail to be attracted to it, which leaves a deep impression on me.', '有意思句。形容词按对象换:interesting 有趣 / promising 有前景 / yummy 美味 / splendid 宏伟。', '推荐信收尾')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「事物优点四句」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c3" class="golink">挖空默写「事物优点四句」›</a></p></div>` },
 
   { id: 'c4', no: '句库 04', title: '建议四句 + 三大从句', tag: '建议信/回复信 · 按目标分数选从句', html: `
     <p class="wlead">建议信=总论句+三个建议句。建议的内容用「动词+名词」从题干想(学语法/延长开放时间/找导游),句尾再挂一个从句冲分:<b>四级未过挂 which 从句,四级过了挂 so that,六级过了挂 because</b> —— 全都背 also 可以,考场上哪个顺手写哪个。</p>
@@ -115,7 +146,7 @@
       食堂:降低价格 lower the price · 丰富食物种类 enrich the kinds of foods<br>
       学翻译(2016):学语法 study grammar · 找专业老师 · 读更多英文书 · 做练习 do more practice<br>
       古建筑调查(2024):读更多书籍 · 查找相关资料 · 找当地导游 find a local guide · 带一个相机</p></div>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「建议四句」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c4" class="golink">挖空默写「建议四句」›</a></p></div>` },
 
   { id: 'c5', no: '句库 05', title: '道歉三句', tag: '原因+背锅+补救 · 三句拿满道歉信中间段', html: `
     <p class="wlead">道歉信中间段就这三句:<b>犯错原因(粗心)+全面背锅+补救办法</b>。原因统一说「太粗心忘了检查行李/时间表」,补救满足对方任何合理要求。</p>
@@ -124,7 +155,7 @@
       ${sent('I take full responsibility and I assure you that this won\'t happen again.', '背锅句,原样背。', '道歉 2')}
       ${sent('To make up for my fault, I will satisfy any reasonable request you make.', '补救句。2008 真题变体:you can buy a new one in Canada, and I will pay for it.', '道歉 3')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「道歉三句」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c5" class="golink">挖空默写「道歉三句」›</a></p></div>` },
 
   { id: 'c6', no: '句库 06', title: '感谢四句', tag: '反面假设+正面解决 · 后两句 80 分以上再背', html: `
     <p class="wlead">感谢信的杀手锏是<b>反面假设句</b>:假如没有你的帮助,我就不会……。后面接三个「没有得到帮助的后果」,直接套获益库的过去分词版(improved / found / made)。</p>
@@ -135,7 +166,7 @@
       ${sent('But you showed by your actions that you are an exception.', '升华句下半:用行动证明你是例外。', '冲高分')}
     </ul>
     <p class="wnote">感谢+邀请是八哥点名的预测组合:感谢之后接 I want to invite you to visit the Great Wall. It is quite famous, enjoying a great reputation in the world.(事物优点句复现)</p>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「感谢四句」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c6" class="golink">挖空默写「感谢四句」›</a></p></div>` },
 
   { id: 'c7', no: '句库 07', title: '人物优点 + 志愿者', tag: '申请信(我)·推荐人(他)·告示志愿者(他们)', html: `
     <p class="wlead">写「人」的优点就这四句,人称随题型换:申请信 I、推荐信 he/she、招募告示 they。志愿者告示直接把后两句挂在活动三句后面。</p>
@@ -148,7 +179,7 @@
       ${sent('They should be warm-hearted, patient and energetic.', '性格(they 版)。', '告示·招募')}
       ${sent('In addition, they ought to have good communication skills and be proficient in English.', '能力(they 版),和人物 3 是同一套词。', '告示·招募')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「人物优点+志愿者」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c7" class="golink">挖空默写「人物优点+志愿者」›</a></p></div>` },
 
   { id: 'c8', no: '句库 08', title: '询问 · 投诉 · 祝贺', tag: '各三两句 · 组合信的配料', html: `
     <p class="wlead">三种小配角,常和主信型组合出题(2024 英语二就是建议+询问)。句子少,直接背。</p>
@@ -170,17 +201,17 @@
       ${sent('Your own intelligence and diligence have earned you this achievement.', '把成就归功于对方的聪明+勤奋。', '祝贺 1')}
       ${sent('I can well imagine that your parents are so proud of you now and anxiously hope to witness your brilliant success.', '想象父母骄傲,场面话。', '祝贺 2')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「询问·投诉·祝贺」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c8" class="golink">挖空默写「询问·投诉·祝贺」›</a></p></div>` },
 
   { id: 'c9', no: '句库 09', title: '大作文 · 动态图数据句', tag: '数字在变就用这组:增长/下降/翻倍', html: `
     <p class="wlead">动态图(柱/线/表,年份对比)第一段全部用「<b>great changes 句 + witness 句</b>」:一句写降的,一句写升的,数据 from A to B 给全。</p>
     <ul class="wsent">
       ${sent('From the chart, we can clearly see that great changes have taken place in <i>the sales of electric vehicles</i>, <i>increasing dramatically from 0.77 million in 2018 to 4.2 million in 2021</i>.', '主句+现在分词拖尾,一降一升各用一次。', '★动态图第 1 句')}
-      ${sent('On the contrary, a remarkable rise was witnessed in <i>the number of online education users</i>, waving from 0.11 billion to 0.423 billion during the same period.', 'witness 被动:上升下降都能换(was witnessed in…waving from…to…)。', '★动态图第 2 句')}
+      ${sent('On the contrary, a remarkable rise was witnessed in <i>the number of online education users</i>, rising from 0.11 billion to 0.423 billion during the same period.', 'witness 被动:上升下降都能换(was witnessed in…rising from…to…)。', '★动态图第 2 句')}
       ${sent('And the percentage of <i>starting a business</i> doubled during the same period.', '小数据一句话:翻倍/略升(ranged from 8% to 20%)。', '动态图收尾')}
       ${sent('数字表达:increasing dramatically 猛增 / decreasing dramatically 猛降 / a steady rise 稳升 / ranging from A to B 从A到B', '记四个就够全部真题。')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「动态图数据句」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c9" class="golink">挖空默写「动态图数据句」›</a></p></div>` },
 
   { id: 'c10', no: '句库 10', title: '大作文 · 静态图数据句', tag: '饼图/单年柱图:最大·第二·其他', html: `
     <p class="wlead">静态图(某一年占比)第一段三件套:<b>lion's share 最大份额 → second largest 第二 → By contrast 其余分别</b>。三个句型把任何饼图写完。</p>
@@ -190,7 +221,7 @@
       ${sent('By contrast, that of <i>cash and others</i> only accounts for 17% and 8% respectively.', '其余项:that of 指代 + respectively(分别)。', '★静态图第 3 句')}
       ${sent('The pie chart reflects <i>the survey of the payment ways of the residents in a certain city in 2019</i>.', '首句点图:chart 名 + the survey of 主题 + 时间地点,全部照题干抄。', '动/静通用首句')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「静态图数据句」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c10" class="golink">挖空默写「静态图数据句」›</a></p></div>` },
 
   { id: 'c11', no: '句库 11', title: '大作文 · 从中获益 + 原因二', tag: '第二段万能:获益三短语 + 四种原因二', html: `
     <p class="wlead">第二段固定结构:<b>总起句 → First and foremost 从中获益(三个短语)→ In addition 原因二</b>。获益短语和小作文是同一套(复现!),原因二从四备选里挑一个。</p>
@@ -208,7 +239,7 @@
       ${sent('In addition, in recent years, China has been characterized by the increase in people\'s income and the rapid development in economy, which enabled people to possess extra money to <i>buy more meat</i>.', '③收入版:收入提高买得起。', '消费类话题')}
       ${sent('In addition, it is difficult for many people to <i>cook their own foods</i> because <i>they are so busy with their work</i>.', '④反面版:别的选项不行,所以选它(太忙没法做饭/堵车不开私家车)。', '★生活方式类')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「从中获益+原因二」›</a></p></div>` },
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c11" class="golink">挖空默写「从中获益+原因二」›</a></p></div>` },
 
   { id: 'c12', no: '句库 12', title: '收尾预测 + 漫画两句', tag: '第三段一句收尾 · 图表漫画组合第一段', html: `
     <p class="wlead">第三段只有一句(最多加半句建议):<b>With due consideration 预测句</b>。另外,大纲新宠「图表+漫画」组合题的第一段是两个固定句,先漫画后图表。</p>
@@ -227,7 +258,7 @@
       ${sent('Actually, there are a host of complicated driving factors that may explain the importance of <i>insisting on dreams</i>, and the two most noteworthy ones could be summarized as follows.', '纯漫画专用总起(比图表版词多)。', '纯漫画')}
       ${sent('In addition, studies from Harvard University have found that college students—those who <i>insist on their dreams</i>—excel other students on a range of education and career achievement factors.', '哈佛研究句:那些主题词的大学生领先他人。', '纯漫画冲分')}
     </ul>
-    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill" class="golink">挖空默写「收尾+漫画句」›</a></p></div>` }
+    <div class="wbox"><h4>去练这组</h4><p><a href="#/drill/c12" class="golink">挖空默写「收尾+漫画句」›</a></p></div>` }
   ];
 
   /* ═══════════ 挖空默写题(答案判等时忽略大小写/空格/尾部标点) ═══════════ */
@@ -292,7 +323,7 @@
     <h3>第一段 · 两种写法(复现句库 09/10)</h3>
     <ul class="wsent">
       ${sent('The pie chart reflects the survey of <i>the payment ways of the residents in a certain city in 2019</i>.', '首句点图:图名 + the survey of 主题 + 地点年份,照题干抄。')}
-      ${sent('动态:great changes have taken place in <i>A</i>, decreasing dramatically from <i>x</i> to <i>y</i>. On the contrary, a remarkable rise was witnessed in <i>B</i>, waving from <i>m</i> to <i>n</i> during the same period.', '一降一升各一句,from…to 给全。')}
+      ${sent('动态:great changes have taken place in <i>A</i>, decreasing dramatically from <i>x</i> to <i>y</i>. On the contrary, a remarkable rise was witnessed in <i>B</i>, rising from <i>m</i> to <i>n</i> during the same period.', '一降一升各一句,from…to 给全。')}
       ${sent('静态:the proportion of <i>A</i> gets the lion\'s share, occupying <i>x%</i> and the percentage of <i>B</i> takes up the second largest part, with <i>y%</i>. By contrast, that of <i>C and D</i> only accounts for <i>m% and n%</i> respectively.', '最大 → 第二 → 其余,三句连招。')}
     </ul>
     <h3>第二段 · 获益+原因二(复现句库 11)</h3>
@@ -318,8 +349,8 @@
       ${sent('As is shown above, at <i>the right side of the cartoon</i> is <i>a car owner</i> who is saying, "<i>Electric vehicle helps me save a lot of money.</i>"', '①完全倒装:at the 方位 is a 人 who is saying "把气泡中文翻译成英文"。')}
       ${sent('Meanwhile, there is a chart which shows that <i>the sales of electric vehicles increased from 4.5 million in 2021 to 9.5 million in 2024</i>.', '②There be + 动态句/静态句,数据照图抄。')}
     </ul>
-    <div class="wbox"><h4>八哥四个组合预测(第一段直接套)</h4>
-      <p>电动车:on a high-speed train → "It is so fast and convenient!" · 高铁:the total length of high-speed railways increased from 120km in 2008 to 45000km in 2024<br>
+    <div class="wbox"><h4>另外三个组合预测(第一段直接套;电动车见下方范文)</h4>
+      <p>高铁:on a high-speed train → "It is so fast and convenient!" · 高铁里程:the total length of high-speed railways increased from 120km in 2008 to 45000km in 2024<br>
       中国文化:on the Great Wall is a foreigner → "It is so impressive/incredible/splendid." · HSK:the number of foreigners who take the HSK exam increased from 0.37 million to 0.92 million<br>
       电子书纸质书:in the library are two students who are using two different ways to read · the percentage of using electronic books increased from 30% in 2019 to 70% in 2023</p></div>
     <h3>纯漫画 · 三段骨架</h3>
@@ -446,12 +477,12 @@ With due consideration of all these factors, we may make a rational prediction: 
 充分考虑这些因素后,我们可以做出合理预测:独自锻炼的比例预计将呈上升趋势。`
     },
     's-ev': {
-      title: '预测 · 新能源汽车产销量(八哥原文)',
-      en: `From the chart, we can clearly see that great changes have taken place in the sales of traditional fuel-based vehicles, decreasing dramatically from 28.01 million in 2018 to 16.81 million in 2021. On the contrary, a remarkable rise was witnessed in the sales of electric vehicles, waving from 0.77 million to 4.2 million during the same period.
+      title: '预测 · 新能源汽车产销量(八哥原文 · 网站校订)',
+      en: `From the chart, we can clearly see that great changes have taken place in the sales of traditional fuel-based vehicles, decreasing dramatically from 28.01 million in 2018 to 16.81 million in 2021. On the contrary, a remarkable rise was witnessed in the sales of electric vehicles, rising from 0.77 million to 4.2 million during the same period.
 
-Actually, there are a host of complicated driving factors that may contribute to this phenomenon, and the two most noteworthy ones could be summarized as follows. First and foremost, from using electric vehicles, we can get numerous benefits, such as saving money greatly, acquiring unique experience and making our own contributions to environmental protection, which would explain what appears in the chart. In addition, with the advancement in science and technology, the Chinese battery industry has been enjoying a rapid development, thus providing people with more long-endurance battery, such as Qilin battery.
+Actually, there are a host of complicated driving factors that may contribute to this phenomenon, and the two most noteworthy ones could be summarized as follows. First and foremost, from using electric vehicles, we can get numerous benefits, such as saving money greatly, acquiring unique experience and making our own contributions to environmental protection, which would explain what appears in the chart. In addition, with the advancement in science and technology, the Chinese battery industry has been enjoying a rapid development, thus providing people with more long-endurance batteries, such as the Qilin battery.
 
-With due consideration of all these contributors, we may make a rational prediction: the sales of the electric vehicles is projected to show an upward trend.`,
+With due consideration of all these contributors, we may make a rational prediction: the sales of electric vehicles are projected to show an upward trend.`,
       zh: `从图中可以清楚看到,传统燃油车销量发生了巨大变化,从 2018 年的 2810 万辆骤降至 2021 年的 1681 万辆。相反,电动汽车销量见证了显著上升,同期从 77 万辆增至 420 万辆。
 
 事实上,有大量复杂的驱动因素可以解释这一现象,最值得注意的两个总结如下。首先,使用电动汽车能让我们获得诸多好处,比如大大省钱、获得独特体验、为环保做出自己的贡献,这正解释了图中所示。此外,随着科技进步,中国电池行业迅速发展,为人们提供了更多长续航电池,比如麒麟电池。
@@ -459,10 +490,10 @@ With due consideration of all these contributors, we may make a rational predict
 充分考虑这些因素后,我们可以做出合理预测:电动汽车销量预计将呈上升趋势。`
     },
     's-grad2019': {
-      title: '2019 真题 · 毕业生去向(八哥原文)',
-      en: `The bar chart reflects the changes of the choices of graduates in a certain university from 2013 to 2018. From the chart, we can clearly see that great changes have taken place in the percentage of looking for a job, decreasing from 68.1% to 60.7%. On the contrary, a rise was witnessed in the proportion of pursuing a master degree, waving from 26.3% to 34% during the same period. And the percentage of starting a business doubled during the same period.
+      title: '2019 真题 · 毕业生去向(八哥原文 · 网站校订)',
+      en: `The bar chart reflects the changes of the choices of graduates in a certain university from 2013 to 2018. From the chart, we can clearly see that great changes have taken place in the percentage of looking for a job, decreasing from 68.1% to 60.7%. On the contrary, a rise was witnessed in the proportion of pursuing a master's degree, rising from 26.3% to 34% during the same period. And the percentage of starting a business doubled during the same period.
 
-Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from pursuing a master degree, we can get numerous benefits, such as acquiring a higher platform, learning more things and broadening our horizons, which would explain what appears in the chart. In addition, it is difficult for many graduates to look for a job because job opportunities are limited.
+Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from pursuing a master's degree, we can get numerous benefits, such as acquiring a higher platform, learning more things and broadening our horizons, which would explain what appears in the chart. In addition, it is difficult for many graduates to look for a job because job opportunities are limited.
 
 With due consideration of all these contributors, we may make a rational prediction: the proportion of pursuing further study is projected to show an upward trend.`,
       zh: `柱状图反映了 2013–2018 年某高校毕业生去向的变化。如图清晰可见,找工作的比例发生巨变,从 68.1% 降到 60.7%。相反,读研的比例见证了上升,同期从 26.3% 涨到 34%。创业的比例同期翻了一番。
@@ -472,8 +503,8 @@ With due consideration of all these contributors, we may make a rational predict
 充分考虑这些因素后,我们可以做出合理预测:继续深造的比例预计将呈上升趋势。`
     },
     's-diet': {
-      title: '预测 · 居民饮食结构(八哥原文)',
-      en: `The table chart reflects the changes of the survey of the dietary structure of the residents in a certain city from 2016 to 2019. From the chart, we can clearly see that great changes have taken place in the percentage of grain, decreasing from 49% to 39%. On the contrary, a rise was witnessed in the proportion of fruit and vegetables, waving from 15% to 28% during the same period. And there was a climb in the percentage of meat, ranging from 8% to 20%.
+      title: '预测 · 居民饮食结构(八哥原文 · 网站校订)',
+      en: `The table chart reflects the changes of the survey of the dietary structure of the residents in a certain city from 2016 to 2019. From the chart, we can clearly see that great changes have taken place in the percentage of grain, decreasing from 49% to 39%. On the contrary, a rise was witnessed in the proportion of fruit and vegetables, rising from 15% to 28% during the same period. And there was a climb in the percentage of meat, ranging from 8% to 20%.
 
 Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from eating more meat, we can get numerous benefits, such as improving our living standards, absorbing more nutrition and maintaining a balanced diet, which would explain what appears in the chart. In addition, in recent years, China has been characterized by the increase in people's income and the rapid development in economy, which enabled people to possess extra money to buy more meat.
 
@@ -511,8 +542,8 @@ With due consideration of all these factors, we may make a rational prediction: 
 充分考虑这些因素后,我们可以做出合理预测:乘坐公共交通的比例预计将呈上升趋势。`
     },
     's-onlineedu': {
-      title: '预测 · 在线教育(八哥原文)',
-      en: `From the chart, we can clearly see that great changes have taken place in the number of online education users, increasing dramatically from 0.11 billion in 2015 to 0.423 billion in 2020. Meanwhile, a steady rise was witnessed in the rate of the Internet penetration, waving from 50.3% to 64.5% during the same period.
+      title: '预测 · 在线教育(八哥原文 · 网站校订)',
+      en: `From the chart, we can clearly see that great changes have taken place in the number of online education users, increasing dramatically from 0.11 billion in 2015 to 0.423 billion in 2020. Meanwhile, a steady rise was witnessed in the Internet penetration rate, rising from 50.3% to 64.5% during the same period.
 
 Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from using online education, we can get numerous benefits, such as acquiring more advanced knowledge and better educational resources, making the study more convenient, improving the study efficiency and making full use of fragmented time to study, which would explain what appears in the chart. In addition, with the advancement in science and technology, the Internet industry has been enjoying a rapid development, thus providing people with more choices.
 
@@ -555,7 +586,7 @@ With due consideration of all these factors, we may make a rational prediction: 
 
 Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from using electric vehicles, we can get numerous benefits, such as saving money greatly, making our life more convenient and making our own contributions to environmental protection, which would explain what appears in the chart. In addition, with the advancement in science and technology, the Chinese battery industry has been enjoying a rapid development, thus providing people with more choices.
 
-With due consideration of all these factors, we may make a rational prediction: the sales of electric vehicles is projected to show an upward trend.`,
+With due consideration of all these factors, we may make a rational prediction: the sales of electric vehicles are projected to show an upward trend.`,
       zh: `如图所示,漫画右边是一位车主,他说:"电动车帮我省了很多钱。"同时,旁边有一张图表,显示电动汽车销量从 2021 年的 450 万辆增长到 2024 年的 950 万辆。
 
 事实上,有两个值得注意的因素可以解释这一现象。首先,使用电动汽车能让我们获得诸多好处,比如大大省钱、让生活更便利、为环保做贡献,这正解释了图中所示。此外,随着科技进步,中国电池行业迅速发展,为人们提供了更多选择。
@@ -875,6 +906,50 @@ Li Ming`,
 
 李明 谨上`
     },
+    'l-intro2017': {
+      title: '2017 真题 · 中国文化演讲回复(八哥原文 · 网站校订)',
+      en: `Dear Professor Williams,
+
+As a student who is filled with respect for you, I am writing this email to accept your invitation to give a presentation about Chinese culture to a host of foreign students.
+
+Here are the key points of my presentation. First and foremost, from Taoism, you can get numerous benefits, such as enriching your spiritual life, broadening your horizons and shortening the distance with Chinese students. In addition, Chinese traditional culture, such as Confucianism is quite famous, enjoying a great reputation in the world.
+
+I really hope that you can accept my presentation. I am looking forward to your early reply.
+
+Yours sincerely,
+Li Ming`,
+      zh: `尊敬的 Williams 教授:
+
+作为一位十分敬重您的学生,我写信接受您的邀请,将为众多留学生做一场关于中国文化的演讲。
+
+以下是演讲要点。首先,道家思想能让大家获益良多,比如丰富精神生活、开阔眼界、拉近与中国学生的距离。此外,以儒家思想为代表的中国传统文化举世闻名,享有盛誉。
+
+真诚希望您认可我的演讲安排,期待早日回复。
+
+李明 谨上`
+    },
+    'l-debate2019': {
+      title: '2019 真题 · 低碳辩论主题与安排(八哥原文)',
+      en: `Dear Professor Smith,
+
+As the president of the Student Union, I am writing this email to suggest a topic for the debate—A Low-Carbon Lifestyle.
+
+My main reason for this topic is that from a low-carbon lifestyle, we can get numerous benefits, such as making our contributions to environmental protection, reducing CO2 emissions. The debate competition is to be held by our university at the auditorium at 8 p.m. on June 15th. It includes a variety of processes, such as the speech-delivering, the question and answering part and the awarding part.
+
+I really hope that you can accept my arrangements. I am looking forward to your early reply.
+
+Yours sincerely,
+Zhang Wei`,
+      zh: `尊敬的 Smith 教授:
+
+作为学生会主席,我写信建议本次辩论的主题——低碳生活。
+
+我建议这个主题,主要是因为低碳生活能让我们获益良多,比如为环保做贡献、减少二氧化碳排放。辩论赛由我校于 6 月 15 日晚 8 点在礼堂举办,包括致辞、问答和颁奖等环节。
+
+真诚希望您接受我的安排,期待早日回复。
+
+张伟 谨上`
+    },
     'l-reco2023': {
       title: '2023 真题 · 机器人展推荐信(八哥原文)',
       en: `Dear David,
@@ -912,14 +987,14 @@ Li Ming`,
         cn: '三篇动态图:① 燃油车 28.01→16.81 百万、电动车 0.77→4.2 百万(2018–2021);② 2019 真题:就业 68.1→60.7%、升学 26.3→34%、创业 1.3→2.6%;③ 谷物 49→39%、果蔬 15→28%、肉类 8→20%(2016–2019)。',
         en: '动态图三连:一降一升各一句(great changes / was witnessed),再加一句翻倍或区间。',
         time: '第 3 天任选两篇各 30 分钟;第 4 天写第三篇 + 对照「句库09」逐句检查',
-        sarr: ['s-ev', 's-grad2019', 's-diet'], link: 'c9', checks: CHECK_BIG },
+        sarr: ['s-ev', 's-grad2019', 's-diet'], link: 'c9', checks: CHECK_BIG_DYNAMIC },
       { n: 3, days: '第 5–6 天', kind: '小作文', type: '告示+纪要+备忘录', title: '三种格式一次记牢(2020 唱歌 / 义卖纪要 / 低碳备忘录)',
         cn: '① 2020 真题:给国际学生写唱歌比赛告示(含招募志愿者);② 慈善义卖会议纪要(sdlpt 顶格);③ 低碳校园活动备忘录(To/From/Date/Subject)。',
         en: '三种格式全靠「活动三句」拼装,注意各自的头尾格式差异。',
         time: '第 5 天三篇各 15 分钟;第 6 天默写三种格式的头尾各一遍',
-        sarr: ['l-notice2020', 'l-minutes', 'l-memo'], link: 'c2', checks: CHECK_SMALL },
+        sarr: ['l-notice2020', 'l-minutes', 'l-memo'], link: 'c2', checks: ['告示:Notice + 日期 + 机构落款,没有书信称呼和尾段', '纪要:Subject / Date / Location / Present 顶格,至少 3 个要点', '备忘录:To / From / Date / Subject 四行头齐全', '三篇都复用了活动句,且时间地点与题目一致'] },
       { n: 4, days: '第 7–8 天', kind: '大作文', type: '静态图', title: '支付方式 / 出行方式 / 在线教育',
-        cn: '三篇:① 2019 支付方式饼图(移动支付 50%/刷卡 25%/现金 17%/其他 8%);② 2020 出行方式(公共交通 60%/私家车 20%/单车 12%/步行 8%);③ 在线教育用户 0.11→0.423 亿、互联网普及率 50.3%→64.5%。',
+        cn: '三篇:① 2019 支付方式饼图(移动支付 50%/刷卡 25%/现金 17%/其他 8%);② 2020 出行方式(公共交通 60%/私家车 20%/单车 12%/步行 8%);③ 在线教育用户 1.1→4.23 亿、互联网普及率 50.3%→64.5%。',
         en: '静态三件套:lion\'s share → take up the second largest → By contrast… respectively。',
         time: '第 7 天任选两篇各 30 分钟;第 8 天第三篇 + 默写「句库10」三个句型',
         sarr: ['s-pay', 's-commute', 's-onlineedu'], link: 'c10', checks: CHECK_BIG },
@@ -927,7 +1002,7 @@ Li Ming`,
         cn: '① 2018 邀请专家参加毕业典礼;② 2017 推荐长城故宫;③ 2012 投诉电子词典;④ 2017 回复 Prof. Williams 的中国文化演讲邀请;⑤ 2019 给 Smith 教授建议辩论主题(低碳)并做安排。',
         en: '每封信先想好用哪个素材包,再套骨架。介绍信=事物优点+活动三句组合示范。',
         time: '第 9 天写前三封;第 10 天写后两封 + 对照范文标注素材包句',
-        sarr: ['l-invite2018', 'l-reco2017', 'l-complaint2012'], link: 'c3', checks: CHECK_SMALL },
+        sarr: ['l-invite2018', 'l-reco2017', 'l-complaint2012', 'l-intro2017', 'l-debate2019'], link: 'c3', checks: CHECK_SMALL },
       { n: 6, days: '第 11–12 天', kind: '大作文', type: '静态图', title: '获取新闻方式 / 上班族就餐选择',
         cn: '① 某高校获取新闻方式(手机 52%/电脑 21%/电视广播 11%/报刊 12%/其他 4%);② 某市上班族工作日就餐(外卖 61.3%/下馆子 17.5%/自己做 16%/食堂 4.2%/其他 1%)。',
         en: '注意两篇的「原因二」选不同的:手机→行业版;外卖→反面版(太忙没法做饭)。',
@@ -942,7 +1017,7 @@ Li Ming`,
         cn: '组合题:① 漫画=车主说"电动车帮我省了很多钱",图表=销量 4.5→9.5 百万(2021–2024);② 漫画=高铁乘客说"又快又方便!",图表=高铁里程 120km→45000km(2008–2024)。',
         en: '第一段两句固定:As is shown above…(倒装) + Meanwhile, there is a chart which shows that…。',
         time: '第 15 天两篇各 30 分钟;第 16 天默写组合题第一段 + 哈佛研究句',
-        sarr: ['s-ev-combo', 's-hsr-combo'], link: 'c12', checks: CHECK_BIG },
+        sarr: ['s-ev-combo', 's-hsr-combo'], link: 'c12', checks: CHECK_BIG_COMBO },
       { n: 9, days: '第 17–18 天', kind: '大作文', type: '纯漫画', title: '坚持梦想(155 词范文)',
         cn: '漫画:爬山途中一人说"我累了,不想爬了",另一人说"休息一下,继续爬"。写主题词「坚持梦想」的重要性。',
         en: '纯漫画三段:a host of complicated driving factors… + 获益句 + 哈佛研究句 + upward trend。',
@@ -967,13 +1042,13 @@ Li Ming`,
       cn: '2018–2021 年汽车销量:燃油车 28.01 → 16.81 百万辆,电动车 0.77 → 4.2 百万辆。',
       dir: 'Write an essay based on the chart below. In your writing, you should 1) interpret the chart, and 2) give your comments. You should write about 150 words.',
       data: '<tr><th>销量(百万辆)</th><td>2018</td><td>2021</td></tr><tr><th>燃油车</th><td>28.01</td><td>16.81</td></tr><tr><th>电动车</th><td>0.77</td><td>4.2</td></tr>',
-      think: ['词汇:燃油车 traditional fuel-based vehicles · 电动车 electric vehicles · 麒麟电池 Qilin battery · 长续航 long-endurance battery。', '一降一升:燃油车 great changes…decreasing,电动车 a remarkable rise was witnessed。', '获益选:省钱 saving money greatly / 独特体验 / 环保贡献;原因二用行业版:电池行业 the Chinese battery industry。'],
+      think: ['词汇:燃油车 traditional fuel-based vehicles · 电动车 electric vehicles · 麒麟电池 the Qilin battery · 长续航电池 long-endurance batteries。', '一降一升:燃油车 great changes…decreasing,电动车 a remarkable rise was witnessed。', '获益选:省钱 saving money greatly / 独特体验 / 环保贡献;原因二用行业版:电池行业 the Chinese battery industry。'],
       outline: ['P1 点图 + 一降一升两句', 'P2 获益(省钱/体验/环保)+ 电池行业迅猛发展', 'P3 销量 projected to show an upward trend'],
       sents: [
         ['great changes have taken place in the sales of traditional fuel-based vehicles, decreasing dramatically from 28.01 million to 16.81 million.', '下降句:现在分词拖尾。'],
-        ['a remarkable rise was witnessed in the sales of electric vehicles, waving from 0.77 million to 4.2 million.', '上升句:witness 被动 + waving from…to。'],
-        ['the Chinese battery industry has been enjoying a rapid development, thus providing people with more long-endurance battery.', '行业版原因二:thus providing 拖尾。']
-      ], checks: CHECK_BIG },
+        ['a remarkable rise was witnessed in the sales of electric vehicles, rising from 0.77 million to 4.2 million.', '上升句:witness 被动 + rising from…to。'],
+        ['the Chinese battery industry has been enjoying a rapid development, thus providing people with more long-endurance batteries.', '行业版原因二:thus providing 拖尾。']
+      ], checks: CHECK_BIG_DYNAMIC },
     { id: 'p2', no: '预测二', title: '居民支付方式', kind: '大作文', type: '静态饼图', sample: 's-pay',
       cn: '2019 年某市居民支付方式调查:移动支付 50% · 刷卡 25% · 现金 17% · 其他 8%。',
       dir: 'Write an essay based on the chart below. In your writing, you should 1) interpret the chart, and 2) give your comments. You should write about 150 words.',
@@ -997,16 +1072,16 @@ Li Ming`,
         ['the construction of urban traffic facilities has been enjoying a rapid development.', '行业版原因二,只换主语名词。']
       ], checks: CHECK_BIG },
     { id: 'p4', no: '预测四', title: '在线教育', kind: '大作文', type: '动态双线', sample: 's-onlineedu',
-      cn: '2015–2020 年:在线教育用户 0.11 → 0.423 亿人;互联网普及率 50.3% → 64.5%。',
+      cn: '2015–2020 年:在线教育用户 1.1 → 4.23 亿人(英文写作:0.11 → 0.423 billion);互联网普及率 50.3% → 64.5%。',
       dir: 'Write an essay based on the chart below. In your writing, you should 1) interpret the chart, and 2) give your comments. You should write about 150 words.',
-      data: '<tr><th></th><td>2015</td><td>2020</td></tr><tr><th>在线教育用户(亿)</th><td>0.11</td><td>0.423</td></tr><tr><th>互联网普及率</th><td>50.3%</td><td>64.5%</td></tr>',
+      data: '<tr><th></th><td>2015</td><td>2020</td></tr><tr><th>在线教育用户(亿)</th><td>1.1</td><td>4.23</td></tr><tr><th>互联网普及率</th><td>50.3%</td><td>64.5%</td></tr>',
       think: ['词汇:网民 netizens · 普及率 the Internet penetration rate(penetration=普及)。', '双线动态:用户数 increasing dramatically;普及率 a steady rise was witnessed。', '获益选:更先进知识和资源 / 学习便利 / 提效 / 碎片时间(可写四个);原因二:the Internet industry。'],
       outline: ['P1 用户数猛增 + 普及率稳升', 'P2 获益(资源/便利/提效/碎片时间)+ 互联网行业', 'P3 用户数 upward trend'],
       sents: [
         ['great changes have taken place in the number of online education users, increasing dramatically from 0.11 billion to 0.423 billion.', '增长句:increasing dramatically。'],
-        ['a steady rise was witnessed in the rate of the Internet penetration.', '稳升:a steady rise。'],
+        ['a steady rise was witnessed in the Internet penetration rate.', '稳升:a steady rise。'],
         ['acquiring more advanced knowledge and better educational resources', '本话题专属获益短语。']
-      ], checks: CHECK_BIG },
+      ], checks: CHECK_BIG_DYNAMIC },
     { id: 'p5', no: '预测五', title: '图表+漫画:电动车', kind: '大作文', type: '组合题', sample: 's-ev-combo',
       cn: '漫画:车主说"电动车帮我省了很多钱"。图表:电动车销量 2021 年 4.5 百万 → 2024 年 9.5 百万辆。',
       dir: 'Write an essay based on the picture and the chart below. In your writing, you should 1) interpret them, and 2) give your comments. You should write about 150 words.',
@@ -1054,6 +1129,37 @@ Li Ming`,
       sents: [
         ['The minutes are as follows:', '纪要正文总起,固定句。'],
         ['It aims to enrich students\' life, improve their love, enhance their social sense of responsibility and broaden their horizons.', '目的句:四个 smile bar 短语连用。']
+      ], checks: CHECK_SMALL },
+    { id: 'p10', no: '预测十', title: '大学生获取新闻方式', kind: '大作文', type: '静态饼图', sample: 's-news',
+      cn: '某高校学生获取新闻方式的调查:智能手机 52% · 电脑 21% · 报刊杂志 12% · 电视广播 11% · 其他 4%。',
+      dir: 'Write an essay based on the chart below. In your writing, you should 1) interpret the chart, and 2) give your comments. You should write about 150 words.',
+      data: '<tr><th></th><td>占比</td></tr><tr><th>智能手机</th><td>52%</td></tr><tr><th>电脑</th><td>21%</td></tr><tr><th>报刊杂志</th><td>12%</td></tr><tr><th>电视广播</th><td>11%</td></tr><tr><th>其他</th><td>4%</td></tr>',
+      think: ['静态饼图:lion\'s share → takes up the second largest part → By contrast… respectively,顺序按图上大小。', '手机相关的行业原因二:the cellphone industry has been enjoying a rapid development。', '获益选:充分利用碎片时间 / 提高学习效率 / 开阔眼界。'],
+      outline: ['P1 点图 + 手机 52% 最大、电脑 21% 第二、其余三项并列', 'P2 获益(碎片时间/提效/眼界)+ 手机行业迅速发展', 'P3 手机获取新闻比例 upward trend'],
+      sents: [
+        ['the proportion of smart phones gets the lion\'s share, occupying 52% and the percentage of computers takes up the second largest part, with 21%.', '静态图最大 + 第二大连招。'],
+        ['that of television and radio, newspapers and magazines and others only accounts for 11%, 12% and 4% respectively.', '其余几项并列:that of… accounts for… respectively。'],
+        ['making full use of fragmented time, improving the study efficiency and broadening our horizons', '本话题获益三短语。']
+      ], checks: CHECK_BIG },
+    { id: 'p11', no: '预测十一', title: '上班族就餐选择', kind: '大作文', type: '静态饼图', sample: 's-dining',
+      cn: '某市上班族工作日就餐选择:外卖 61.3% · 下馆子 17.5% · 自己做 16% · 食堂 4.2% · 其他 1%。',
+      dir: 'Write an essay based on the chart below. In your writing, you should 1) interpret the chart, and 2) give your comments. You should write about 150 words.',
+      data: '<tr><th></th><td>占比</td></tr><tr><th>点外卖</th><td>61.3%</td></tr><tr><th>下馆子</th><td>17.5%</td></tr><tr><th>自己做饭</th><td>16%</td></tr><tr><th>食堂</th><td>4.2%</td></tr><tr><th>其他</th><td>1%</td></tr>',
+      think: ['静态饼图套同一套句,只换主题名词:the dining choices of the commuters on weekdays。', '原因二走「反面版」:it is difficult for many people to cook their own foods because they are so busy with their work。', '获益选:生活更便利 / 大大节省时间 / 获得更多选择。'],
+      outline: ['P1 点图 + 外卖 61.3% 最大、下馆子 17.5% 第二、其余三项并列', 'P2 获益(便利/省时/选择多)+ 工作太忙没法做饭', 'P3 外卖比例 upward trend'],
+      sents: [
+        ['the proportion of ordering the food delivery gets the lion\'s share, occupying 61.3%', '静态图最大占比句,换主题词即可。'],
+        ['it is difficult for many people to cook their own foods because they are so busy with their work.', '反面版原因二:because 从句给理由。'],
+        ['making our life more convenient, saving time greatly and acquiring more choices', '本话题获益三短语。']
+      ], checks: CHECK_BIG },
+    { id: 'p12', no: '预测十二', title: '机器人展推荐信', kind: '小作文', type: '书信', sample: 'l-reco2023',
+      cn: '你的朋友 David 想了解中国的机器人展,写信向他推荐"希望"机器人展并说明理由。',
+      dir: 'Suppose your friend David wants to know about robot shows in China. Write an email to recommend the "Hope" robot show to him. Use "Li Ming" instead. You should write about 100 words.',
+      think: ['推荐信骨架=目的句 + 三个理由 + 期待回复;理由用「有名 → 获益 → 有趣」三层。', '第三层用 so…that 结果句:I never fail to be attracted to it。', '落款 Li Ming,不写机构。'],
+      outline: ['P1 As one who…, I am writing this email to recommend…', 'P2 有名句 + 获益句 + so…that 有趣句', 'P3 I really hope that you can accept my recommendation.'],
+      sents: [
+        ['As one who has taken part in some robot shows, I am writing this email to recommend you the "Hope" robot show.', '推荐信目的句:As one who… 身份前置。'],
+        ['it is so interesting that I never fail to be attracted to it, which leaves a deep impression on me.', 'so…that + which 从句,推荐第三层理由。']
       ], checks: CHECK_SMALL }
   ];
 

@@ -1,7 +1,7 @@
 /* e2 作文模版 · 渲染逻辑
    数据 window.WR2(writing-data.js)。
    路由:#/ 目录 · #/core 核心句库 · #/drill[/组] 挖空循环练 · #/t/<id> 模版/句库详情
-        · #/practice 练习 · #/grade 批改 · #/g/<id> 预测题。
+        · #/practice 练习 · #/grade 批改 · #/g/<id> 预测题 · #/cram 考前一页纸。
    本机状态:练习勾选 e2.wr2.practice.v1 · 批改草稿/自评 e2.wr2.grade.v1 · 默写统计 e2.wr2.drill.v1。 */
 (function () {
   'use strict';
@@ -72,11 +72,28 @@
   });
 
   /* ───── 草稿区 ───── */
+  /* 页面重新渲染会换掉 textarea,这里只保留当前这一屏的引用;
+     关闭/切走页面时统一落盘,避免最后几个字因为 300ms 防抖丢掉。 */
+  const DRAFT_TA = new Map();
+  function flushDrafts() {
+    if (!DRAFT_TA.size) return;
+    const g = GR();
+    let dirty = false;
+    DRAFT_TA.forEach((ta, id) => {
+      if (g.drafts[id] !== ta.value) { g.drafts[id] = ta.value; dirty = true; }
+    });
+    if (dirty) LS.write(GK, g);
+  }
+  window.addEventListener('pagehide', flushDrafts);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flushDrafts(); });
+
   function bindDrafts(root) {
     const gr = GR();
+    DRAFT_TA.clear();
     root.querySelectorAll('textarea[data-draft]').forEach(ta => {
       const id = ta.dataset.draft;
       ta.value = gr.drafts[id] || '';
+      DRAFT_TA.set(id, ta);
       const upd = () => { const n = $('#wc_' + id); if (n) n.textContent = wc(ta.value); };
       upd();
       let t = null;
@@ -136,8 +153,11 @@
       `<span class="tt"><b>作文课后练习</b><i>${W.practice.sub}</i><span class="wprog"><b style="width:${Math.round(pd / W.practice.sessions.length * 100)}%;background:var(--blue)"></b></span></span>` +
       `<span class="tg">${pd}/${W.practice.sessions.length}</span><span class="ar">›</span></a>` +
       `<a class="wcard green" href="#/grade"><span class="no">批改</span>` +
-      `<span class="tt"><b>作文批改</b><i>9 道预测题 · 写完对照范文自评</i></span>` +
-      `<span class="tg">写 ${gp.drafted}/9 · 评 ${gp.graded}/9</span><span class="ar">›</span></a>` +
+      `<span class="tt"><b>作文批改</b><i>${W.preds.length} 道预测题 · 写完对照范文自评</i></span>` +
+      `<span class="tg">写 ${gp.drafted}/${W.preds.length} · 评 ${gp.graded}/${W.preds.length}</span><span class="ar">›</span></a>` +
+      `<a class="wcard" href="#/cram"><span class="no">一页纸</span>` +
+      `<span class="tt"><b>考前一页纸</b><i>句库浓缩成 2 页 · 可直接打印</i></span>` +
+      `<span class="tg">打印</span><span class="ar">›</span></a>` +
       `</div></section>`;
     $('#wtT').textContent = '作文模版';
     document.title = '作文模版 · e2';
@@ -207,8 +227,12 @@
           LS.write(DK, st);
           miss++;
           fb.hidden = false;
-          fb.innerHTML = `<span class="no-x">✗ 再想想 · 正确答案:<b>${d.a}</b></span>`;
+          fb.innerHTML = `<span class="no-x">✗ 再想想 · 正确答案:<b>${d.a}</b>${queue.length > 1 ? '(这句回队尾,后面还会再出)' : '(只有这一句,再写一遍)'}</span>`;
           input.value = '';
+          /* 答错按文案回队尾:点「下一句」把本句移到队尾继续练,直到全对。 */
+          const go = $('#drillGo');
+          go.textContent = '下一句';
+          go.onclick = () => { queue.push(queue.shift()); renderCurrent(); };
           input.focus();
         }
       };
@@ -217,7 +241,7 @@
       $('#drillGo').onclick = judge;
       input.addEventListener('keydown', e => {
         if (e.isComposing || e.keyCode === 229) return;   // 输入法选词时的 Enter 不算提交
-        if (e.key === 'Enter') judge();
+        if (e.key === 'Enter') { e.preventDefault(); $('#drillGo').onclick(); }
       });
       $('#drillPeek').addEventListener('click', () => {
         const st = DR();
@@ -362,6 +386,47 @@
     document.title = `${p.no} ${p.title} · e2`;
   }
 
+  /* ───── 考前一页纸 ───── */
+  const stripTags = s => String(s || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  function coreSent(cid, idx) {
+    const c = W.core.find(x => x.id === cid);
+    if (!c) return '';
+    const arr = [...c.html.matchAll(/<li><span class="en">([\s\S]*?)<\/span><span class="zh">([\s\S]*?)<\/span><\/li>/g)];
+    return arr[idx] ? stripTags(arr[idx][1]) : '';
+  }
+  function cramBlock(title, picks) {
+    const rows = picks.map(([cid, i]) => coreSent(cid, i)).filter(Boolean);
+    if (!rows.length) return '';
+    return `<section class="cram-b"><h2>${title}</h2>` + rows.map(s => `<p>${s}</p>`).join('') + `</section>`;
+  }
+  function renderCram() {
+    MAIN.innerHTML =
+      `<a class="wback" href="#/">‹ 返回目录</a>` +
+      `<div class="whero-sm"><h1>考前一页纸</h1><p>把 12 组句库压成一页:小作文骨架、大作文三段、格式差异。打印出来考前扫一遍。</p></div>` +
+      `<div class="cram-ops"><button class="drill-btn" id="cramPrint" type="button">打印 / 存成 PDF</button>` +
+      `<span>建议 A4 · 双栏 · 2 页内</span></div>` +
+      `<div class="cram-grid">` +
+      cramBlock('小作文 · 首段与尾段(句库 01)', [['c1', 0], ['c1', 3], ['c1', 4]]) +
+      cramBlock('大作文 · 动态图第一段(句库 09)', [['c9', 0], ['c9', 1]]) +
+      cramBlock('大作文 · 静态图第一段(句库 10)', [['c10', 3], ['c10', 0], ['c10', 1], ['c10', 2]]) +
+      cramBlock('大作文 · 第二段(句库 11)', [['c11', 0], ['c11', 1], ['c11', 3], ['c11', 6]]) +
+      cramBlock('大作文 · 第三段收尾(句库 12)', [['c12', 0]]) +
+      cramBlock('组合题 · 先漫画后图表(句库 12)', [['c12', 2], ['c12', 3]]) +
+      `</div>` +
+      `<section class="cram-b cram-fmt"><h2>四种格式 · 头尾别写错</h2>` +
+      `<table><tr><th>题型</th><th>头</th><th>尾</th></tr>` +
+      `<tr><td>书信</td><td>Dear Sir or Madam / Dear + 人名</td><td>I really hope… + looking forward to your early reply + Yours sincerely, Li Ming</td></tr>` +
+      `<tr><td>告示</td><td>Notice 居中 + 日期(标题下一行右侧)</td><td>联系方式 + Come on and join us now! + 机构落款</td></tr>` +
+      `<tr><td>纪要</td><td>Subject / Date / Location / Present 顶格</td><td>The minutes are as follows: 后编号列 3 个要点</td></tr>` +
+      `<tr><td>备忘录</td><td>To / From / Date / Subject 四行</td><td>直接列要点,不写书信尾段</td></tr>` +
+      `</table></section>` +
+      `<p class="cram-foot">句子全部来自核心句库,和真题范文同源;背不下来就先回句库逐句过一遍。</p>`;
+    const btn = $('#cramPrint');
+    if (btn) btn.addEventListener('click', () => window.print());
+    $('#wtT').textContent = '考前一页纸';
+    document.title = '考前一页纸 · e2';
+  }
+
   /* ───── 路由 ───── */
   function render() {
     const parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
@@ -371,6 +436,7 @@
     if (parts[0] === 't' && TPL[parts[1]]) return renderTpl(TPL[parts[1]]);
     if (parts[0] === 'practice') return renderPractice();
     if (parts[0] === 'grade') return renderGrade();
+    if (parts[0] === 'cram') return renderCram();
     if (parts[0] === 'g' && PRED[parts[1]]) return renderPred(PRED[parts[1]]);
     return renderHome();
   }
