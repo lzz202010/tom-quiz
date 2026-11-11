@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f7f6f3">
 <title>作文模版 · e2</title>
 <meta name="description" content="e2 作文模块:大/小作文模版、核心句库、课后练习与批改预测题。">
-<link rel="icon" type="image/svg+xml" href="favicon.svg?v=17">
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=19">
 <style>
 /* 自包含:作文模块只用自己的样式,不碰 style.css(色板与主站一致) */
 *{box-sizing:border-box}
@@ -15,6 +15,7 @@
   --line:#dedbd4; --red:#a8322a;
   --blue:#3a6ea5; --blue-bg:#eef4fa; --blue-line:#cfdfef;
   --green:#2f7d4f; --green-bg:#eef6f0; --green-line:#cfe5d6;
+  --ctl:34px;              /* 所有按钮/标签的统一触摸高度 */
 }
 html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
   font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
@@ -24,20 +25,43 @@ a{color:inherit;text-decoration:none}
 
 /* ───── 顶栏 ───── */
 .wtop{max-width:720px;margin:0 auto;padding:14px 20px 0;display:flex;align-items:center;gap:10px}
-.wtop a{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;
+.wtop a{border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 12px;
+  min-height:var(--ctl);display:inline-flex;align-items:center;
   font-size:12.5px;transition:.13s}
 .wtop a:hover{border-color:var(--red);color:var(--red)}
 .wtop .wt-t{flex:1;text-align:center;font-weight:600;font-size:13px;color:var(--mute)}
 .wmain{max-width:720px;margin:0 auto;padding:18px 20px 90px}
 
+/* ───── 模块导航(吸顶,五页同一套入口) ───── */
+.wnav{position:sticky;top:0;z-index:20;display:flex;gap:6px;max-width:720px;margin:12px auto 0;
+  padding:7px 20px;background:var(--bg);overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none}
+.wnav::-webkit-scrollbar{display:none}
+.wnav a{flex:0 0 auto;border:1px solid var(--line);background:#fff;border-radius:20px;
+  height:32px;padding:0 14px;display:inline-flex;align-items:center;
+  font-size:12.5px;color:#5d5a54;transition:.13s}
+.wnav a:hover{border-color:#c9c5bc}
+.wnav a[aria-current="page"]{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+
 /* ───── 目录页 ───── */
-.whero h1{margin:26px 0 0;font:600 30px/1.2 Georgia,"PingFang SC",serif;letter-spacing:-.01em}
+.whero h1{margin:22px 0 0;font:600 30px/1.2 Georgia,"PingFang SC",serif;letter-spacing:-.01em}
 .whero p{margin:10px 0 0;color:var(--mute);font-size:13px}
-.wsec{margin-top:30px}
+/* 首页三个进度数字:一眼看到自己到哪了 */
+.wstats{display:flex;gap:8px;margin:18px 0 0;flex-wrap:wrap}
+.wstats span{flex:1 1 0;min-width:94px;border:1px solid var(--line);background:#fff;
+  border-radius:10px;padding:10px 12px}
+.wstats b{display:block;font:600 21px/1.1 Georgia,serif;letter-spacing:-.01em}
+.wstats b em{font:400 12px/1 -apple-system,sans-serif;font-style:normal;color:var(--mute);margin-left:2px}
+.wstats i{display:block;font-style:normal;color:var(--mute);font-size:11px;margin-top:4px}
+.wsec{margin-top:28px}
 .wsec>h2{margin:0 0 12px;font-size:15.5px;font-weight:600}
+.wsec>h2 .cnt{color:var(--mute);font-weight:400;font-size:12px;margin-left:6px}
 .wcards{display:flex;flex-direction:column;gap:10px}
-.wcard{display:flex;align-items:center;gap:12px;background:var(--panel);
+.wcard{position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;background:var(--panel);
   border:1px solid var(--line);border-radius:11px;padding:15px 16px;transition:.13s}
+.wcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--red);opacity:.45}
+.wcard.blue::before{background:var(--blue)}
+.wcard.green::before{background:var(--green)}
 .wcard:hover{border-color:#c9c5bc;transform:translateY(-1px);box-shadow:0 3px 10px #0000000a}
 .wcard:active{transform:scale(.99)}
 .wcard .no{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--red);letter-spacing:.04em}
@@ -97,10 +121,11 @@ a{color:inherit;text-decoration:none}
   padding:14px 16px;margin:12px 0;font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
 .wfmt p{margin:7px 0}
 .wfmt i{color:var(--mute);font-family:inherit}
-/* 图表图 */
-.wfig{margin:14px 0;text-align:center}
-.wfig img{max-width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
-.wfig figcaption{color:var(--mute);font-size:11.5px;margin-top:6px}
+/* 图表图:加边框和内边距,不让裁切图看起来像页面配图 */
+.wfig{margin:16px 0;text-align:center}
+.wfig img{display:block;margin:0 auto;width:auto;height:auto;max-width:100%;max-height:300px;
+  border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px}
+.wfig figcaption{margin-top:7px;color:var(--mute);font-size:11px}
 /* 范文 */
 .wsample{border:1px solid var(--line);border-radius:12px;background:#fff;margin:12px 0;overflow:hidden}
 .wsample .ws-hd{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px dashed var(--line);
@@ -109,8 +134,21 @@ a{color:inherit;text-decoration:none}
 .wsample .ws-en{padding:4px 17px 14px;white-space:pre-wrap;font:13.4px/1.75 Georgia,"Times New Roman",serif}
 .wsample .ws-zh{border-top:1px dashed var(--line);padding:12px 17px 14px;color:#5d5a54;
   font-size:12.8px;white-space:pre-wrap}
-.wsample .ws-toggle{border:0;background:none;color:var(--red);font-size:12.5px;cursor:pointer;
-  padding:10px 15px 0;text-align:left}
+.wsample .ws-toggle{border:1px solid var(--line);background:#fff;color:var(--mute);border-radius:8px;
+  min-height:32px;padding:0 12px;margin:10px 15px 14px;font-size:12px;cursor:pointer;
+  display:inline-flex;align-items:center}
+.wsample .ws-toggle:hover{border-color:var(--red);color:var(--red)}
+/* 重点句标记:句库里的句子在范文里加下划线,可一键只看这些句子 */
+.wsample .ws-legend{display:flex;align-items:center;gap:10px;padding:9px 15px 0;
+  color:var(--mute);font-size:11.5px}
+.wsample .ws-legend b{color:var(--red)}
+.wsample .ws-only{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:14px;
+  height:26px;padding:0 10px;font-size:11.5px;color:var(--mute);cursor:pointer;white-space:nowrap}
+.wsample .ws-only.on{border-color:var(--red);color:var(--red)}
+.wsample .ws-en .sen.key{border-bottom:2px solid #e2b3aa;
+  background:linear-gradient(transparent 76%, #f8e9e6 76%)}
+.wsample .ws-en.only-key .sen:not(.key){display:none}
+.wsample .ws-en.only-key{padding-top:6px}
 /* 数据表(练习/批改里的图表数据) */
 .wdata{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;
   background:#fff;border:1px solid var(--line);border-radius:10px;display:block;overflow-x:auto}
@@ -166,6 +204,14 @@ a{color:inherit;text-decoration:none}
 .wpreds .st.s1{color:var(--blue);border-color:var(--blue-line);background:var(--blue-bg)}
 .wpreds .st.s2{color:var(--green);border-color:var(--green-line);background:var(--green-bg)}
 .wpreds .ar{flex:0 0 auto;color:#b5b1a8}
+/* 批改列表筛选:12 题按大/小作文分开看 */
+.wfilter{display:flex;gap:7px;margin:16px 0 6px;flex-wrap:wrap}
+.wfilter button{border:1px solid var(--line);background:#fff;border-radius:20px;
+  min-height:32px;padding:0 13px;font-size:12.5px;color:#5d5a54;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px}
+.wfilter button i{font-style:normal;color:var(--mute);font-size:11px}
+.wfilter button.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+.wfilter button.on i{color:#ffffffb3}
 .whero-sm h1{margin:26px 0 0;font:600 26px/1.2 Georgia,"PingFang SC",serif}
 .whero-sm p{margin:8px 0 0;color:var(--mute);font-size:12.5px}
 
@@ -256,7 +302,7 @@ a{color:inherit;text-decoration:none}
 
 /* 打印:只留一页纸正文 */
 @media print{
-  .wtop,.cram-ops,.wback,.cram-foot{display:none}
+  .wtop,.cram-ops,.wback,.cram-foot,.wnav{display:none}
   html,body{background:#fff}
   .wmain{max-width:none;padding:0}
   .whero-sm h1{font-size:18px;margin:0 0 2px}
@@ -269,13 +315,41 @@ a{color:inherit;text-decoration:none}
   @page{margin:10mm}
 }
 
+/* ───── 内容之间的连接:范文 ↔ 原卷 ↔ 练习/预测 ↔ 句库 ───── */
+.wsample .ws-links{display:flex;flex-wrap:wrap;gap:6px;padding:9px 15px 0}
+.ws-go{display:inline-flex;align-items:center;height:26px;padding:0 9px;border-radius:14px;
+  border:1px solid var(--line);background:#fbfaf7;color:#5d5a54;font-size:11.5px}
+.ws-go:hover{border-color:var(--red);color:var(--red)}
+.wrel{margin:26px 0 0}
+.wrel h3{margin:0 0 10px;font-size:14.5px;font-weight:700}
+.wrel h3 .cnt{color:var(--mute);font-weight:400;font-size:12px;margin-left:6px}
+.schips{display:flex;flex-direction:column;gap:7px}
+.schip{display:block;border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px}
+.schip b{display:block;font-size:13.5px;font-weight:600}
+.schip i{display:block;font-style:normal;color:var(--mute);font-size:11.5px;margin-top:2px}
+.schip:hover{border-color:#c9c5bc}
+.wback-btn{border:0;background:none;cursor:pointer;font-size:12.5px;color:var(--mute);padding:8px 0}
+.wback-btn:hover{color:var(--red)}
+.wyear-links{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 4px}
+/* 年份索引:16 个小方块,比再列一列卡片省一半高度 */
+.wyears{display:flex;flex-wrap:wrap;gap:7px}
+.wyears a{display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:36px;
+  border:1px solid var(--line);background:#fff;border-radius:9px;font-size:13px;
+  font-variant-numeric:tabular-nums}
+.wyears a:hover{border-color:var(--red);color:var(--red)}
+
 /* 小屏 */
 @media (max-width:520px){
+  :root{--ctl:40px}
   .wtop,.wmain{padding-left:15px;padding-right:15px}
+  .wnav{padding-left:15px;padding-right:15px}
+  .wnav a{height:34px;padding:0 13px}
   .whero h1{font-size:26px}
+  .wstats b{font-size:19px}
   .wcard .tg{display:none}
   .wsent .en{font-size:13.2px}
   .wsample .ws-en{font-size:13px}
+  .wfig img{max-height:230px;padding:6px}
 }
 </style>
 </head>
@@ -285,10 +359,17 @@ a{color:inherit;text-decoration:none}
   <span class="wt-t" id="wtT">作文模版</span>
   <a href="#/" id="wtH">目录</a>
 </div>
+<nav class="wnav" id="wnav" aria-label="作文模块导航">
+  <a href="#/">目录</a>
+  <a href="#/core">句库</a>
+  <a href="#/practice">练习</a>
+  <a href="#/grade">批改</a>
+  <a href="#/cram">一页纸</a>
+</nav>
 <main class="wmain" id="wrMain"></main>
 
-<script src="writing-data.js?v=17"></script>
-<script src="writing.js?v=17"></script>
-<script src="sw-reg.js?v=17"></script>
+<script src="writing-data.js?v=19"></script>
+<script src="writing.js?v=19"></script>
+<script src="sw-reg.js?v=19"></script>
 </body>
 </html>

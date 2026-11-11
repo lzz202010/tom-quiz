@@ -971,7 +971,220 @@ Li Ming`,
 真诚希望您接受我的推荐,期待早日回复。
 
 李明 谨上`
-    }
+    },
+    'l-con2011': {
+      title: "2011 真题 · 祝贺升学并给建议(按八哥句式仿写)",
+      en: `Dear Li Ming,
+
+As one who has just finished the first year in college, I am writing this email to congratulate you on your admission to Peking University and give you some suggestions on university life.
+
+Here are my suggestions. First and foremost, it is necessary for you to make a study plan, which would help you arrange your time reasonably. In addition, you are supposed to take part in more social activities, which would broaden your horizons and improve your communication skills. Last but not least, learning to live independently is of great importance.
+
+I really hope that you can accept my suggestions. I am looking forward to your early reply.
+
+Yours sincerely,
+Li Ming`,
+      zh: `亲爱的李明:
+
+作为刚读完大一的人,我写信祝贺你被北京大学录取,并就大学生活给你一些建议。
+
+建议如下。首先,你有必要制定学习计划,这能帮你合理安排时间。此外,你应该多参加社团活动,这会开阔眼界、提升沟通能力。最后,学会独立生活非常重要。
+
+真心希望你能接受我的建议,期待早日回复。
+
+李明 谨上`
+    },
+    's-car2011': {
+      title: "2011 真题 · 轿车品牌市场份额(按八哥句式仿写)",
+      en: `The bar chart reflects the changes of the market shares of some brands in the domestic car market from 2008 to 2009. From the chart, we can clearly see that great changes have taken place in the percentage of domestic brands, increasing from 25% to 31%. On the contrary, a remarkable decrease was witnessed in that of Japanese brands, falling from 35% to 26% during the same period. And the share of American brands rose slightly, ranging from 12% to 13%.
+
+Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from buying domestic cars, we can get numerous benefits, such as lower prices, convenient after-sales service and a strong sense of national pride, which would explain what appears in the chart. In addition, with the advancement in science and technology, the Chinese auto industry has been enjoying a rapid development, thus providing people with more choices.
+
+With due consideration of all these factors, we may make a rational prediction: the market share of domestic brands is projected to show an upward trend.`,
+      zh: `柱状图反映了 2008–2009 年国内轿车市场部分品牌市场份额的变化。如图清晰可见,国产品牌占比发生巨变,从 25% 升至 31%。相反,日系品牌见证了显著下降,同期从 35% 跌至 26%。美系品牌份额略有上升,从 12% 到 13%。
+
+事实上,有两个值得注意的因素可以解释这一现象。首先,购买国产车能带来诸多好处,比如价格更低、售后便利、民族自豪感强,这正解释了图中所示。此外,随着科技进步,中国汽车工业迅速发展,为人们提供了更多选择。
+
+充分考虑这些因素后,我们可以做出合理预测:国产品牌的市场份额预计将呈上升趋势。`
+    },
+    'l-sale2013': {
+      title: "2013 真题 · 慈善义卖邮件(按八哥句式仿写)",
+      en: `Dear classmates,
+
+As the president of the Student Union, I am writing this email to inform you of a charity sale for kids in need of help and encourage you to participate.
+
+The charity sale is to be held at the school square at 9 a.m. on June 15th. It aims to raise money for the children in poor areas and enrich our campus life. It includes a variety of processes, such as collecting donations, selling second-hand books and making handwritten cards. Several volunteers are needed for this activity. They should be warm-hearted, patient and responsible.
+
+I really hope that you can accept my invitation and join us. I am looking forward to your early reply.
+
+Yours sincerely,
+Li Ming`,
+      zh: `亲爱的同学们:
+
+作为学生会主席,我写信告知大家一场帮助困难儿童的慈善义卖,并鼓励大家参与。
+
+义卖将于 6 月 15 日上午 9 点在学校广场举行,旨在为贫困地区儿童筹款并丰富校园生活。活动包括收集捐赠、义卖二手书、制作手写卡片等环节。本次活动需要若干志愿者,他们应当热心、耐心、有责任心。
+
+真心希望大家接受邀请、加入我们,期待早日回复。
+
+李明 谨上`
+    },
+    's-parttime2013': {
+      title: "2013 真题 · 学生兼职情况(按八哥句式仿写)",
+      en: `The bar chart reflects the survey of the part-time jobs of the students in a certain university. From the chart, we can clearly see that the percentage of freshmen who take part-time jobs is 67.77%, and that of sophomores and juniors takes up 71.13% and 71.93% respectively. By contrast, the proportion of seniors gets the lion's share, occupying 88.24%.
+
+Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from doing part-time jobs, we can get numerous benefits, such as earning extra money, accumulating social experience and improving our communication skills, which would explain what appears in the chart. In addition, with the approach of graduation, it is difficult for many seniors to find a satisfying job, so they are eager to gain more experience before leaving campus.
+
+With due consideration of all these factors, we may make a rational prediction: the percentage of students taking part-time jobs is projected to show an upward trend.`,
+      zh: `柱状图反映了某高校学生兼职情况的调查。如图清晰可见,大一学生兼职比例为 67.77%,大二和大三分别为 71.13% 和 71.93%。相比之下,大四占比最大,达 88.24%。
+
+事实上,有两个值得注意的因素可以解释这一现象。首先,做兼职能带来诸多好处,比如赚取额外收入、积累社会经验、提升沟通能力,这正解释了图中所示。此外,随着毕业临近,很多大四学生难以找到满意的工作,因此希望在离校前积累更多经验。
+
+充分考虑这些因素后,我们可以做出合理预测:学生兼职比例预计将呈上升趋势。`
+    },
+    'l-flat2014': {
+      title: "2014 真题 · 与室友同住的生活习惯(按八哥句式仿写)",
+      en: `Dear John,
+
+As a student who is going to study abroad and share an apartment with you, I am writing this email to tell you about my living habits and ask for some advice.
+
+Here are my living habits. First and foremost, I usually get up early and go to bed before 11 p.m., so I hope we can keep quiet at night. In addition, I am fond of cooking Chinese food, and I will clean the kitchen after cooking. Last but not least, I like plants, so I may put some flowers on the balcony.
+
+I really hope that you can give me some advice about living there. I am looking forward to your early reply.
+
+Yours sincerely,
+Li Ming`,
+      zh: `亲爱的 John:
+
+作为即将出国留学并和你合租公寓的学生,我写信告诉你我的生活习惯,并向你请教一些建议。
+
+我的习惯如下。首先,我通常早睡早起,晚上 11 点前休息,希望我们夜里都能保持安静。此外,我喜欢做中餐,做完会清理厨房。最后,我喜欢植物,可能会在阳台放些花。
+
+真心希望你能就当地生活给我一些建议,期待早日回复。
+
+李明 谨上`
+    },
+    's-pop2014': {
+      title: "2014 真题 · 城乡人口变化(按八哥句式仿写)",
+      en: `The bar chart reflects the changes of the urban and rural population in China from 1990 to 2010. From the chart, we can clearly see that great changes have taken place in the urban population, increasing dramatically from 300 million to 666 million. On the contrary, a remarkable decrease was witnessed in the rural population, falling from 834 million to 674 million during the same period. And in 2010 the urban population surpassed the rural one for the first time.
+
+Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from living in cities, people can get numerous benefits, such as better education, more job opportunities and convenient medical service, which would explain what appears in the chart. In addition, with the rapid development of economy, the government has been sparing no effort to promote urbanization.
+
+With due consideration of all these factors, we may make a rational prediction: the urban population is projected to show an upward trend.`,
+      zh: `柱状图反映了 1990–2010 年中国城镇与乡村人口的变化。如图清晰可见,城镇人口发生巨变,从 3 亿猛增至 6.66 亿。相反,乡村人口见证了显著下降,同期从 8.34 亿降至 6.74 亿。2010 年城镇人口首次超过乡村人口。
+
+事实上,有两个值得注意的因素可以解释这一现象。首先,在城市生活能带来诸多好处,比如更好的教育、更多就业机会、便利的医疗服务,这正解释了图中所示。此外,随着经济快速发展,政府一直在不遗余力地推进城镇化。
+
+充分考虑这些因素后,我们可以做出合理预测:城镇人口预计将呈上升趋势。`
+    },
+    'l-camp2015': {
+      title: "2015 真题 · 夏令营招募志愿者告示(按八哥句式仿写)",
+      en: `Notice
+
+June 10th, 2015
+
+This notice is written to inform you that our university is going to host a summer camp for high school students.
+
+The camp is to be held from July 10th to July 20th on our campus. It aims to enrich students' summer life and help them get familiar with university life. It includes a variety of activities, such as attending lectures, visiting laboratories and taking part in outdoor games. Several volunteers are needed for this activity. They should be warm-hearted, patient and good at communication.
+
+Those who are interested, please sign up at the Student Union office before June 30th. Come on and join us now!
+
+The Student Union`,
+      zh: `告示
+
+2015 年 6 月 10 日
+
+本告示通知大家:我校将举办面向高中生的夏令营。
+
+夏令营将于 7 月 10 日至 20 日在校园举行,旨在丰富高中生的暑期生活,帮助他们熟悉大学生活。活动包括听讲座、参观实验室、参加户外游戏等。本次活动需要若干志愿者,他们应当热心、耐心、善于沟通。
+
+有意者请于 6 月 30 日前到学生会办公室报名。快来加入我们吧!
+
+学生会`
+    },
+    's-spring2015': {
+      title: "2015 真题 · 春节假期花销比例(按八哥句式仿写)",
+      en: `The pie chart reflects the survey of the holiday spending of the residents in a certain city during the Spring Festival. From the chart, we can clearly see that the proportion of buying New Year gifts gets the lion's share, occupying 40%. The percentage of having dinner parties and that of transportation both take up 20%. By contrast, other spending only accounts for 20%.
+
+Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from buying gifts, people can get numerous benefits, such as expressing their love, strengthening family ties and enjoying the festive atmosphere, which would explain what appears in the chart. In addition, in recent years, China has been characterized by the increase in people's income, which enabled them to spend more on the festival.
+
+With due consideration of all these factors, we may make a rational prediction: the total spending during the Spring Festival is projected to show an upward trend.`,
+      zh: `饼图反映了某市居民春节假期花销的调查。如图清晰可见,购买新年礼物占比最大,达 40%。聚会吃饭和交通各占 20%。相比之下,其他花销仅占 20%。
+
+事实上,有两个值得注意的因素可以解释这一现象。首先,买礼物能带来诸多好处,比如表达心意、增进亲情、感受节日氛围,这正解释了图中所示。此外,近年来中国人收入不断提高,使人们能在节日上花更多钱。
+
+充分考虑这些因素后,我们可以做出合理预测:春节期间的总花销预计将呈上升趋势。`
+    },
+    'l-food2022': {
+      title: "2022 真题 · 校园美食节邀请(按八哥句式仿写)",
+      en: `Dear international students,
+
+As a student who is planning a campus food festival, I am writing this email to introduce it to you and invite you to participate.
+
+The food festival is to be held at the school square at 10 a.m. on May 20th. It aims to enrich our campus life and promote cultural exchange. It includes a variety of activities, such as tasting traditional Chinese food, learning to cook dumplings and enjoying folk performances. You can also bring your local food and share it with us.
+
+I really hope that you can accept my invitation. I am looking forward to your early reply.
+
+Yours sincerely,
+Li Ming`,
+      zh: `亲爱的留学生们:
+
+作为正在筹备校园美食节的学生,我写信向大家介绍活动并邀请你们参加。
+
+美食节将于 5 月 20 日上午 10 点在学校广场举行,旨在丰富校园生活、促进文化交流。活动包括品尝传统中餐、学包饺子、欣赏民俗表演等。你们也可以带来家乡美食与大家分享。
+
+真心希望你们能接受邀请,期待早日回复。
+
+李明 谨上`
+    },
+    's-express2022': {
+      title: "2022 真题 · 快递业务量变化(按八哥句式仿写)",
+      en: `The bar chart reflects the changes of the express delivery volume in China from 2018 to 2020. From the chart, we can clearly see that great changes have taken place in the total volume, increasing dramatically from 51 billion to 83 billion. Meanwhile, a remarkable rise was witnessed in the rural volume, climbing from 12 billion to 30 billion during the same period.
+
+Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from ordering goods online, people can get numerous benefits, such as saving time greatly, enjoying lower prices and acquiring more choices, which would explain what appears in the chart. In addition, with the advancement in science and technology, the express delivery industry has been enjoying a rapid development, thus providing people with better service.
+
+With due consideration of all these factors, we may make a rational prediction: the express delivery volume is projected to show an upward trend.`,
+      zh: `柱状图反映了 2018–2020 年中国快递业务量的变化。如图清晰可见,业务总量发生巨变,从 510 亿件猛增至 830 亿件。同时,农村业务量见证了显著上升,同期从 120 亿件增至 300 亿件。
+
+事实上,有两个值得注意的因素可以解释这一现象。首先,网上购物能带来诸多好处,比如大大节省时间、享受更低价格、获得更多选择,这正解释了图中所示。此外,随着科技进步,快递行业迅速发展,为人们提供了更好的服务。
+
+充分考虑这些因素后,我们可以做出合理预测:快递业务量预计将呈上升趋势。`
+    },
+    'l-play2025': {
+      title: "2025 真题 · 名著短剧邀请(按八哥句式仿写)",
+      en: `Dear John,
+
+As a student who is planning a short play based on a classic Chinese novel, I am writing this email to introduce it to you and invite you to take part in it.
+
+The play is adapted from Journey to the West. It is to be put on in the school hall at 7 p.m. on June 20th. It aims to spread traditional Chinese culture and enrich our campus life. It includes a variety of activities, such as rehearsing the play, designing costumes and making stage props. You are good at acting, so you can play the role of the Monkey King.
+
+I really hope that you can accept my invitation. I am looking forward to your early reply.
+
+Yours sincerely,
+Li Ming`,
+      zh: `亲爱的 John:
+
+作为正在筹备一部中国古典名著短剧的学生,我写信向你介绍这部剧,并邀请你参加。
+
+该剧改编自《西游记》,将于 6 月 20 日晚 7 点在学校礼堂上演。它旨在传播中国传统文化、丰富校园生活。活动包括排练、设计服装、制作道具等。你擅长表演,可以出演美猴王这一角色。
+
+真心希望你能接受邀请,期待早日回复。
+
+李明 谨上`
+    },
+    's-elder2025': {
+      title: "2025 真题 · 老年人休闲活动调查(按八哥句式仿写)",
+      en: `The bar chart reflects the survey of the main daily leisure activities of the elderly in a certain community. From the chart, we can clearly see that the proportion of watching TV gets the lion's share, occupying 90.8%. The percentage of taking a walk takes up the second largest part, with 68.3%. By contrast, that of growing flowers, reading and playing chess only accounts for 34.7%, 31.8% and 18.4% respectively.
+
+Actually, there are two noteworthy factors that may contribute to this phenomenon. First and foremost, from watching TV and taking a walk, the elderly can get numerous benefits, such as relaxing themselves, killing time and keeping healthy, which would explain what appears in the chart. In addition, with the improvement of living standards and medical care, more elderly people are able to enjoy a longer and healthier life.
+
+With due consideration of all these factors, we may make a rational prediction: the time the elderly spend on healthy activities is projected to show an upward trend.`,
+      zh: `柱状图反映了某社区老年人主要日常休闲活动的调查。如图清晰可见,看电视占比最大,达 90.8%。散步占第二位,为 68.3%。相比之下,养花、阅读和下棋分别只占 34.7%、31.8% 和 18.4%。
+
+事实上,有两个值得注意的因素可以解释这一现象。首先,看电视和散步能给老年人带来诸多好处,比如放松身心、消磨时间、保持健康,这正解释了图中所示。此外,随着生活水平和医疗条件改善,越来越多的老年人能够享有更长久、更健康的生活。
+
+充分考虑这些因素后,我们可以做出合理预测:老年人用于健康活动的时间预计将呈上升趋势。`
+    },
   };
 
   /* ═══════════ 课后练习:11 次 · 22 天(全部来自 7 次带练真题) ═══════════ */

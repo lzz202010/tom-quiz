@@ -26,12 +26,104 @@
   const SESSION = {}; W.practice.sessions.forEach(s => { SESSION[s.n] = s; });
   const CN_NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一'];
 
+  /* ───── 内容索引:把范文、真题、练习/预测、句库串成一张网 ─────
+     范文标题里带年份 → 能指回那一年的第 47/48 题原卷;
+     练习和预测引用了哪篇范文 → 反查得到「这篇还在哪出现」;
+     句库哪一组出现在哪篇范文 → 用挖空句的答案做文本匹配(78% 可命中,
+     其余是改写句,不硬凑)。 */
+  const YEAR_MIN = 2010, YEAR_MAX = 2025;
+  function sampleYear(sid) {
+    const m = (W.samples[sid].title.match(/(20\d{2})/) || [])[1];
+    const y = +m;
+    return y >= YEAR_MIN && y <= YEAR_MAX ? y : 0;
+  }
+  function sampleUnit(sid) {
+    const y = sampleYear(sid);
+    return y ? `${y}-${sid.charAt(0) === 'l' ? 'w47' : 'w48'}` : '';
+  }
+  const SAMPLE_LINKS = {};
+  W.practice.sessions.forEach(s => (s.sarr || []).forEach(k => {
+    (SAMPLE_LINKS[k] = SAMPLE_LINKS[k] || []).push({ href: `#/practice/${s.n}`, label: `练习第${CN_NUM[s.n - 1]}次` });
+  }));
+  W.preds.forEach(p => {
+    (SAMPLE_LINKS[p.sample] = SAMPLE_LINKS[p.sample] || []).push({ href: `#/g/${p.id}`, label: p.no });
+  });
+  const normText = s => String(s).toLowerCase().replace(/[’']/g, '')
+    .replace(/[^a-z0-9% ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const SAMPLE_TEXT = Object.keys(W.samples).map(k => ({ k: k, t: normText(W.samples[k].en) }));
+  const GROUP_SAMPLES = {};
+  W.core.forEach(c => {
+    const hit = [];
+    W.drill.filter(d => d.g === c.id).forEach(d => {
+      const probe = normText(d.s.replace(/(_+\s*)+/, ' ' + d.a + ' ')).slice(0, 40);
+      if (!probe) return;
+      SAMPLE_TEXT.forEach(s => { if (s.t.indexOf(probe) >= 0 && hit.indexOf(s.k) < 0) hit.push(s.k); });
+    });
+    GROUP_SAMPLES[c.id] = hit;
+  });
+
+  /* 逐句标记:范文里凡是句库原句,或命中模板句式,都套一层 .key */
+  const KEY_SENTS = [];
+  W.drill.forEach(d => {
+    const probe = normText(d.s.replace(/(_+\s*)+/, ' ' + d.a + ' ')).slice(0, 40);
+    if (probe) KEY_SENTS.push({ probe: probe, g: d.g });
+  });
+  /* 句库原句在范文里常被改写,光靠精确匹配只能盖住 1/4;
+     再加一层模板句式判断,覆盖到约 6 成句子,标出来的才是真·可背句。 */
+  const KEY_PAT = [
+    /there (are|is) (two|a host of|many).{0,60}(factors|contributors)/i,
+    /^\s*first and foremost/i, /^\s*in addition/i, /^\s*last but not least/i,
+    /^with due consideration/i, /^i really hope/i, /^i am looking forward/i,
+    /^as (a|an|the|one who)/i, /^here are the (reasons|key points|suggestions)/i,
+    /(pie|bar|line|table) chart reflects/i, /from the chart, we can (clearly )?see/i,
+    /great changes have taken place/i, /was witnessed/i, /gets? the lion'?s share/i,
+    /takes? up the second largest/i, /accounts? for .{0,40}respectively/i,
+    /which would explain/i, /it is (universally acknowledged|quite famous|difficult for)/i,
+    /so .{0,40}that i never fail/i, /this (notice|email|letter) is written to/i,
+    /the minutes are as follows/i, /come on and join us/i,
+    /(several volunteers|volunteers are needed)/i, /it aims to/i,
+    /i am not satisfied with/i, /it is necessary for/i,
+    /(increasing|decreasing) (dramatically|steadily)/i,
+    /(increased|decreased|rose|fell) from .{0,40} to /i,
+    /(occupying|accounting for) \d/i, /is projected to show an upward trend/i,
+    /looking forward to your early reply/i
+  ];
+  const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function sentenceHtml(en) {
+    const re = /[^.!?]+[.!?]*\s*/g;
+    let out = '', count = 0, total = 0, m;
+    while ((m = re.exec(en))) {
+      const raw = m[0];
+      if (!raw.trim()) { out += escHtml(raw); continue; }
+      total++;
+      const norm = normText(raw);
+      const hit = KEY_SENTS.find(k => norm.indexOf(k.probe) >= 0 || (norm.length > 26 && k.probe.indexOf(norm) >= 0));
+      const pat = !hit && KEY_PAT.some(re2 => re2.test(raw));
+      if (hit || pat) {
+        count++;
+        out += `<span class="sen key"${hit ? ` data-g="${hit.g}"` : ''}>${escHtml(raw)}</span>`;
+      } else out += `<span class="sen">${escHtml(raw)}</span>`;
+    }
+    return { html: out, count: count, total: total };
+  }
+
   /* ───── 范文块 ───── */
-  function sampleHtml(sid) {
+  function sampleHtml(sid, ctx) {
     const s = W.samples[sid];
     if (!s) return '';
+    const links = [];
+    const y = sampleYear(sid);
+    if (y) links.push(`<a class="ws-go" href="index.html?y=${y}&u=${sampleUnit(sid)}">${y} 原卷 第${sid.charAt(0) === 'l' ? 47 : 48} 题 ›</a>`);
+    (SAMPLE_LINKS[sid] || []).forEach(l => {
+      if (l.href === ctx) return;                 // 不给自己所在的页面再放一条自己的链接
+      links.push(`<a class="ws-go" href="${l.href}">${l.label} ›</a>`);
+    });
+    const body = sentenceHtml(s.en);
     return `<div class="ws-hd"><b>${s.title}</b><span>范文 · ${wc(s.en)} 词</span></div>` +
-      `<div class="ws-en">${s.en}</div>` +
+      (links.length ? `<div class="ws-links">${links.join('')}</div>` : '') +
+      `<div class="ws-legend"><span>重点句 <b>${body.count}</b>/${body.total} · 下划线为句库必背句</span>` +
+      (body.count ? `<button class="ws-only" type="button" data-only>只看重点句</button>` : '') + `</div>` +
+      `<div class="ws-en">${body.html}</div>` +
       `<button class="ws-toggle" type="button" data-zh>看译文</button>` +
       `<div class="ws-zh" hidden>${s.zh}</div>`;
   }
@@ -41,6 +133,14 @@
         const zh = b.nextElementSibling;
         zh.hidden = !zh.hidden;
         b.textContent = zh.hidden ? '看译文' : '收起译文';
+      });
+    });
+    root.querySelectorAll('[data-only]').forEach(b => {
+      b.addEventListener('click', () => {
+        const box = b.closest('.wsample').querySelector('.ws-en');
+        const on = box.classList.toggle('only-key');
+        b.textContent = on ? '看全文' : '只看重点句';
+        b.classList.toggle('on', on);
       });
     });
   }
@@ -140,11 +240,23 @@
   }
   function renderHome() {
     const pd = practiceProgress(), gp = gradeProgress(), ds = drillStats();
+    const pct = Math.round(ds.mastered / ds.total * 100);
     MAIN.innerHTML =
-      `<div class="whero"><h1>作文模版</h1><p>请选择大作文、小作文学习目录或作文课后练习。</p></div>` +
-      `<section class="wsec"><h2>(一) 大作文</h2><div class="wcards">` + W.big.map(card).join('') + `</div></section>` +
-      `<section class="wsec"><h2>(二) 小作文</h2><div class="wcards">` + W.small.map(card).join('') + `</div></section>` +
-      `<section class="wsec"><div class="wcards">` +
+      `<div class="whero"><h1>作文模版</h1><p>请选择大作文、小作文学习目录或作文课后练习。</p>` +
+      `<div class="wstats">` +
+      `<span><b>${ds.mastered}<em>/${ds.total}</em></b><i>句已默写掌握 · ${pct}%</i></span>` +
+      `<span><b>${pd}<em>/${W.practice.sessions.length}</em></b><i>次课后练习完成</i></span>` +
+      `<span><b>${gp.drafted}<em>/${W.preds.length}</em></b><i>篇预测已写</i></span>` +
+      `</div></div>` +
+      `<section class="wsec"><h2>(一) 大作文<span class="cnt">${W.big.length} 个模版</span></h2><div class="wcards">` + W.big.map(card).join('') + `</div></section>` +
+      `<section class="wsec"><h2>(二) 小作文<span class="cnt">${W.small.length} 个模版</span></h2><div class="wcards">` + W.small.map(card).join('') + `</div></section>` +
+      (() => {
+        const ys = [...new Set(Object.keys(W.samples).map(sampleYear).filter(Boolean))].sort((a, b) => b - a);
+        if (!ys.length) return '';
+        return `<section class="wsec"><h2>真题范文<span class="cnt">${ys.length} 年 · 点年份看原卷与范文</span></h2>` +
+          `<div class="wyears">` + ys.map(y => `<a href="#/year/${y}">${y}</a>`).join('') + `</div></section>`;
+      })() +
+      `<section class="wsec"><h2>练与测<span class="cnt">句库 / 练习 / 批改 / 打印</span></h2><div class="wcards">` +
       `<a class="wcard red" href="#/core"><span class="no">句库</span>` +
       `<span class="tt"><b>核心句库</b><i>八哥背诵句 12 组 · 全部题型共用一套句</i>` +
       `<span class="wprog"><b style="width:${Math.round(ds.mastered / ds.total * 100)}%;background:var(--red)"></b></span></span>` +
@@ -164,16 +276,22 @@
   }
 
   /* ───── 核心句库目录 ───── */
+  function coreCard(c) {
+    return `<a class="wcard" href="#/t/${c.id}"><span class="no">${c.no}</span>` +
+      `<span class="tt"><b>${c.title}</b><i>${c.tag}</i></span><span class="ar">›</span></a>`;
+  }
   function renderCore() {
     const ds = drillStats();
+    const small = W.core.filter(c => +c.id.slice(1) <= 8);
+    const big = W.core.filter(c => +c.id.slice(1) > 8);
     MAIN.innerHTML =
       `<a class="wback" href="#/">‹ 返回目录</a>` +
       `<div class="whero-sm"><h1>核心句库</h1><p>八哥背诵句 12 组 · 全部题型共用:小作文素材包、大作文获益句是同一套。点开逐句背,背完去默写。</p></div>` +
       `<a class="drillcta" href="#/drill">句子循环练 · 挖空默写<span>已掌握 ${ds.mastered}/${ds.total} · 写错的句自动回队,直到全对</span><b>去默写 ›</b></a>` +
-      `<div class="wcards" style="margin-top:16px">` +
-      W.core.map(c => `<a class="wcard" href="#/t/${c.id}"><span class="no">${c.no}</span>` +
-        `<span class="tt"><b>${c.title}</b><i>${c.tag}</i></span><span class="ar">›</span></a>`).join('') +
-      `</div>`;
+      `<section class="wsec"><h2>小作文 · 素材包<span class="cnt">8 组 · 首段尾段到各类信件</span></h2><div class="wcards">` +
+      small.map(coreCard).join('') + `</div></section>` +
+      `<section class="wsec"><h2>大作文 · 数据与论证<span class="cnt">4 组 · 图表句、获益原因、收尾</span></h2><div class="wcards">` +
+      big.map(coreCard).join('') + `</div></section>`;
     $('#wtT').textContent = '核心句库';
     document.title = '核心句库 · e2';
   }
@@ -269,15 +387,60 @@
   }
 
   /* ───── 模版/句库详情 ───── */
+  function sampleChips(sid) {
+    const y = sampleYear(sid);
+    const t = W.samples[sid].title.replace(/^[^·]*·\s*/, '').replace(/\(.*?\)/g, '').trim();
+    return `<a class="schip" href="#/s/${sid}"><b>${t}</b>` +
+      `<i>${y ? y + ' 真题' : '预测 / 原创'} · ${wc(W.samples[sid].en)} 词</i></a>`;
+  }
   function renderTpl(t) {
+    const rel = /^c\d+$/.test(t.id) ? (GROUP_SAMPLES[t.id] || []) : [];
     MAIN.innerHTML =
       `<a class="wback" href="#/">‹ 返回目录</a>` +
       `<div class="wd-hd"><h1>${t.no} · ${t.title}</h1><span class="tag">${t.tag}</span></div>` +
-      `<div class="wdetail">${t.html}</div>`;
+      `<div class="wdetail">${t.html}</div>` +
+      (rel.length
+        ? `<section class="wrel"><h3>用到这组句的范文<span class="cnt">${rel.length} 篇</span></h3>` +
+          `<div class="schips">${rel.map(sampleChips).join('')}</div></section>`
+        : '');
     MAIN.querySelectorAll('[data-sample]').forEach(el => { el.classList.add('wsample'); el.innerHTML = sampleHtml(el.dataset.sample); });
     bindToggles(MAIN);
     $('#wtT').textContent = `${t.no} ${t.title}`;
     document.title = `${t.no} ${t.title} · e2`;
+  }
+
+  /* ───── 单篇范文(内容图的中心节点) ───── */
+  const SAMPLE_GROUPS = {};
+  Object.keys(GROUP_SAMPLES).forEach(g => {
+    GROUP_SAMPLES[g].forEach(k => { (SAMPLE_GROUPS[k] = SAMPLE_GROUPS[k] || []).push(g); });
+  });
+  function renderSample(sid) {
+    const s = W.samples[sid];
+    if (!s) return renderHome();
+    const y = sampleYear(sid);
+    const gs = SAMPLE_GROUPS[sid] || [];
+    MAIN.innerHTML =
+      `<button class="wback wback-btn" id="sBack" type="button">‹ 返回</button>` +
+      `<div class="wd-hd"><h1>${s.title}</h1>` +
+      `<span class="tag">${y ? y + ' 年真题 · 第' + (sid.charAt(0) === 'l' ? 47 : 48) + ' 题' : '预测 / 原创范文'}</span>` +
+      `<p class="wd-meta">${wc(s.en)} 词 · 来自八哥体系</p></div>` +
+      `<div class="wdetail"><div class="wsample">${sampleHtml(sid, '#/s/' + sid)}</div>` +
+      (gs.length
+        ? `<section class="wrel"><h3>这篇用到的句库<span class="cnt">${gs.length} 组</span></h3>` +
+          `<div class="schips">${gs.map(gid => {
+            const c = W.core.find(x => x.id === gid);
+            return `<a class="schip" href="#/t/${gid}"><b>${c.no} ${c.title}</b><i>${c.tag}</i></a>`;
+          }).join('')}</div></section>`
+        : '') +
+      `</div>`;
+    bindToggles(MAIN);
+    const b = $('#sBack');
+    if (b) b.addEventListener('click', () => {
+      if (history.length > 1) history.back();
+      else location.hash = '#/core';
+    });
+    $('#wtT').textContent = s.title;
+    document.title = `${s.title} · e2`;
   }
 
   /* ───── 课后练习 ───── */
@@ -295,34 +458,42 @@
     bar.style.width = Math.round(pd / total * 100) + '%';
     span.textContent = `${pd}/${total} 完成`;
   }
-  function sessionItem(s) {
+  function sessionItem(s, openN) {
     const arr = PR().checks[s.n] || [];
     const ok = s.checks.every((c, i) => arr[i]);
     const link = s.linkext
       ? `<a class="golink" href="${s.linkext}">打开真题页(第 47、48 题)›</a>`
       : (s.link && TPL[s.link] ? `<a class="golink" href="#/t/${s.link}">背「${TPL[s.link].no} ${TPL[s.link].title}」›</a>` : '');
-    const samples = (s.sarr || []).map(k => `<div class="wsample" data-sample="${k}"></div>`).join('');
+    const samples = (s.sarr || []).map(k => `<div class="wsample" data-sample="${k}" data-ctx="#/practice/${s.n}"></div>`).join('');
     const chart = s.fig
-      ? `<figure class="wfig"><img src="${s.fig}" alt="图表" loading="lazy"></figure>`
+      ? `<figure class="wfig"><img src="${s.fig}" alt="作文题图表" loading="lazy">` +
+        `<figcaption>题目图表 · 裁切自真题 PDF,只含写作题图</figcaption></figure>`
       : (s.data ? `<table class="wdata">${s.data}</table>` : '');
-    return `<details class="wsess" data-n="${s.n}">` +
+    return `<details class="wsess" data-n="${s.n}"${s.n === openN ? ' open' : ''}>` +
       `<summary><span class="sn ${s.kind === '大作文' ? 'big' : ''}">第${CN_NUM[s.n - 1]}次</span>` +
       `<span class="st"><b>${s.title}</b><i>${s.kind} · ${s.type} · ${s.days}</i></span>` +
       `<span class="sd">${ok ? '<span class="done-mark">✓ 完成</span>' : s.days}</span></summary>` +
       `<div class="bd"><p class="cn">${s.cn}</p><p class="en">${s.en}</p>${chart}` +
       `<p class="tm">${s.time}</p>${link}${samples}${checkHtml('p', s.n, s.checks)}</div></details>`;
   }
-  function renderPractice() {
+  function renderPractice(openN) {
     const pd = practiceProgress(), total = W.practice.sessions.length;
     MAIN.innerHTML =
       `<a class="wback" href="#/">‹ 返回目录</a>` +
       `<div class="whero-sm"><h1>作文课后练习</h1><p>${W.practice.sub}</p></div>` +
       `<div class="wprogbar"><div class="bar"><b style="width:${Math.round(pd / total * 100)}%;background:var(--red)"></b></div><span>${pd}/${total} 完成</span></div>` +
       `<p class="wnote">写完点开范文对照;勾完全部自查项才算这次完成。范文都是八哥带练原文,里面的句子和句库一模一样。</p>` +
-      `<ul class="wsess">` + W.practice.sessions.map(sessionItem).join('') + `</ul>`;
-    MAIN.querySelectorAll('[data-sample]').forEach(el => { el.classList.add('wsample'); el.innerHTML = sampleHtml(el.dataset.sample); });
+      `<ul class="wsess">` + W.practice.sessions.map(s => sessionItem(s, openN)).join('') + `</ul>`;
+    MAIN.querySelectorAll('[data-sample]').forEach(el => {
+      el.classList.add('wsample');
+      el.innerHTML = sampleHtml(el.dataset.sample, el.dataset.ctx);
+    });
     bindToggles(MAIN);
     paintChecks(MAIN);
+    if (openN) {
+      const d = MAIN.querySelector(`details[data-n="${openN}"]`);
+      if (d) d.scrollIntoView({ block: 'start' });
+    }
     $('#wtT').textContent = '作文课后练习';
     document.title = '作文课后练习 · e2';
   }
@@ -338,16 +509,30 @@
     const el = $(`a.wp[data-id="${id}"] .st`);
     if (el) { const s = predStatus(id); el.textContent = ['未写', '已写草稿', '已自评 ✓'][s]; el.className = `st s${s}`; }
   }
+  let GF = 'all';
   function renderGrade() {
+    const cnt = {
+      all: W.preds.length,
+      big: W.preds.filter(p => p.kind === '大作文').length,
+      small: W.preds.filter(p => p.kind === '小作文').length
+    };
+    const list = W.preds.filter(p => GF === 'all' || p.kind === (GF === 'big' ? '大作文' : '小作文'));
     MAIN.innerHTML =
       `<a class="wback" href="#/">‹ 返回目录</a>` +
       `<div class="whero-sm"><h1>作文批改</h1><p>作文课后批改 · 先自己写,再对照范文自评</p></div>` +
-      `<div class="wpreds">` + W.preds.map(p => {
+      `<div class="wfilter">` +
+      [['all', '全部'], ['big', '大作文'], ['small', '小作文']].map(([k, t]) =>
+        `<button type="button" data-f="${k}"${GF === k ? ' class="on"' : ''}>${t}<i>${cnt[k]}</i></button>`).join('') +
+      `</div>` +
+      `<div class="wpreds">` + list.map(p => {
         const s = predStatus(p.id);
         return `<a class="wp" data-id="${p.id}" href="#/g/${p.id}"><span class="no">${p.no}</span>` +
           `<span class="tt"><b>${p.title}</b><i>(${p.kind})</i></span>` +
           `<span class="st s${s}">${['未写', '已写草稿', '已自评 ✓'][s]}</span><span class="ar">›</span></a>`;
       }).join('') + `</div>`;
+    MAIN.querySelectorAll('.wfilter button').forEach(b => {
+      b.addEventListener('click', () => { GF = b.dataset.f; renderGrade(); });
+    });
     $('#wtT').textContent = '作文批改';
     document.title = '作文批改 · e2';
   }
@@ -375,7 +560,7 @@
       p.sents.map(x => `<li><span class="en">${x[0]}</span><span class="zh">${x[1]}</span></li>`).join('') +
       `</ul></div></details>` +
       `<details><summary>参考范文<span class="hint">写完再看</span></summary><div class="bd">` +
-      `<div class="wsample">${sampleHtml(p.sample)}</div></div></details>` +
+      `<div class="wsample">${sampleHtml(p.sample, '#/g/' + p.id)}</div></div></details>` +
       `<details><summary>自评清单<span class="hint">${p.checks.length} 条</span></summary><div class="bd">` +
       checkHtml('g', p.id, p.checks) + `</div></details>` +
       `</div></div>`;
@@ -427,14 +612,62 @@
     document.title = '考前一页纸 · e2';
   }
 
+  /* ───── 按真题年份看作文(从原卷进来时的落点) ───── */
+  function renderYear(y) {
+    const list = Object.keys(W.samples).filter(k => sampleYear(k) === y);
+    const preds = W.preds.filter(p => sampleYear(p.sample) === y);
+    const sess = W.practice.sessions.filter(s => (s.sarr || []).some(k => sampleYear(k) === y));
+    MAIN.innerHTML =
+      `<a class="wback" href="#/grade">‹ 返回批改</a>` +
+      `<div class="whero-sm"><h1>${y} 真题 · 作文</h1>` +
+      `<p>这一年的大小作文范文,以及它在练习、预测里的位置。</p></div>` +
+      `<div class="wyear-links">` +
+      `<a class="drill-btn ghost" href="index.html?y=${y}&u=${y}-w47">打开原卷 第 47 题(小作文)›</a>` +
+      `<a class="drill-btn ghost" href="index.html?y=${y}&u=${y}-w48">第 48 题(大作文)›</a>` +
+      `</div>` +
+      (list.length
+        ? `<section class="wsec"><h2>范文<span class="cnt">${list.length} 篇</span></h2><div class="schips">${list.map(sampleChips).join('')}</div></section>`
+        : `<section class="wsec"><h2>这一年还没有收录范文</h2>` +
+          `<p class="wnote">先看几道同题型的预测范文,写法和真题一致:</p><div class="schips">` +
+          W.preds.slice(0, 4).map(p => `<a class="schip" href="#/g/${p.id}"><b>${p.no} ${p.title}</b><i>${p.kind} · ${p.type}</i></a>`).join('') +
+          `</div></section>`) +
+      (preds.length
+        ? `<section class="wsec"><h2>作为预测题<span class="cnt">${preds.length} 道</span></h2><div class="schips">` +
+          preds.map(p => `<a class="schip" href="#/g/${p.id}"><b>${p.no} ${p.title}</b><i>${p.kind} · ${p.type}</i></a>`).join('') +
+          `</div></section>`
+        : '') +
+      (sess.length
+        ? `<section class="wsec"><h2>在练习里<span class="cnt">${sess.length} 次</span></h2><div class="schips">` +
+          sess.map(s => `<a class="schip" href="#/practice/${s.n}"><b>第${CN_NUM[s.n - 1]}次 · ${s.title}</b><i>${s.kind} · ${s.type}</i></a>`).join('') +
+          `</div></section>`
+        : '');
+    $('#wtT').textContent = `${y} 真题作文`;
+    document.title = `${y} 真题作文 · e2`;
+  }
+
   /* ───── 路由 ───── */
+  /* 顶部五个入口跟随当前页高亮:用户随时知道自己在哪、能去哪 */
+  const NAV_MAP = { '': '#/', core: '#/core', drill: '#/core', t: '#/', s: '#/core',
+    practice: '#/practice', grade: '#/grade', g: '#/grade', cram: '#/cram', year: '#/' };
+  function markNav(key) {
+    const nav = document.getElementById('wnav');
+    if (!nav) return;
+    const want = NAV_MAP[key] || '#/';
+    nav.querySelectorAll('a').forEach(a => {
+      if (a.getAttribute('href') === want) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  }
   function render() {
     const parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
     window.scrollTo(0, 0);
+    markNav(parts[0] || '');
     if (parts[0] === 'core') return renderCore();
     if (parts[0] === 'drill') return renderDrill(parts[1]);
     if (parts[0] === 't' && TPL[parts[1]]) return renderTpl(TPL[parts[1]]);
-    if (parts[0] === 'practice') return renderPractice();
+    if (parts[0] === 's' && W.samples[parts[1]]) return renderSample(parts[1]);
+    if (parts[0] === 'year' && /^\d{4}$/.test(parts[1] || '')) return renderYear(+parts[1]);
+    if (parts[0] === 'practice') return renderPractice(+parts[1] || 0);
     if (parts[0] === 'grade') return renderGrade();
     if (parts[0] === 'cram') return renderCram();
     if (parts[0] === 'g' && PRED[parts[1]]) return renderPred(PRED[parts[1]]);

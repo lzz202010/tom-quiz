@@ -292,24 +292,24 @@
   sortEl.addEventListener('change', render);
   V.on(render);
 
-  /* ── 返回:记住从哪一卷、哪一单元进来的,不再一按就掉回首页 ── */
+  /* ── 返回:统一「先回主页」,再给一个真正的「回到原题」──
+     原来的做法是拼一个带 y 的 index.html 链接,和原题页的「返回生词本」
+     互相指,永远回不到列表。现在「回到原题」走 history.back(),
+     回到的是用户实际看过的那一页(连滚动位置都在),不再造 URL 闭环。 */
   const P = new URLSearchParams(location.search);
   const back = $('#vbBack');
-  if (P.get('y')) {
-    const sp = new URLSearchParams();
-    sp.set('y', P.get('y'));
-    if (P.get('u')) sp.set('u', P.get('u'));
-    sp.set('from', 'vocab');
-    back.href = 'index.html?' + sp;
-    back.textContent = '← 回到原题';
-    /* 「回到原题」进的是 from=vocab 页面,那边顶栏又只能回生词本,形成闭环;
-       补一个直达主页的出口(复用 .vb-back 样式,只在带 y 参数时出现)。 */
-    const home = document.createElement('a');
-    home.className = 'vb-back';
-    home.style.order = '0';            // .vb-back 默认 order:-1,让它排到标题右侧
-    home.href = 'index.html';
-    home.textContent = '主页';
-    back.parentNode.appendChild(home);
+  back.href = 'index.html';
+  back.textContent = '← 主页';
+  const fromPaper = /index\.html\?(?:[^#]*&)?y=\d+/.test(document.referrer || '') || !!P.get('from');
+  if (fromPaper) {
+    const ret = document.createElement('a');
+    ret.className = 'vb-back vb-back-2';
+    ret.href = 'index.html';
+    ret.textContent = '回到原题';
+    ret.addEventListener('click', e => {
+      if (history.length > 1) { e.preventDefault(); history.back(); }
+    });
+    back.parentNode.insertBefore(ret, back.nextSibling);
   }
 
   render();

@@ -455,7 +455,24 @@ button.no:hover{text-decoration:underline}
   .years{grid-template-columns:repeat(2,1fr);gap:9px}
   .yr{padding:13px 12px}
   .pv-bar{gap:8px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top))}
+  .pv-bar .back,.pv-bar .tg,.pv-bar .go,.pv-bar .dl{min-height:38px;padding-left:10px;padding-right:10px}
+  .hd-vb{min-height:36px}
+  .vb-back,.vb-back-2{min-height:36px;display:inline-flex;align-items:center}
   .pv-n{display:none}
+}
+
+/* 顶栏按钮统一触摸高度:原来 6px padding + 12.5px 字 ≈ 28px,
+   看着像文字、点起来也容易落空。桌面 34px、手机 38px。 */
+.pv-bar .back,.pv-bar .tg,.pv-bar .go,.pv-bar .dl{min-height:34px;display:inline-flex;
+  align-items:center;justify-content:center}
+.hd-vb{min-height:32px}
+/* 生词本第二个返回:「回到原题」走历史,和「← 主页」区分开 */
+.vb-back-2{color:var(--red);padding-left:2px}
+.vb-back-2::before{content:"·";color:#c9c5bc;margin-right:7px}
+/* 手机上把 PDF 按钮压成「PDF」,给「作文」腾位置 */
+@media(max-width:600px){
+  .pv-bar .dl .dl-t{display:none}
+  .pv-bar .wr{padding-left:9px;padding-right:9px}
 }
 
 /* 键盘操作才有焦点圈:鼠标/触屏点按不出现,不改变页面既有观感 */

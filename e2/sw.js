@@ -4,7 +4,7 @@
    · PDF / 其它大文件不进缓存,避免占满手机配额;Range 请求不拦截
    · 页面导航走网络优先,上线后能拿到新页面;断网回退到缓存
    · 改站后 CACHE 要 +1(用 scripts/e2/bump_version.py --bump 一并同步 ?v=) */
-const CACHE = 'e2-v17';
+const CACHE = 'e2-v19';
 const CORE = [
   './', './index.html', './vocab.html', './writing.html',
   './style.css', './favicon.svg', './sw-reg.js',

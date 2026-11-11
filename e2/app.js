@@ -15,7 +15,7 @@
     if (PAPERS[y]) return Promise.resolve(PAPERS[y]);
     return new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = `d/${y}.js?v=17`;
+      s.src = `d/${y}.js?v=19`;
       s.onload = () => {
         const p = (window.E2DATA || {})[y];
         if (!p) return rej(new Error('该年数据缺失'));
@@ -530,7 +530,7 @@
     if (window.E2GLOSS_DATA) return Promise.resolve();
     if (!glossP) glossP = new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = 'gloss-data.js?v=17';
+      s.src = 'gloss-data.js?v=19';
       s.onload = () => res();
       s.onerror = () => rej(new Error('释义词典加载失败'));
       document.head.appendChild(s);
@@ -628,8 +628,11 @@
     const el = $('#vbEntry');
     if (el) el.href = 'vocab.html?' + vbQuery('paper');
   }
+  /* 回生词本:走历史记录,回到进站前那一页(保留它的滚动位置和搜索词)。
+     没有可退的历史(直接打开带 y 的链接)才退回干净的列表页,避免 URL 互相指。 */
   function backToVocab() {
-    location.replace('vocab.html?' + vbQuery('back'));
+    if (history.length > 1 && /vocab\.html/.test(document.referrer)) history.back();
+    else location.href = 'vocab.html';
   }
 
   function syncVbCount() {
@@ -840,19 +843,35 @@
       jumpToUnit();
     });
   }
-  async function openPV(y) {
-    S.y = y || S.y;
-    const f = `pdf/e2-${S.y}.pdf`;
-    $('#pvdl').href = f;
-    $('#pvdl').textContent = `${S.y} 整套 PDF`;
-    $('#pv').hidden = false;
-    document.body.style.overflow = 'hidden';
-    $('#pvpages').scrollIntoView({ block: 'start' });
+  /* ───── 预览层:URL 是唯一状态源 ─────
+     ?y= 在 = 预览开,不在 = 首页。打开压一条历史,关闭退一条;
+     刷新、前进/后退、手机返回键,全部走同一个 syncFromURL,不会再出现
+     「页面在、URL 不在」或「URL 在、页面不在」的错位。 */
+  function pvQuery() {
     const sp = new URLSearchParams();
     sp.set('y', S.y);
     if (wantUnit) sp.set('u', wantUnit);
     if (FROM_VOCAB) sp.set('from', 'vocab');
-    history.pushState({ e2pv: 1 }, '', '?' + sp);
+    return '?' + sp;
+  }
+  function paperFromURL() {
+    const q = new URLSearchParams(location.search);
+    const y = +q.get('y');
+    return D.years.includes(y) ? { y: y, u: q.get('u') || '' } : null;
+  }
+
+  async function openPV(y, opts) {
+    opts = opts || {};
+    S.y = y || S.y;
+    if (opts.u) wantUnit = opts.u;
+    const f = `pdf/e2-${S.y}.pdf`;
+    $('#pvdl').href = f;
+    $('#pvdl').innerHTML = `<span class="dl-t">${S.y} 整套 </span>PDF`;
+    $('#pvwr').href = `writing.html#/year/${S.y}`;
+    $('#pv').hidden = false;
+    document.body.style.overflow = 'hidden';
+    $('#pvpages').scrollIntoView({ block: 'start' });
+    if (!opts.fromURL) history.pushState({ e2pv: 1, y: S.y }, '', pvQuery());
     syncVbLinks();
     if (!PAPERS[S.y]) {
       $('#pvpages').innerHTML = '<section class="page"><p class="doc-empty">正在加载…</p></section>';
@@ -867,13 +886,25 @@
   function closePV(fromPop) {
     $('#pv').hidden = true;
     document.body.style.overflow = '';
-    if (!fromPop) history.replaceState(null, '', location.pathname);
+    if (!fromPop) {
+      /* 自己压进来的历史自己退掉,让「返回」和「后退键」是同一条路径 */
+      if (history.state && history.state.e2pv) { history.back(); return; }
+      history.replaceState(null, '', location.pathname);
+    }
     drawYears();                              // 回首页时把成绩和难度刷出来
   }
+  function syncFromURL() {
+    const cur = paperFromURL();
+    if (cur) {
+      if ($('#pv').hidden || cur.y !== S.y || (cur.u && cur.u !== wantUnit)) {
+        openPV(cur.y, { fromURL: true, u: cur.u });
+      }
+    } else if (!$('#pv').hidden) {
+      closePV(true);
+    }
+  }
   /* 手机/浏览器返回键:先关预览露出年份列表,不要直接退出整个站点 */
-  window.addEventListener('popstate', () => {
-    if (!$('#pv').hidden) closePV(true);
-  });
+  window.addEventListener('popstate', syncFromURL);
 
   /* 从生词本跳进原题时,顶栏「返回」应当回生词本,而不是关掉预览回首页。
      但「原题 ↔ 生词本」会形成闭环(生词本的返回链接又带回 y 参数),所以补一个
@@ -1018,5 +1049,6 @@
   drawYears();
   syncVbCount();
   setRV(window.matchMedia('(max-width:760px)').matches);   // 手机上默认用阅读模式
-  if (q.has('y') || q.get('print') === '1') openPV(S.y);
+  if (q.has('y')) openPV(S.y, { fromURL: true, u: q.get('u') || '' });
+  else if (q.get('print') === '1') openPV(S.y);
 })();
