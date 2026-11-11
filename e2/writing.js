@@ -32,6 +32,11 @@
      句库哪一组出现在哪篇范文 → 用挖空句的答案做文本匹配(78% 可命中,
      其余是改写句,不硬凑)。 */
   const YEAR_MIN = 2010, YEAR_MAX = 2025;
+  /* 来源只有两类:八哥原文(含校订)与本站按八哥句式仿写。
+     仿写不冒充原文,范文头、列表卡、年份页都带来源徽标。 */
+  const sampleSrc = sid => /按八哥句式/.test(W.samples[sid].title) ? 'site' : 'bage';
+  const sampleTitle = sid => W.samples[sid].title.replace(/\(按八哥句式[^)]*\)/g, '').trim();
+  const srcBadge = sid => `<span class="ws-src ${sampleSrc(sid)}">${sampleSrc(sid) === 'site' ? '本站仿写' : '八哥原文'}</span>`;
   function sampleYear(sid) {
     const m = (W.samples[sid].title.match(/(20\d{2})/) || [])[1];
     const y = +m;
@@ -119,7 +124,7 @@
       links.push(`<a class="ws-go" href="${l.href}">${l.label} ›</a>`);
     });
     const body = sentenceHtml(s.en);
-    return `<div class="ws-hd"><b>${s.title}</b><span>范文 · ${wc(s.en)} 词</span></div>` +
+    return `<div class="ws-hd"><b>${sampleTitle(sid)}</b>${srcBadge(sid)}<span>范文 · ${wc(s.en)} 词</span></div>` +
       (links.length ? `<div class="ws-links">${links.join('')}</div>` : '') +
       `<div class="ws-legend"><span>重点句 <b>${body.count}</b>/${body.total} · 下划线为句库必背句</span>` +
       (body.count ? `<button class="ws-only" type="button" data-only>只看重点句</button>` : '') + `</div>` +
@@ -253,7 +258,9 @@
       (() => {
         const ys = [...new Set(Object.keys(W.samples).map(sampleYear).filter(Boolean))].sort((a, b) => b - a);
         if (!ys.length) return '';
-        return `<section class="wsec"><h2>真题范文<span class="cnt">${ys.length} 年 · 点年份看原卷与范文</span></h2>` +
+        const all = Object.keys(W.samples).filter(k => sampleYear(k));
+        const siteN = all.filter(k => sampleSrc(k) === 'site').length;
+        return `<section class="wsec"><h2>真题范文<span class="cnt">${ys.length} 年 · ${all.length - siteN} 篇原文 / ${siteN} 篇仿写</span></h2>` +
           `<div class="wyears">` + ys.map(y => `<a href="#/year/${y}">${y}</a>`).join('') + `</div></section>`;
       })() +
       `<section class="wsec"><h2>练与测<span class="cnt">句库 / 练习 / 批改 / 打印</span></h2><div class="wcards">` +
@@ -389,8 +396,8 @@
   /* ───── 模版/句库详情 ───── */
   function sampleChips(sid) {
     const y = sampleYear(sid);
-    const t = W.samples[sid].title.replace(/^[^·]*·\s*/, '').replace(/\(.*?\)/g, '').trim();
-    return `<a class="schip" href="#/s/${sid}"><b>${t}</b>` +
+    const t = sampleTitle(sid).replace(/^[^·]*·\s*/, '').replace(/\(.*?\)/g, '').trim();
+    return `<a class="schip" href="#/s/${sid}"><b>${t}${srcBadge(sid)}</b>` +
       `<i>${y ? y + ' 真题' : '预测 / 原创'} · ${wc(W.samples[sid].en)} 词</i></a>`;
   }
   function renderTpl(t) {
@@ -421,7 +428,7 @@
     const gs = SAMPLE_GROUPS[sid] || [];
     MAIN.innerHTML =
       `<button class="wback wback-btn" id="sBack" type="button">‹ 返回</button>` +
-      `<div class="wd-hd"><h1>${s.title}</h1>` +
+      `<div class="wd-hd"><h1>${sampleTitle(sid)} ${srcBadge(sid)}</h1>` +
       `<span class="tag">${y ? y + ' 年真题 · 第' + (sid.charAt(0) === 'l' ? 47 : 48) + ' 题' : '预测 / 原创范文'}</span>` +
       `<p class="wd-meta">${wc(s.en)} 词 · 来自八哥体系</p></div>` +
       `<div class="wdetail"><div class="wsample">${sampleHtml(sid, '#/s/' + sid)}</div>` +
@@ -439,8 +446,8 @@
       if (history.length > 1) history.back();
       else location.hash = '#/core';
     });
-    $('#wtT').textContent = s.title;
-    document.title = `${s.title} · e2`;
+    $('#wtT').textContent = sampleTitle(sid);
+    document.title = `${sampleTitle(sid)} · e2`;
   }
 
   /* ───── 课后练习 ───── */
@@ -626,7 +633,11 @@
       `<a class="drill-btn ghost" href="index.html?y=${y}&u=${y}-w48">第 48 题(大作文)›</a>` +
       `</div>` +
       (list.length
-        ? `<section class="wsec"><h2>范文<span class="cnt">${list.length} 篇</span></h2><div class="schips">${list.map(sampleChips).join('')}</div></section>`
+        ? `<section class="wsec"><h2>范文<span class="cnt">${list.length} 篇</span></h2>` +
+          (list.some(k => sampleSrc(k) === 'site')
+            ? `<p class="wnote">其中 ${list.filter(k => sampleSrc(k) === 'site').length} 篇为本站按八哥句式仿写,其余为八哥原文。</p>`
+            : '') +
+          `<div class="schips">${list.map(sampleChips).join('')}</div></section>`
         : `<section class="wsec"><h2>这一年还没有收录范文</h2>` +
           `<p class="wnote">先看几道同题型的预测范文,写法和真题一致:</p><div class="schips">` +
           W.preds.slice(0, 4).map(p => `<a class="schip" href="#/g/${p.id}"><b>${p.no} ${p.title}</b><i>${p.kind} · ${p.type}</i></a>`).join('') +

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f7f6f3">
 <title>作文模版 · e2</title>
 <meta name="description" content="e2 作文模块:大/小作文模版、核心句库、课后练习与批改预测题。">
-<link rel="icon" type="image/svg+xml" href="favicon.svg?v=19">
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=20">
 <style>
 /* 自包含:作文模块只用自己的样式,不碰 style.css(色板与主站一致) */
 *{box-sizing:border-box}
@@ -138,6 +138,12 @@ a{color:inherit;text-decoration:none}
   min-height:32px;padding:0 12px;margin:10px 15px 14px;font-size:12px;cursor:pointer;
   display:inline-flex;align-items:center}
 .wsample .ws-toggle:hover{border-color:var(--red);color:var(--red)}
+/* 来源徽标:八哥原文 / 本站仿写,避免把仿写当原文背 */
+.ws-src{display:inline-block;margin-left:7px;padding:0 7px;height:18px;line-height:17px;
+  border-radius:9px;border:1px solid var(--line);background:#fbfaf7;color:var(--mute);
+  font-size:10px;font-weight:600;vertical-align:1px;white-space:nowrap}
+.ws-src.site{color:#8a5a2b;border-color:#e6d3c0;background:#fdf6ee}
+.wd-hd h1 .ws-src{vertical-align:middle}
 /* 重点句标记:句库里的句子在范文里加下划线,可一键只看这些句子 */
 .wsample .ws-legend{display:flex;align-items:center;gap:10px;padding:9px 15px 0;
   color:var(--mute);font-size:11.5px}
@@ -368,8 +374,8 @@ a{color:inherit;text-decoration:none}
 </nav>
 <main class="wmain" id="wrMain"></main>
 
-<script src="writing-data.js?v=19"></script>
-<script src="writing.js?v=19"></script>
-<script src="sw-reg.js?v=19"></script>
+<script src="writing-data.js?v=20"></script>
+<script src="writing.js?v=20"></script>
+<script src="sw-reg.js?v=20"></script>
 </body>
 </html>
