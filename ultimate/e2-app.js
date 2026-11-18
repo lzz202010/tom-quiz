@@ -610,7 +610,7 @@
       node.parentNode.replaceChild(wrap, node);
     });
   }
-  /* ───── 生词本往返:记住年份与当前单元,不再一按返回就掉回首页 ───── */
+  /* ───── 路径:练习 → 英语 → 年份套卷；作文/生词本从哪进回哪 ───── */
   let FROM_VOCAB = false;
   function currentUnitId() {
     const sc = $('.pv-scroll');
@@ -619,6 +619,14 @@
     let id = '';
     $$('#pvpages .page').forEach(p => { if (p.getBoundingClientRect().top <= top) id = p.dataset.unit; });
     return id || ($('#pvpages .page') ? $('#pvpages .page').dataset.unit : '');
+  }
+  function hashQuery() {
+    const i = location.hash.indexOf('?');
+    return new URLSearchParams(i >= 0 ? location.hash.slice(i + 1) : '');
+  }
+  function yearIn(val) {
+    const y = +val;
+    return D.years.includes(y) ? y : 0;
   }
   function vbQuery(from) {
     const sp = new URLSearchParams();
@@ -632,12 +640,85 @@
     const el = $('#vbEntry');
     if (el) el.href = '#/e2/vocab?' + vbQuery('paper');
   }
-  /* 回生词本:走历史记录,回到进站前那一页(保留它的滚动位置和搜索词)。
-     没有可退的历史(直接打开带 y 的链接)才退回干净的列表页,避免 URL 互相指。 */
-  function backToVocab() {
-    FROM_VOCAB = false;
-    location.hash = '#/e2/vocab';
+  function e2CrumbHTML(trail) {
+    return '<nav class="e2-crumb" aria-label="当前位置">' + trail.map((x, i) => {
+      const last = i === trail.length - 1;
+      if (last || !x.h) return '<span class="here">' + esc(x.t) + '</span>';
+      return '<a href="' + x.h + '">' + esc(x.t) + '</a><span class="sep">/</span>';
+    }).join('') + '</nav>';
   }
+  function paintPaperCrumb() {
+    const el = $('#pvcrumb');
+    if (!el) return;
+    el.outerHTML = e2CrumbHTML([
+      { h: '#/', t: '练习' },
+      { h: '#/e2', t: '英语' },
+      { t: String(S.y || '') }
+    ]).replace('class="e2-crumb"', 'class="e2-crumb" id="pvcrumb"');
+  }
+  /* 套卷上的返回:从生词本/作文进来就回到那一页,否则回到英语首页 */
+  function paperBackHash() {
+    const q = hashQuery();
+    const from = q.get('from');
+    if (from === 'vocab') return '#/e2/vocab?' + vbQuery('paper');
+    if (from === 'writing') return S.y ? '#/e2/writing/' + S.y : '#/e2/writing';
+    return '#/e2';
+  }
+  function frameBackHash(kind, parts) {
+    if (kind === 'writing') {
+      const y = parts[2] && yearIn(parts[2]);
+      return y ? '#/e2/' + y : '#/e2';
+    }
+    const y = yearIn(hashQuery().get('y'));
+    const from = hashQuery().get('from');
+    if (from === 'paper' || y) return y ? '#/e2/' + y : '#/e2';
+    return '#/e2';
+  }
+  function e2Go(hash) {
+    if (location.hash === hash) return;
+    location.hash = hash;
+  }
+  /* 返回:上一页就是上级时用 history.back(),不再压一条地址;
+     否则 replace 到上级,系统返回不会又回到刚离开的页。 */
+  function hashKey(h) {
+    const norm = window.__ultNormHash || function (x) {
+      x = String(x == null ? '' : x);
+      if (!x || x === '#') return '#/';
+      if (x.charAt(0) !== '#') x = '#' + x;
+      const i = x.indexOf('?');
+      const path = (i < 0 ? x : x.slice(0, i)).replace(/\/+$/, '') || '#/';
+      return (path === '#' ? '#/' : path) + (i < 0 ? '' : x.slice(i));
+    };
+    const n = norm(h);
+    const i = n.indexOf('?');
+    if (i < 0) return n;
+    const sp = new URLSearchParams(n.slice(i + 1));
+    sp.delete('u');
+    const keys = [];
+    sp.forEach(function (_, k) { if (keys.indexOf(k) < 0) keys.push(k); });
+    keys.sort();
+    const q = keys.map(function (k) { return k + '=' + sp.get(k); }).join('&');
+    return n.slice(0, i) + (q ? '?' + q : '');
+  }
+  function e2Back(to, ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    to = (window.__ultNormHash || hashKey)(to || '#/e2');
+    if (hashKey(location.hash) === hashKey(to)) return;
+    const stack = window.__ultHashStack;
+    const prev = stack && stack.length >= 2 ? stack[stack.length - 2] : '';
+    if (prev && hashKey(prev) === hashKey(to)) history.back();
+    else if (typeof ultReplace === 'function') ultReplace(to);
+    else location.replace(to);
+  }
+
+  document.addEventListener('click', ev => {
+    const home = ev.target.closest && ev.target.closest('#e2homeback');
+    if (home) { e2Back('#/', ev); return; }
+    const back = ev.target.closest && ev.target.closest('#e2back');
+    if (back) { e2Back(back.getAttribute('href') || '#/e2', ev); return; }
+    const crumb = ev.target.closest && ev.target.closest('.e2-crumb a[href^="#"]');
+    if (crumb) e2Back(crumb.getAttribute('href'), ev);
+  }, true);
 
   function syncVbCount() {
     const n = V ? V.count() : 0;
@@ -890,7 +971,11 @@
     document.body.style.overflow = 'hidden';
     $('#pvpages').scrollIntoView({ block: 'start' });
     document.body.classList.add('e2-paper', 'e2-print');
-    if (!opts.fromURL && location.hash !== '#/e2/' + S.y) location.hash = '#/e2/' + S.y;
+    const keep = hashQuery();
+    let next = '#/e2/' + S.y;
+    if (keep.get('from')) next += '?from=' + encodeURIComponent(keep.get('from'));
+    if (!opts.fromURL && location.hash !== next) location.hash = next;
+    paintPaperCrumb();
     syncVbLinks();
     if (!PAPERS[S.y]) {
       $('#pvpages').innerHTML = '<section class="page"><p class="doc-empty">正在加载…</p></section>';
@@ -907,7 +992,7 @@
     if (pv) pv.hidden = true;
     document.body.style.overflow = '';
     document.body.classList.remove('e2-paper', 'e2-print');
-    if (!fromPop && location.hash.indexOf('#/e2/') === 0) location.hash = '#/e2';
+    if (!fromPop && location.hash.indexOf('#/e2/') === 0) e2Back('#/e2');
     drawYears();
   }
   function syncFromURL() { /* hash 路由由 ultimate 的 route() 调用 renderE2 */ }
@@ -931,6 +1016,10 @@
     }
     app.innerHTML = `<div class="e2-root" id="e2root">
       <div id="e2home">
+        <div class="e2-top">
+          <a class="back" href="#/" id="e2homeback">返回</a>
+          ${e2CrumbHTML([{ h: '#/', t: '练习' }, { t: '英语' }])}
+        </div>
         <p class="e2-lead">考研英语（二）2010–2025 真题，每年一套 9 张 A4。可以在手机上阅读、校对答案，或下载 PDF 打印。</p>
         <div class="e2-acts"><a href="#/e2/writing">作文范文</a><a href="#/e2/vocab">生词本<span id="vbCount"></span></a></div>
         <div class="grp-h">真题套卷</div>
@@ -939,6 +1028,7 @@
       <div id="pv" class="pv" hidden>
         <div class="pv-bar">
           <button class="back" id="pvx">返回</button>
+          <nav class="e2-crumb" id="pvcrumb" aria-label="当前位置"></nav>
           <span class="pv-n" id="pvn"></span>
           <a class="dl" id="pvdl" href="#" download>下载 PDF</a>
           <a class="tg wr" id="pvwr" href="#/e2/writing">作文</a>
@@ -957,15 +1047,7 @@
     if (!$('#pvx') || !$('#pvpages')) return;
     if (domBound) return;
     domBound = true;
-  if (FROM_VOCAB) {
-    $('#pvx').textContent = '← 生词本';
-    const home = document.createElement('a');
-    home.className = 'back';
-    home.href = '#/e2';
-    home.textContent = '主页';
-    $('#pvx').parentNode.insertBefore(home, $('#pvx').nextSibling);
-  }
-  $('#pvx').onclick = () => FROM_VOCAB ? backToVocab() : closePV();
+  $('#pvx').onclick = ev => { e2Back(paperBackHash(), ev); };
   $('.pv-scroll').addEventListener('scroll', () => { clearTimeout(syncVbLinks.t); syncVbLinks.t = setTimeout(syncVbLinks, 160); }, { passive: true });
   $('#pgo').onclick = () => {
     const p = paper(S.y);
@@ -1055,6 +1137,7 @@
 
   if (!winBound) {
     winBound = true;
+
   /* 直接按 Cmd/Ctrl+P 时,无条件用当前样式重建打印根:
      避免复用上一次打印留下的旧字号,也避免浏览器自己带上预览层的缩放 */
   window.addEventListener('beforeprint', () => {
@@ -1069,7 +1152,9 @@
   });
   window.addEventListener('resize', fitScreen);
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !$('#pv').hidden) FROM_VOCAB ? backToVocab() : closePV();
+    if (e.key === 'Escape' && $('#pv') && !$('#pv').hidden) {
+      e2Back(paperBackHash(), e);
+    }
     // 阅读模式:左右方向键翻单元
     if (RV.on && !$('#pv').hidden && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       const p = paper(S.y);
@@ -1091,24 +1176,66 @@
     document.body.classList.remove('e2-paper', 'e2-print');
   }
 
-  function showFrame(title, src) {
+  function showFrame(title, src, backHash, trail) {
     leavePaper();
     const app = document.getElementById('app');
-    app.innerHTML = `<div class="e2-root"><a class="back" href="#/e2" id="e2back">‹ 英语二</a>
-      <h1 class="or-h1" style="font-size:22px;margin:8px 0 12px">${title}</h1>
-      <div class="e2-frame"><iframe title="${title}" src="${src}"></iframe></div></div>`;
+    backHash = backHash || '#/e2';
+    trail = trail || [{ h: '#/', t: '练习' }, { h: '#/e2', t: '英语' }, { t: title }];
+    app.innerHTML = `<div class="e2-root e2-frame-page">
+      <div class="e2-top">
+        <a class="back" href="${backHash}" id="e2back">返回</a>
+        ${e2CrumbHTML(trail)}
+      </div>
+      <div class="e2-frame"><iframe id="e2frame" title="${title}" src="${src}"></iframe></div></div>`;
     window.scrollTo(0, 0);
+    const frame = document.getElementById('e2frame');
+    if (frame) frame.addEventListener('load', () => bindFrameNav(frame, backHash, title));
+  }
+
+  /* 把嵌进来的旧页里指向独立 e2 站的链接拦下,留在壳内 */
+  function bindFrameNav(frame, backHash, kindTitle) {
+    let doc;
+    try { doc = frame.contentDocument; } catch (e) { return; }
+    if (!doc || doc.documentElement.getAttribute('data-e2-bound')) return;
+    doc.documentElement.setAttribute('data-e2-bound', '1');
+    const kind = /生词/.test(kindTitle || '') ? 'vocab' : 'writing';
+    doc.addEventListener('click', ev => {
+      const a = ev.target.closest && ev.target.closest('a[href]');
+      if (!a) return;
+      let u;
+      try { u = new URL(a.getAttribute('href'), frame.contentWindow.location.href); } catch (e) { return; }
+      if (!/\/e2\/?(index\.html)?$/.test(u.pathname)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const y = yearIn(u.searchParams.get('y'));
+      const unit = u.searchParams.get('u') || '';
+      if (y) {
+        e2Go('#/e2/' + y + (unit ? '/' + unit : '') + '?from=' + kind);
+      } else {
+        e2Back(backHash, ev);
+      }
+    }, true);
   }
 
   window.renderE2 = function (parts) {
+    parts = parts.map(p => p.split('?')[0]);
     const sub = parts[1] || '';
     if (sub === 'vocab') {
       const q = location.hash.split('?')[1];
-      return showFrame('生词本', E2BASE + 'vocab.html' + (q ? '?' + q : ''));
+      const back = frameBackHash('vocab', parts);
+      const y = yearIn(hashQuery().get('y')) || (back.match(/^#\/e2\/(\d{4})/) || [])[1];
+      const trail = [{ h: '#/', t: '练习' }, { h: '#/e2', t: '英语' }];
+      if (y) trail.push({ h: '#/e2/' + y, t: String(y) });
+      trail.push({ t: '生词本' });
+      return showFrame('生词本', E2BASE + 'vocab.html' + (q ? '?' + q : ''), back, trail);
     }
     if (sub === 'writing') {
       const y = parts[2] && /^\d{4}$/.test(parts[2]) ? parts[2] : '';
-      return showFrame('英语二作文', E2BASE + 'writing.html' + (y ? '#/year/' + y : ''));
+      const back = frameBackHash('writing', parts);
+      const trail = [{ h: '#/', t: '练习' }, { h: '#/e2', t: '英语' }];
+      if (y) trail.push({ h: '#/e2/' + y, t: y });
+      trail.push({ t: '作文' });
+      return showFrame('英语二作文', E2BASE + 'writing.html' + (y ? '#/year/' + y : ''), back, trail);
     }
     ensureShell();
     bindShell();

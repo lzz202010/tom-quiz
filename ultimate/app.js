@@ -667,7 +667,7 @@ function startSession(o, sure) {
                           from: fromSum ? ((S.last || {}).from || '#/') : here, pushed: !fromSum }, o);
   save();
   if (here === '#/s') route();
-  else if (fromSum) location.replace('#/s');
+  else if (fromSum) ultReplace('#/s');
   else location.hash = '#/s';
 }
 /* 离开做题页回到进来的那一页:能用浏览器后退就后退(历史不留做题页),否则直接换过去 */
@@ -675,7 +675,7 @@ function leaveSession(clear) {
   const cur = S.cur, to = (cur && cur.from) || '#/';
   if (clear) { S.cur = null; save(); }
   if (cur && cur.pushed && history.length > 1) history.back();
-  else location.replace(to);
+  else ultReplace(to);
 }
 function snapshot(subj) { const o = {}; topicsOf(subj).forEach(t => { o[t.id] = stage(subj, t.id).k; }); return o; }
 
@@ -697,7 +697,7 @@ function pushQ(cur, d, q) {
 let tick = null;
 function viewSession() {
   const cur = S.cur;
-  if (!cur) { location.replace('#/'); return; }
+  if (!cur) { ultReplace('#/'); return; }
   loadData(cur.subj).then(function (d) {
     if (cur.mode === 'paper' && !cur.done && Date.now() > cur.dl) { submitPaper(); return; }
     const rg = pageRange(cur, d, cur.i), ps = rg[0], pe = rg[1];
@@ -862,7 +862,7 @@ function finish() {
   sum.from = cur.from;
   S.last = sum; S.cur = null; save();
   autoSnap();
-  location.replace('#/sum');
+  ultReplace('#/sum');
 }
 
 /* ───────────── 实战套卷 ───────────── */
@@ -929,7 +929,7 @@ function submitPaper() {
 /* ───────────── 一组结束 ───────────── */
 function viewSum() {
   const s = S.last;
-  if (!s) { location.replace('#/'); return; }
+  if (!s) { ultReplace('#/'); return; }
   loadData(s.subj).then(function (d) {
     const n = s.ids.length, ok = s.ids.filter(id => (s.ans[id] || {}).ok).length, delta = s.est1 - s.est0;
     const pts = SUBJ[s.subj].pts;
@@ -946,7 +946,7 @@ function viewSum() {
       <button class="go" id="again">${s.mode === 'paper' ? '返回' : '继续'}</button>
       <div class="links"><a href="#" id="rv">回看</a><a href="#" id="pr">打印</a></div>
     </section>`);
-    $('#again').onclick = () => { if (s.mode === 'paper') location.replace('#/bank'); else startTrain(s.subj); };
+    $('#again').onclick = () => { if (s.mode === 'paper') ultReplace('#/bank'); else startTrain(s.subj); };
     $('#pr').onclick = ev => { ev.preventDefault(); printAsk(s.subj, s.ids, s.title, false); };
     const review = k => { startSession({ mode: 'review', subj: s.subj, ids: s.ids, title: '回看 · ' + s.title, done: true });
                           S.cur.ans = s.ans; S.cur.i = k; S.cur.boss = s.boss; save(); viewSession(); };
@@ -1929,7 +1929,8 @@ document.addEventListener('visibilitychange', function () {
 function route() {
   clearInterval(tick);
   document.title = 'beta111';
-  const h = location.hash.replace(/^#\/?/, '').split('/');
+  const routeHash = location.hash;
+  const h = routeHash.split('?')[0].replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
   const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' || r === 'e2' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作和英语在首页,「学习」就是运筹学
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
@@ -1943,10 +1944,10 @@ function route() {
   else if (r === 'wrongs') viewWrongs();
   else if (r === 's') viewSession();
   else if (r === 'sum') viewSum();
-  else if (r === 'ai') { location.replace('#/'); return; }
-  else if (r === 'learn') location.replace('#/or');     // 「学习」现在只有运筹学,直接进运筹学首页
+  else if (r === 'ai') { ultReplace('#/'); return; }
+  else if (r === 'learn') ultReplace('#/or');     // 「学习」现在只有运筹学,直接进运筹学首页
   else if (r === 'or') loadOR(() => { if (location.hash.indexOf('#/or') === 0) window.renderOR(h); });
-  else if (r === 'e2') loadE2(() => { if (location.hash.indexOf('#/e2') === 0) window.renderE2(h); });
+  else if (r === 'e2') loadE2(() => { if (location.hash === routeHash) window.renderE2(h); });
   else if (r === 'writing') loadWriting(() => { if (location.hash.indexOf('#/writing') === 0) window.renderWriting(); });
   else viewHome();
 }
@@ -1982,7 +1983,52 @@ app.addEventListener('touchend', function (e) {
   if (b && !b.disabled) b.click();
 }, { passive: true });
 let navCount = 0;          // 本次打开后在站内跳过几次;>1 说明后退还停在站内
-window.addEventListener('hashchange', () => { navCount++; layerMark = false; while (LAYERS.length) LAYERS[0].close(true); route(); });   // 换页时收起所有浮层
+/* 站内 hash 栈:用来判断「上一页是不是上级」。顶栏返回在是的时候 history.back(),
+   避免再压一条相同地址,系统返回又回到刚离开的页。 */
+function normHash(h) {
+  h = String(h == null ? '' : h);
+  if (!h || h === '#') return '#/';
+  if (h.charAt(0) !== '#') h = '#' + h;
+  const i = h.indexOf('?');
+  const path = (i < 0 ? h : h.slice(0, i)).replace(/\/+$/, '') || '#/';
+  if (path === '#') return '#/' + (i < 0 ? '' : h.slice(i));
+  return path + (i < 0 ? '' : h.slice(i));
+}
+let hashAct = '';
+const savedRoutes = history.state && history.state.ultRoutes;
+const hashStack = Array.isArray(savedRoutes) && savedRoutes.length &&
+  savedRoutes[savedRoutes.length - 1] === normHash(location.hash)
+  ? savedRoutes.slice() : [normHash(location.hash)];
+function saveRouteHistory() {
+  history.replaceState(Object.assign({}, history.state, { ultRoutes: hashStack.slice() }), '');
+}
+saveRouteHistory();
+window.__ultHashStack = hashStack;
+window.__ultNormHash = normHash;
+function ultReplace(h) {
+  hashAct = 'replace';
+  if (normHash(location.hash) === normHash(h)) { hashAct = ''; return; }
+  location.replace(h);
+}
+window.addEventListener('hashchange', () => {
+  const h = normHash(location.hash);
+  const restored = history.state && history.state.ultRoutes;
+  if (Array.isArray(restored) && restored[restored.length - 1] === h && hashAct !== 'replace') {
+    hashStack.splice(0, hashStack.length, ...restored);
+  } else if (hashAct === 'replace') {
+    hashStack[Math.max(0, hashStack.length - 1)] = h;
+  } else if (hashStack.length >= 2 && normHash(hashStack[hashStack.length - 2]) === h) {
+    hashStack.pop();
+  } else if (normHash(hashStack[hashStack.length - 1]) !== h) {
+    hashStack.push(h);
+  }
+  hashAct = '';
+  saveRouteHistory();
+  navCount++;
+  layerMark = false;
+  while (LAYERS.length) LAYERS[0].close(true);
+  route();
+});   // 换页时收起所有浮层
 // 申请持久存储(iOS 上减少被系统清掉的可能),打开时顺手存今天的快照
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 setTimeout(autoSnap, 1500);

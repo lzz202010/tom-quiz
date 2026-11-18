@@ -1022,3 +1022,32 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 @media (max-width: 700px) {
   .snap-row .snap-open { min-height: 46px; }
 }
+
+/* 返回热区至少 44px 见方，字不必放大，热区要够瞄 */
+#app > .back,
+#back,
+#bback,
+.or-page > #orback,
+.or-bar .back {
+  box-sizing: border-box;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+#app > .back {
+  display: flex;
+  align-items: center;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.qhead .x,
+#quit {
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}

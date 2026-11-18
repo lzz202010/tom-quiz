@@ -176,3 +176,71 @@ body.e2-paper .nav{display:none}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
 }
+
+/* 英语路径与返回热区：顶栏标明位置，返回可点范围至少 44px（不改完型排版） */
+.e2-top{display:flex;align-items:center;gap:4px 8px;min-height:44px;margin:0 0 12px}
+.e2-root .e2-top .back,
+.e2-root .pv-bar .back,
+.e2-root a.back,
+.e2-root button.back{
+  box-sizing:border-box;
+  min-width:44px;min-height:44px;
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:10px 12px;font-size:14px;line-height:1;cursor:pointer;flex:0 0 auto
+}
+.e2-crumb{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:44px;
+  font-size:13px;color:var(--mute);line-height:1.3}
+.e2-crumb a{color:var(--soft,#8b8880);padding:10px 0}
+.e2-crumb .here{color:var(--ink);font-weight:600}
+.e2-crumb .sep{color:#c9c5bc;padding:0 1px}
+.e2-root .pv-bar{flex-wrap:wrap;align-items:center}
+.e2-root .pv-bar .e2-crumb{flex:1 1 auto;min-width:0}
+.e2-frame-page .e2-frame{height:calc(100dvh - 140px);min-height:420px;margin-left:0;margin-right:0}
+
+
+/* ───── 完型填空:收紧选项占位,只锁完型原文字号(打印样式不动) ───── */
+
+/* 阅读模式:只把完型原文提到 17px,其他篇目仍是 16px。
+   窄屏(约 390px)改回 2×2 并收紧间距,避免四个选项挤成一行点不准;
+   宽屏再排一行。 */
+@media screen and (max-width: 700px) {
+  .e2-root .rv-body:has(.opts.o4) .passage p {
+    font-size: 17px;
+    line-height: 1.85;
+  }
+  .e2-root .rv-body .q:has(.opts.o4) { margin: 0 0 8px; }
+  .e2-root .rv-body .opts.o4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 8px;
+    row-gap: 4px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .e2-root .rv-body .opts.o4 .o {
+    padding: 4px 0;
+    gap: .2em;
+  }
+}
+
+@media screen and (min-width: 480px) {
+  .e2-root .rv-body .opts.o4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 6px;
+    row-gap: 0;
+  }
+  .e2-root .rv-body .opts.o4 .o { padding: 2px 0; }
+}
+
+/* 纸面预览(仅屏幕,不改 @media print):收紧完型选项,原文不小于 12px */
+@media screen {
+  .e2-root .page:has(.qs.cloze) .passage,
+  .e2-root .page:has(.qs.cloze) .passage p {
+    font-size: max(1em, 12px);
+    line-height: 1.55;
+  }
+  .e2-root .page .qs.cloze .q { margin-bottom: .18em; }
+  .e2-root .page .qs.cloze .opts.o4 {
+    column-gap: .3em;
+    font-size: .82em;
+  }
+}
