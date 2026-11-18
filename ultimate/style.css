@@ -970,3 +970,45 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
     flex-shrink: 0;
   }
 }
+
+
+/* ───── 导航切换防抖:顶栏高度固定,学习页不再把站名收成 0;练习科目切换不再垂直居中带动整页跳 ───── */
+.home {
+  justify-content: flex-start;
+  padding-top: 8px;
+}
+@media (max-width: 700px) {
+  :root {
+    --top-h: calc(max(10px, env(safe-area-inset-top, 0px)) + 46px);
+  }
+  .top {
+    box-sizing: border-box;
+    height: var(--top-h);
+    min-height: var(--top-h);
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+    padding-bottom: 4px;
+    overflow: hidden;
+  }
+  .logo { line-height: 1.25; }
+  /* 覆盖学习页收顶栏:练习 / 学习 / 我的切换时顶栏高度保持一致 */
+  body:has(.or-page) .top {
+    position: sticky;
+    top: 0;
+    height: var(--top-h);
+    min-height: var(--top-h);
+    padding: 10px 16px 4px;
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+  }
+  body:has(.or-page) .top .logo { display: block; }
+  .or-page > #orback {
+    top: var(--top-h);
+    padding-top: 10px;
+  }
+  .or-bar {
+    top: var(--top-h);
+    padding-top: 8px;
+  }
+  .or-timer { top: calc(var(--top-h) + 8px); }
+  .home { padding-top: 4px; }
+  .nav a, .nav a.on { font-weight: 500; }
+}
