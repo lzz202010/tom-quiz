@@ -1096,20 +1096,44 @@ async function autoSnap() {
     await kvSet('snaps', list);
   } catch (e) { /* 隐私模式等存不了就算了 */ }
 }
+async function delSnap(k) {
+  const list = ((await kvGet('snaps')) || []).filter(x => x !== k);
+  await kvDel('snap:' + k);
+  await kvSet('snaps', list);
+}
+async function delAllSnaps() {
+  for (const k of ((await kvGet('snaps')) || [])) await kvDel('snap:' + k);
+  await kvSet('snaps', []);
+}
 async function fillSnaps() {
   const box = $('#snaps');
   if (!box) return;
   const list = window.indexedDB ? ((await kvGet('snaps')) || []) : [];
   const snaps = (await Promise.all(list.map(k => kvGet('snap:' + k).then(v => v && Object.assign({ k: k }, v))))).filter(Boolean);
   if (!$('#snaps')) return;
-  box.innerHTML = snaps.length ? snaps.map(x => { const d = new Date(x.at);
-    return `<a href="#" class="row-i chev" data-snap="${x.k}"><span>${d.getMonth() + 1} 月 ${d.getDate()} 日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span><span class="v">${x.n} 题</span></a>`; }).join('')
-    : '<div class="row-i off"><span>还没有，做完一组后自动生成</span></div>';
+  if (!snaps.length) {
+    box.innerHTML = '<div class="row-i off"><span>还没有，做完一组后自动生成</span></div>';
+    return;
+  }
+  box.innerHTML = snaps.map(x => { const d = new Date(x.at);
+    const when = (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return `<div class="row-i snap-row"><a href="#" class="snap-open" data-snap="${x.k}"><span>${when}</span><span class="v">${x.n} 题</span></a><button type="button" class="snap-del" data-del="${x.k}">删除</button></div>`;
+  }).join('') + '<a href="#" class="row-i danger" id="snap-clear">清空全部自动备份</a>';
   box.querySelectorAll('[data-snap]').forEach(a => a.onclick = async function (ev) {
     ev.preventDefault();
     const x = await kvGet('snap:' + a.dataset.snap);
     if (x && await ask('恢复到 ' + new Date(x.at).toLocaleString('zh-CN') + ' 的记录(做过 ' + x.n + ' 题)?当前记录会被覆盖。', { ok: '恢复' })) { restoreS(x.S); toast('已恢复'); }
   });
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = async function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (await ask('删除这份备份?删除后不能恢复。', { ok: '删除', danger: true })) { await delSnap(b.dataset.del); toast('已删除'); fillSnaps(); }
+  });
+  const clear = $('#snap-clear');
+  if (clear) clear.onclick = async function (ev) {
+    ev.preventDefault();
+    if (await ask('清空全部自动备份?删除后不能恢复。', { ok: '全部清空', danger: true })) { await delAllSnaps(); toast('已清空自动备份'); fillSnaps(); }
+  };
 }
 
 /* ───────────── AI 教练(Claude API,浏览器直连,官方 SDK 打包在 vendor/anthropic-sdk-1.0.0.mjs) ─────────────

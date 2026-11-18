@@ -1012,3 +1012,13 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
   .home { padding-top: 4px; }
   .nav a, .nav a.on { font-weight: 500; }
 }
+
+
+/* 本机自动备份:行内恢复 + 删除 */
+.snap-row { padding: 0; gap: 0; }
+.snap-row .snap-open { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 50px; padding: 0 8px 0 16px; color: inherit; }
+.snap-row .snap-del { flex: none; align-self: stretch; padding: 0 16px; border: 0; background: none; color: var(--bad); font: inherit; font-size: 15px; cursor: pointer; }
+.snap-row .snap-del:active { opacity: .6; }
+@media (max-width: 700px) {
+  .snap-row .snap-open { min-height: 46px; }
+}
