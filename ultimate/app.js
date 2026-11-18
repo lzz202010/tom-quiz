@@ -1,4 +1,4 @@
-/* Ultimate · 管综提分
+/* Ultimate · beta111
    一组 10 题:系统按「考频 × 没掌握」挑漏分最多的考点,难度跟着你的表现上下浮动(保持在够得着的区间),
    组末一道压轴真题;错题按 1/3/7/16/35 天回来。题库由 scripts/build_ultimate.py 生成。 */
 'use strict';
@@ -304,6 +304,42 @@ function typeset(node) {
   }
   return node;
 }
+/* 公式库(KaTeX)按需加载:首页不拉,进做题、结算、打印或学习时再取,避免挡住练习首页 */
+function loadHref(href, kind) {
+  return new Promise(function (ok, fail) {
+    const attr = 'data-ult-href';
+    if (kind === 'css') {
+      const hit = document.querySelector('link[' + attr + '="' + href + '"]');
+      if (hit) { if (hit.dataset.ultReady) ok(); else hit.addEventListener('load', function () { ok(); }); return; }
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href;
+      l.setAttribute(attr, href);
+      l.onload = function () { l.dataset.ultReady = '1'; ok(); };
+      l.onerror = fail;
+      document.head.append(l);
+    } else {
+      const hit = document.querySelector('script[' + attr + '="' + href + '"]');
+      if (hit) { if (hit.dataset.ultReady) ok(); else hit.addEventListener('load', function () { ok(); }); return; }
+      const s = document.createElement('script');
+      s.src = href;
+      s.setAttribute(attr, href);
+      s.onload = function () { s.dataset.ultReady = '1'; ok(); };
+      s.onerror = fail;
+      document.head.append(s);
+    }
+  });
+}
+let katexP = null;
+function loadKatex() {
+  if (window.renderMathInElement && window.katex) return Promise.resolve();
+  if (katexP) return katexP;
+  katexP = loadHref('vendor/katex/katex.min.css', 'css')
+    .then(function () { return loadHref('vendor/katex/katex.min.js', 'js'); })
+    .then(function () { return loadHref('vendor/katex/auto-render.min.js', 'js'); })
+    .catch(function (e) { katexP = null; throw e; });
+  return katexP;
+}
 /* 写作模块(writing.js,从旧站复制)要用的几个全局工具 */
 const $app = app;
 function el(tag, cls, inner) { const n = document.createElement(tag); if (cls) n.className = cls; if (inner != null) n.innerHTML = inner; return n; }
@@ -318,7 +354,8 @@ function loadOR(cb) {
   const v = window.UFILES.v ? '?v=' + window.UFILES.v : '';
   const one = (f, done) => { const t = document.createElement('script'); t.src = f; t.onload = done; t.onerror = () => toast('运筹学内容加载失败'); document.head.append(t); };
   app.innerHTML = '<div class="or-page"><p class="dim">加载中…</p></div>';
-  (window.marked ? f => f() : f => one('vendor/marked-12.0.2.min.js', f))(() => one('or/or-data.js' + v, () => one('or/or-solvers.js' + v, () => one('or.js' + v, cb))));
+  const go = () => (window.marked ? f => f() : f => one('vendor/marked-12.0.2.min.js', f))(() => one('or/or-data.js' + v, () => one('or/or-solvers.js' + v, () => one('or.js' + v, cb))));
+  loadKatex().then(go, go);
 }
 /* 运筹学计入进度的章(按西安工业大学 IE 复试大纲;09 排队论一般不考,不计入) */
 const OR_CORE = ['01', '02', '03', '04', '05', '06', '07', '08', '10', '15', '16'];
@@ -326,6 +363,13 @@ const orDone = os => (os.done || []).filter(n => OR_CORE.indexOf(n) >= 0).length
 function loadWriting(cb) {
   if (window.renderWriting) { cb(); return; }
   const v = (window.UFILES.v ? '?v=' + window.UFILES.v : '');
+  if (!document.querySelector('link[data-wrcss]')) {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'writing.css' + v;
+    css.setAttribute('data-wrcss', '1');
+    document.head.append(css);
+  }
   const one = (f, done) => { const t = document.createElement('script'); t.src = f + v; t.onload = done; t.onerror = () => toast('写作内容加载失败'); document.head.append(t); };
   one('writing-data.js', () => one('writing.js', cb));
 }
@@ -601,7 +645,7 @@ function viewHome() {
     <button class="go" id="go">${resume ? '继续' : '开始'}</button>
     ${resume ? '<a href="#" id="newg" class="dim sm">换一组</a>' : ''}
   </section>`);
-  idle(() => loadData(subj));            // 首页渲染完就在后台把本科题库拉下来,点「开始」直接进
+  idle(() => { loadData(subj); loadKatex(); });  // 首页先出,再在后台拉本科题库和公式库,点「开始」少等
   $('#go').onclick = () => { if (resume) { S.cur.from = '#/'; S.cur.pushed = true; save(); location.hash = '#/s'; } else startTrain(subj); };
   const ng = $('#newg');
   if (ng) ng.onclick = ev => { ev.preventDefault(); S.cur = null; save(); startTrain(subj); };
@@ -698,7 +742,7 @@ let tick = null;
 function viewSession() {
   const cur = S.cur;
   if (!cur) { ultReplace('#/'); return; }
-  loadData(cur.subj).then(function (d) {
+  Promise.all([loadData(cur.subj), loadKatex()]).then(function (res) { const d = res[0];
     if (cur.mode === 'paper' && !cur.done && Date.now() > cur.dl) { submitPaper(); return; }
     const rg = pageRange(cur, d, cur.i), ps = rg[0], pe = rg[1];
     cur.i = ps;
@@ -930,7 +974,7 @@ function submitPaper() {
 function viewSum() {
   const s = S.last;
   if (!s) { ultReplace('#/'); return; }
-  loadData(s.subj).then(function (d) {
+  Promise.all([loadData(s.subj), loadKatex()]).then(function (res) { const d = res[0];
     const n = s.ids.length, ok = s.ids.filter(id => (s.ans[id] || {}).ok).length, delta = s.est1 - s.est0;
     const pts = SUBJ[s.subj].pts;
     const ups = topicsOf(s.subj).filter(t => (s.lv0 || {})[t.id] !== undefined && stage(s.subj, t.id).k > s.lv0[t.id] && s.lv0[t.id] > 0);
@@ -1817,7 +1861,7 @@ function plainQ(h) { return String(h || '').replace(/<br\s*\/?>/g, '\n').replace
    预览里看到的每一页就是打出来的那一页。纸面 794×1123px = 210×297mm(96dpi),上下边距 60px≈16mm,左右 57px≈15mm。 */
 const PAGE = { h: 1123, py: 60, px: 57, foot: 26 };
 function printAsk(subj, ids, title, pickCount) {
-  loadData(subj).then(function (d) {
+  Promise.all([loadData(subj), loadKatex()]).then(function (res) { const d = res[0];
     const o = { ans: 'key', space: subj === 'math' ? 'sm' : 'no', which: 'new', n: 20 };
     const opt = (k, v, t) => `<option value="${v}"${o[k] === v ? ' selected' : ''}>${t}</option>`;
     const pv = el('div', 'pv');
