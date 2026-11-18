@@ -285,7 +285,7 @@ body.previewing { overflow: hidden; }
 @media (max-width: 700px) {
   .top { justify-content: center; padding: 10px 16px 4px; padding-top: max(10px, env(safe-area-inset-top)); }
   .logo { font-size: 34px; }
-  .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; gap: 0; display: grid; grid-template-columns: repeat(4, 1fr);
+  .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; gap: 0; display: grid; grid-template-columns: repeat(3, 1fr);
     background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
   .nav a { text-align: center; padding: 13px 0 11px; font-size: 13px; border-radius: 0; }
   .nav a.on { color: var(--ink); font-weight: 600; }
@@ -754,7 +754,10 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .gk-tex { display: inline-block; height: 1.35em; width: auto; vertical-align: -.3em; background: #fff; border-radius: 2px; }
 .gk-t { border-collapse: collapse; margin: 10px 0; font-size: 13.5px; max-width: 100%; display: block; overflow-x: auto; }
 .gk-t td, .gk-t th { border: 1px solid var(--line, rgba(128,128,128,.3)); padding: 4px 8px; text-align: center; }
-.stem, .opt, .sol { overflow-wrap: anywhere; }
+.stem, .opt, .sol { overflow-wrap: anywhere; min-width: 0; }
+.stem .katex-display, .opt .katex-display, .sol .katex-display {
+  overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 2px 0; -webkit-overflow-scrolling: touch;
+}
 .meta .fav { margin-left: auto; color: var(--mute); text-decoration: none; padding: 2px 4px; }
 .meta .fav.on { color: var(--acc); }
 .meta .fav + .fav, .meta #rmw { margin-left: auto; }

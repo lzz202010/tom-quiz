@@ -946,11 +946,6 @@ function viewMe() {
   <div class="grp-h">收藏</div>
   <div class="grp">${row('favgo', '做收藏的题', fav.length ? fav.length + ' 题' : '', fav.length ? 'chev' : 'off')}
     ${row('favpr', '打印收藏', '', fav.length ? 'chev' : 'off')}</div>
-  <div class="grp-h">AI 设置</div>
-  <div class="grp">${row('aiprov', '服务商', PROV()[AI.provider].name, 'chev')}${row('aikey', 'API Key', AI.keys[AI.provider] ? '已设置' : builtinKey(AI.provider) ? '内置' : '未设置', 'chev')}
-    ${row('airem', '记住 Key', AI.remember ? '记住' : '关闭网页即清除', 'chev')}
-    ${row('aimodel', '模型', MODELS()[AI.model][0], 'chev')}${row('aibud', '每日上限', kTok(AI.budget) + ' token', 'chev')}
-    <div class="row-i"><span>今日已用</span><span class="v">${kTok(aiToday().in + aiToday().out)} · 约 ${yuan(aiToday().usd)}</span></div></div>
   <div class="grp-h">目标分</div>
   <div class="grp">
     <label class="row-i"><span>数学</span><span class="v"><input type="number" inputmode="numeric" id="tm" min="20" max="75" value="${S.target.math}"> / 75</span></label>
@@ -974,11 +969,6 @@ function viewMe() {
   $('#prw').onclick = () => wrong.length && printAsk(S.subj, wrong, SUBJ[S.subj].name + '错题', false);
   $('#bkp').onclick = () => { S.bankTab = 'papers'; save(); location.hash = '#/bank'; };
   $('#bkt').onclick = () => { S.bankTab = 'topics'; save(); location.hash = '#/bank'; };
-  $('#aikey').onclick = () => askKey().then(viewMe);
-  $('#airem').onclick = () => { AI.remember = !AI.remember; saveAI(); viewMe(); toast(AI.remember ? 'Key 会保存在本机浏览器' : 'Key 只在本次打开有效'); };
-  $('#aimodel').onclick = () => { const ks = Object.keys(MODELS()).filter(k => MODELS()[k][3] === AI.provider); AI.model = ks[(ks.indexOf(AI.model) + 1) % ks.length]; saveAI(); viewMe(); };
-  $('#aiprov').onclick = () => pickProvider().then(viewMe);
-  $('#aibud').onclick = () => ask('每天最多用多少万 token?', { input: String(AI.budget / 10000), type: 'number' }).then(v => { if (v && +v > 0) { AI.budget = Math.round(+v * 10000); saveAI(); viewMe(); } });
   $('#ex').onclick = exportBackup;
   $('#im').onclick = importBackup;
   fillSnaps();
@@ -1894,7 +1884,7 @@ function route() {
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
   if (r !== 's' && S.cur && S.cur.qt && !S.cur.away) { S.cur.away = Date.now(); save(); }
   document.body.classList.toggle('playing', r === 's');
-  document.body.classList.toggle('chatmode', r === 'ai' || (r === 'or' && h[1] === 'ai'));
+  document.body.classList.remove('chatmode');
   document.body.classList.toggle('reading', /^#\/writing\/./.test(location.hash));   // 写作阅读页全屏:它有自己的返回条和上一篇/下一篇
   if (r === 't') viewTopic(h[1], h[2]);
   else if (r === 'bank' || r === 'papers') viewBank();
@@ -1902,7 +1892,7 @@ function route() {
   else if (r === 'wrongs') viewWrongs();
   else if (r === 's') viewSession();
   else if (r === 'sum') viewSum();
-  else if (r === 'ai') viewAI('main');
+  else if (r === 'ai') { location.replace('#/'); return; }
   else if (r === 'learn') location.replace('#/or');     // 「学习」现在只有运筹学,直接进运筹学首页
   else if (r === 'or') loadOR(() => { if (location.hash.indexOf('#/or') === 0) window.renderOR(h); });
   else if (r === 'writing') loadWriting(() => { if (location.hash.indexOf('#/writing') === 0) window.renderWriting(); });
