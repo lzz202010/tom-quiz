@@ -845,3 +845,128 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .sol-sec > summary::after { content: "›"; font-size: 18px; line-height: 1; color: var(--mute); transform: rotate(90deg); transition: transform .15s; }
 .sol-sec:not([open]) > summary::after { transform: rotate(0deg); }
 .sol-sec-b { padding: 0 14px 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+
+/* ───── 三页视觉统一(练习 / 学习 / 我的):卡片与标题语言、科目切换、底栏图标与避让 ─────
+   不改配色、站名、做题选项铬、英语模块。后置覆盖,方便审阅与撤回。 */
+:root {
+  --ui-r: 14px;          /* 三个主页面共用的卡片圆角 */
+  --tabbar-h: 0px;       /* 桌面无底栏;手机上在 700px 媒体查询里写入 */
+}
+
+/* 分区标题:跟「我的」分组标题同一套字号与颜色 */
+.grp-h, .or-stage {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mute);
+}
+.or-h1 { font-size: 24px; font-weight: 500; }   /* 与主站 h1 齐 */
+
+/* 卡片圆角 / 内边距:学习页向「我的」看齐,不改全局 --r(做题选项仍用 10px) */
+.grp, .stats div,
+.lcard, .or-tiles a, .or-demos a, .or-ch, .or-card, .or-vids, .or-timer,
+.or-tools .card, .or-search, .or-next { border-radius: var(--ui-r); }
+.lcard, .or-tiles a { padding: 16px 18px; }
+.lcard b, .or-tiles b { font-size: 16px; font-weight: 500; }
+
+/* 科目分段:标签永远横向书写,不允许被挤成竖排单字 */
+.seg button { white-space: nowrap; flex-shrink: 0; }
+
+/* 底栏图标:桌面仍是文字链,手机再显示 */
+.nav .nav-ico { display: none; }
+.nav .nav-lab { display: inline; }
+
+@media (max-width: 700px) {
+  :root { --tabbar-h: calc(49px + env(safe-area-inset-bottom, 0px)); }
+
+  /* 练习页六个科目:改成两行三段,等宽,选中不挤版面 */
+  .home .seg {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    width: 100%;
+    max-width: 360px;
+    margin-bottom: 28px;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--bg2);
+    box-sizing: border-box;
+  }
+  .home .seg button {
+    width: auto;
+    min-width: 0;
+    flex: none;
+    padding: 8px 4px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    box-shadow: none;
+  }
+  .home .seg button.on {
+    background: var(--card);
+    color: var(--ink);
+    font-weight: 500;
+    box-shadow: 0 1px 3px #0000001f, 0 0 0 .5px #0000000d;
+  }
+
+  /* 主栏给底栏让位:49px + 安全区 + 余量;练习 / 学习 / 我的都走 main */
+  html, body { scroll-padding-bottom: var(--tabbar-h); }
+  main { padding-bottom: calc(var(--tabbar-h) + 40px); }
+  .or-page { padding-bottom: 32px; }
+
+  /* 底部标签栏:24px 图标 + 标签,总高仍不小于 49px,正文字号保持 16px */
+  .nav {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .nav a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 49px;
+    padding: 5px 0 3px;
+    border-radius: 0;
+    color: var(--mute);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: 0;
+  }
+  .nav a.on {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .nav .nav-ico {
+    display: block;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nav a.on .nav-ico {
+    stroke-width: 2.1;
+    fill: color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  /* 轻提示跟着底栏走 */
+  #toast { bottom: calc(var(--tabbar-h) + 16px); }
+}
+
+@media (min-width: 701px) {
+  /* 桌面分段控件保持一行横排标签 */
+  .seg, .home .seg {
+    display: inline-flex;
+    flex-wrap: nowrap;
+  }
+  .seg button, .home .seg button {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}

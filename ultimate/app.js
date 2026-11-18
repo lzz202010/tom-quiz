@@ -980,7 +980,7 @@ function viewMe() {
     <label class="row-i"><span>公考</span><span class="v"><input type="number" inputmode="numeric" id="tg" min="30" max="135" value="${S.target.gk}"> / 135</span></label></div>
   <div class="grp-h">数据</div>
   <div class="grp">${row('ex', '导出备份', S.lastBackup ? ago(S.lastBackup) : '从未', 'chev')}${row('im', '从备份恢复', '', 'chev')}</div>
-  <div class="grp-h">本机自动备份 · 每天一份,留 7 天</div>
+  <div class="grp-h">本机自动备份 · 每天一份，留 7 天</div>
   <div class="grp" id="snaps"><div class="row-i off"><span>读取中…</span></div></div>
   <div class="grp danger-g">${row('rs', '清空记录', '', 'danger')}</div>`);
   app.querySelectorAll('a.row-i').forEach(a => a.addEventListener('click', ev => ev.preventDefault()));
@@ -1104,7 +1104,7 @@ async function fillSnaps() {
   if (!$('#snaps')) return;
   box.innerHTML = snaps.length ? snaps.map(x => { const d = new Date(x.at);
     return `<a href="#" class="row-i chev" data-snap="${x.k}"><span>${d.getMonth() + 1} 月 ${d.getDate()} 日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span><span class="v">${x.n} 题</span></a>`; }).join('')
-    : '<div class="row-i off"><span>还没有,做完一组后自动生成</span></div>';
+    : '<div class="row-i off"><span>还没有，做完一组后自动生成</span></div>';
   box.querySelectorAll('[data-snap]').forEach(a => a.onclick = async function (ev) {
     ev.preventDefault();
     const x = await kvGet('snap:' + a.dataset.snap);
