@@ -612,7 +612,7 @@ function viewHomeWR() {
   html(`<section class="home">
     ${subjSwitch('home', true)}
     <div class="big"><span class="num">${n}</span><span class="of">/ 30 篇</span></div>
-    <div class="cap">管综写作 · 已读</div>
+    <div class="cap">写作 · 已读</div>
     <button class="go" id="go">${wr.last ? '继续读' : '开始'}</button>
     <a href="#/writing" class="dim sm">全部篇目 · 怎么写 · 考前一页纸</a>
   </section>`);
