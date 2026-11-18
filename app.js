@@ -1,5 +1,5 @@
 'use strict';
-/* 管综数学刷书 · 纯前端单页应用(界面沿用 gzbuild-quiz 模板)
+/* tom-quiz · 纯前端单页应用(界面沿用 gzbuild-quiz 模板)
    - 已转录的题集(questions.js):一题一卡,公式用 KaTeX 渲染,选完立即判分并显示解析
    - 未转录的单元:左侧原书页面,右侧答题卡,对答案时点出正确选项(答案键会被记住)
    数据来自 data.js(scripts/build.py)与 questions.js(scripts/build_questions.py) */
@@ -721,7 +721,7 @@ function renderSidebar(hash) {
   side.innerHTML = '';
   const wrongN = wrongIds(curSubject()).length;
   const brand = el('div', 'brand');
-  brand.append(el('div', 'brand-title', '管综精练'));
+  brand.append(el('div', 'brand-title', 'tom-quiz'));
   brand.append(el('div', 'brand-sub', BANK.updated + ' 更新'));
   side.append(brand);
   const nav = el('nav', 'snav');
@@ -1105,7 +1105,7 @@ function exportBackup() {
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '管综精练备份-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.download = 'tom-quiz备份-' + new Date().toISOString().slice(0, 10) + '.json';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
