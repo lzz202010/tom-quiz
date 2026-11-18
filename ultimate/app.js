@@ -329,6 +329,22 @@ function loadWriting(cb) {
   const one = (f, done) => { const t = document.createElement('script'); t.src = f + v; t.onload = done; t.onerror = () => toast('写作内容加载失败'); document.head.append(t); };
   one('writing-data.js', () => one('writing.js', cb));
 }
+function loadE2(cb) {
+  if (window.renderE2) { cb(); return; }
+  const v = window.UFILES && window.UFILES.v ? '?v=' + window.UFILES.v : '';
+  if (!document.querySelector('link[data-e2css]')) {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'e2-embed.css' + v;
+    css.setAttribute('data-e2css', '1');
+    document.head.append(css);
+  }
+  const one = (f, done) => { const t = document.createElement('script'); t.src = f; t.onload = done; t.onerror = () => toast('英语内容加载失败'); document.head.append(t); };
+  app.innerHTML = '<p class="dim">加载中…</p>';
+  const ev = v || '?v=20';
+  one('../e2/data.js' + ev, () => one('../e2/vocab.js' + ev, () => one('e2-app.js' + ev, cb)));
+}
+
 
 const idle = f => (window.requestIdleCallback || (g => setTimeout(g, 300)))(f);
 function html(s) { app.innerHTML = s; typeset(app); window.scrollTo(0, 0); }
@@ -527,7 +543,7 @@ function subjSwitch(route, withOR) {
   const tab = withOR !== undefined && route === 'home' ? S.homeTab : '';     // 首页上「写作」「运筹学」是额外的视图
   return '<div class="seg">' + Object.keys(SUBJ).map(k =>
     `<button class="${!tab && S.subj === k ? 'on' : ''}" data-subj="${k}" data-route="${route}">${SUBJ[k].name}</button>`).join('')
-    + (route === 'home' ? `<button class="${tab === 'wr' ? 'on' : ''}" data-subj="wr" data-route="home">写作</button><button class="${tab === 'or' ? 'on' : ''}" data-subj="or" data-route="home">运筹学</button>` : '') + '</div>';
+    + (route === 'home' ? `<button class="${tab === 'wr' ? 'on' : ''}" data-subj="wr" data-route="home">写作</button><button class="${tab === 'or' ? 'on' : ''}" data-subj="or" data-route="home">运筹学</button><button class="${tab === 'e2' ? 'on' : ''}" data-subj="e2" data-route="home">英语</button>` : '') + '</div>';
 }
 function bar(m, k) { return `<span class="bar k${k}"><i style="width:${k ? Math.round(m * 100) : 0}%"></i></span>`; }   // 没侦察的不画(先验 50% 会误导)
 
@@ -558,9 +574,20 @@ function viewHomeWR() {
   </section>`);
   $('#go').onclick = () => { location.hash = wr.last ? '#/writing/read/' + wr.last : '#/writing'; };
 }
+function viewHomeE2() {
+  html(`<section class="home">
+    ${subjSwitch('home', true)}
+    <div class="big"><span class="num">16</span><span class="of">/ 套</span></div>
+    <div class="cap">英语二 · 2010–2025 真题</div>
+    <button class="go" id="go">打开真题</button>
+    <a href="#/e2/vocab" class="dim sm">生词本 · 作文范文</a>
+  </section>`);
+  $('#go').onclick = () => { location.hash = '#/e2'; };
+}
 function viewHome() {
   if (S.homeTab === 'or') return viewHomeOR();
   if (S.homeTab === 'wr') return viewHomeWR();
+  if (S.homeTab === 'e2') return viewHomeE2();
   const subj = S.subj, cf = SUBJ[subj];
   const tested = topicsOf(subj).filter(t => stage(subj, t.id).k).length, all = topicsOf(subj).length;
   const resume = S.cur && S.cur.subj === subj, today = S.days[dayKey()] || 0;
@@ -1880,7 +1907,7 @@ function route() {
   document.title = 'beta111';
   const h = location.hash.replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
-  const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作在首页,「学习」就是运筹学
+  const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' || r === 'e2' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作和英语在首页,「学习」就是运筹学
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
   if (r !== 's' && S.cur && S.cur.qt && !S.cur.away) { S.cur.away = Date.now(); save(); }
   document.body.classList.toggle('playing', r === 's');
@@ -1895,13 +1922,14 @@ function route() {
   else if (r === 'ai') { location.replace('#/'); return; }
   else if (r === 'learn') location.replace('#/or');     // 「学习」现在只有运筹学,直接进运筹学首页
   else if (r === 'or') loadOR(() => { if (location.hash.indexOf('#/or') === 0) window.renderOR(h); });
+  else if (r === 'e2') loadE2(() => { if (location.hash.indexOf('#/e2') === 0) window.renderE2(h); });
   else if (r === 'writing') loadWriting(() => { if (location.hash.indexOf('#/writing') === 0) window.renderWriting(); });
   else viewHome();
 }
 document.addEventListener('click', function (ev) {
   const b = ev.target.closest('[data-subj]');
   if (!b) return;
-  if (b.dataset.subj === 'or' || b.dataset.subj === 'wr') S.homeTab = b.dataset.subj;          // 首页的运筹学只是首页的一个视图,其他页的科目仍是数学/逻辑
+  if (b.dataset.subj === 'or' || b.dataset.subj === 'wr' || b.dataset.subj === 'e2') S.homeTab = b.dataset.subj;          // 首页的运筹学、写作、英语是额外视图,其他页的科目仍是数学/逻辑
   else { S.subj = b.dataset.subj; S.homeTab = ''; }
   save(); route();
 });
