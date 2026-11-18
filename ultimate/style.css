@@ -833,3 +833,12 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
   body.playing .qleft, body.playing .qright { padding-top: 8px; padding-bottom: 14px; }
   body.playing .stem { font-size: 15px; line-height: 1.8; }
 }
+
+/* 解析分步折叠:题型判断 / 推理过程 / 选项排除,方便手机阅读长解析 */
+.sol-sec { margin: 0 0 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); overflow: hidden; }
+.sol-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  min-height: 44px; padding: 10px 14px; font-weight: 600; font-size: 14px; -webkit-user-select: none; user-select: none; }
+.sol-sec > summary::-webkit-details-marker { display: none; }
+.sol-sec > summary::after { content: "›"; font-size: 18px; line-height: 1; color: var(--mute); transform: rotate(90deg); transition: transform .15s; }
+.sol-sec:not([open]) > summary::after { transform: rotate(0deg); }
+.sol-sec-b { padding: 0 14px 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }

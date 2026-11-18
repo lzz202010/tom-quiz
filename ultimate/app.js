@@ -280,6 +280,23 @@ function record(subj, q, pick, secs) {
 
 /* ───────────── 通用渲染 ───────────── */
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function wrapSol(html) {
+  const s = String(html || '');
+  const re = /<b>(题型判断|推理过程|选项逐一排除|选项排除)<\/b>/g;
+  const hits = [];
+  let m;
+  while ((m = re.exec(s))) hits.push(m);
+  if (!hits.length) return s;
+  let out = s.slice(0, hits[0].index);
+  for (let i = 0; i < hits.length; i++) {
+    const title = hits[i][1];
+    const start = hits[i].index + hits[i][0].length;
+    const end = i + 1 < hits.length ? hits[i + 1].index : s.length;
+    const body = s.slice(start, end).replace(/^(?:<br\s*\/?>)+/i, '').replace(/(?:<br\s*\/?>)+$/i, '');
+    out += '<details class="sol-sec" open><summary>' + title + '</summary><div class="sol-sec-b">' + body + '</div></details>';
+  }
+  return out;
+}
 function typeset(node) {
   if (window.renderMathInElement) {
     window.renderMathInElement(node, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false,
@@ -683,7 +700,7 @@ function viewSession() {
         return `<button class="opt ${c}" data-p="${L}" data-id="${x}" ${rv ? 'disabled' : ''}><b>${L}</b><span>${o}</span></button>`; }).join('')}</div>`; };
     const verdictOf = (x, qx, ax) => revealOf(x) ? `<div class="verdict ${ax.ok ? 'ok' : ax.skip ? 'skip' : 'bad'}">${ax.ok ? '✓' : ax.skip ? '未答 · 答案 ' + qx.ans : qx.ans}
         <span class="mono${ax.t > secOf(cur.subj, qx.t) * 1.25 ? ' hot' : ''}">${mmss(ax.t)}</span>${qx.skip ? '<em>可放弃</em>' : ''}</div>
-        <div class="sol">${qx.sol || ''}</div>` : '';
+        <div class="sol">${wrapSol(qx.sol)}</div>` : '';
     let bodyL, bodyR;
     if (!multi) {
       bodyL = `<div class="meta"><span>${q.src}</span><a href="#" class="cp" data-cpimg="1" title="把整道题截成图片复制,可直接粘贴到别的 AI(X)">复制图片</a>${tools(id)}</div>
@@ -1817,7 +1834,7 @@ function paperBlocks(d, subj, ids, title, o) {
   const ans = order => { const qq = order.map(id => d.byId[id]);
     return o.ans === 'none' ? [] : [`<h2 class="doc-ah">答案${o.ans === 'sol' ? '与解析' : ''}</h2>
     <div class="keys">${qq.map((q, k) => `<span><i>${k + 1}</i>${q.ans}</span>`).join('')}</div>`]
-    .concat(o.ans !== 'sol' ? [] : qq.map((q, k) => `<div class="sol-i"><b>${k + 1}. ${q.ans}</b><span class="src">${q.src}</span><div>${q.sol || ''}</div></div>`)); };
+    .concat(o.ans !== 'sol' ? [] : qq.map((q, k) => `<div class="sol-i"><b>${k + 1}. ${q.ans}</b><span class="src">${q.src}</span><div>${wrapSol(q.sol)}</div></div>`)); };
   return { head: head, body: body, ans: ans };
 }
 function paginate(bl) {
