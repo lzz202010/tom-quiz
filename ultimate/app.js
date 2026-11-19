@@ -556,51 +556,24 @@ function viewHome() {
   const subj = S.subj, cf = SUBJ[subj];
   const ts = topicsOf(subj), tested = ts.filter(t => stage(subj, t.id).k).length, all = ts.length;
   const resume = S.cur && S.cur.subj === subj, today = S.days[dayKey()] || 0;
-  const totalQ = ts.reduce((a, t) => a + t.n, 0);
-  const doneQ = Object.keys(S.cards).filter(id => S.cards[id].s === subj).length;
   const wrongQ = wrongIds(subj, []);
   const topLeaks = ts.slice().sort((a, b) => leak(subj, b) - leak(subj, a)).slice(0, 3);
-  const leakSum = topLeaks.reduce((a, t) => a + leak(subj, t), 0);
-  const leakNames = topLeaks.map(t => t.name.split(' ')[0]).join(' · ');
   // 摸底完成前不显示预估分(没测过的考点算出来的分是猜的)
   const num = tested < all ? `<span class="num">${tested}</span><span class="of">/ ${all}</span>`
     : `<span class="num">${fmt(est(subj))}</span><span class="of">/ ${cf.per * cf.pts}</span>`;
   html(`<section class="home">
     ${subjSwitch('home', false)}
     <div class="big">${num}</div>
-    <div class="cap">${tested < all ? '摸底' : '预估'}${today ? ' · 今日 ' + today + ' 题' : ''} · 已刷 ${doneQ}/${totalQ}</div>
+    <div class="cap">${tested < all ? '摸底' : '预估'}${today ? ' · 今日 ' + today : ''} · <a href="#" id="spTog" class="${S.sprint ? 'hot' : 'dim'}">${S.sprint ? '冲刺' : '常规'}</a></div>
     <button class="go" id="go">${resume ? '继续' : '开始'}</button>
-    ${resume ? '<a href="#" id="newg" class="dim sm">换一组</a>' : ''}
-    <div class="sp-panel">
-      <div class="sp-head">
-        <button class="sp-pill ${S.sprint ? 'on' : ''}" id="spTog">⚡ 10天冲刺：${S.sprint ? '已开启 · 真题优先/次日回炉' : '已关闭'}</button>
-      </div>
-      <div class="sp-grid">
-        <a href="#" class="sp-card hot" id="spLeak">
-          <b>🔥 漏分Top3急救</b>
-          <span>${esc(leakNames)} · 抢回 ${fmt(leakSum)} 分</span>
-        </a>
-        <a href="#" class="sp-card" id="spReal">
-          <b>🎯 近5年高频真题直击</b>
-          <span>按考频权重精选近年核心母题 · 保稳抢分</span>
-        </a>
-        <a href="#" class="sp-card" id="spBank">
-          <b>📚 ${totalQ}题总库 · 全库搜题</b>
-          <span>${META[subj].papers.length}套历年真题 · ${all}个考点 · 关键词检索</span>
-        </a>
-        <a href="#" class="sp-card" id="spWrong">
-          <b>❗ 错题速清 (${wrongQ.length}题)</b>
-          <span>${wrongQ.length ? '立即重做待攻克错题 · 考前清零' : '当前无积压错题 · 去做真题套卷'}</span>
-        </a>
-      </div>
-    </div>
+    <div class="links">${resume ? '<a href="#" id="newg">换一组</a>' : ''}<a href="#" id="goLeak">主攻弱项</a><a href="#" id="goReal">近年真题</a>${wrongQ.length ? `<a href="#" id="goWrong" class="hot">错题 ${wrongQ.length}</a>` : '<a href="#/bank">真题卷</a>'}</div>
   </section>`);
   idle(() => loadData(subj));            // 首页渲染完就在后台把本科题库拉下来,点「开始」直接进
   $('#go').onclick = () => { if (resume) { S.cur.from = '#/'; S.cur.pushed = true; save(); location.hash = '#/s'; } else startTrain(subj); };
   const ng = $('#newg');
   if (ng) ng.onclick = ev => { ev.preventDefault(); S.cur = null; save(); startTrain(subj); };
-  $('#spTog').onclick = () => { S.sprint = !S.sprint; save(); viewHome(); toast(S.sprint ? '⚡ 已开启 10 天冲刺：真题优先、错题隔天回炉' : '已切回常规复习节奏'); };
-  $('#spLeak').onclick = ev => {
+  $('#spTog').onclick = ev => { ev.preventDefault(); S.sprint = !S.sprint; save(); viewHome(); toast(S.sprint ? '已开启 10 天冲刺：真题优先、错题次日回炉' : '已切回常规复习节奏'); };
+  $('#goLeak').onclick = ev => {
     ev.preventDefault();
     loadData(subj).then(function (d) {
       const tids = topLeaks.map(t => t.id), used = new Set(), ids = [];
@@ -609,10 +582,10 @@ function viewHome() {
         const q = bestIn(d, subj, tid, 0.68, used, { real: true }) || bestIn(d, subj, tid, 0.68, used);
         if (q) { used.add(q.id); pushQ({ ids: ids }, d, q); }
       }
-      startSession({ mode: 'list', subj: subj, ids: ids, title: '漏分急救 · ' + topLeaks[0].name.split(' ')[0] });
+      startSession({ mode: 'list', subj: subj, ids: ids, title: '主攻弱项 · ' + topLeaks[0].name.split(' ')[0] });
     });
   };
-  $('#spReal').onclick = ev => {
+  $('#goReal').onclick = ev => {
     ev.preventDefault();
     loadData(subj).then(function (d) {
       const pool = d.qs.filter(q => !q.skip && q.real && (q.y || 0) >= 2019);
@@ -625,14 +598,13 @@ function viewHome() {
       for (let i = 0; i < pool.length && ids.length < gN(); i++) {
         if (!used.has(pool[i].id)) { used.add(pool[i].id); pushQ({ ids: ids }, d, pool[i]); }
       }
-      startSession({ mode: 'list', subj: subj, ids: ids, title: '近5年高频真题精练' });
+      startSession({ mode: 'list', subj: subj, ids: ids, title: '近年真题' });
     });
   };
-  $('#spBank').onclick = ev => { ev.preventDefault(); S.bankTab = 'search'; save(); location.hash = '#/bank'; };
-  $('#spWrong').onclick = ev => {
+  const gw = $('#goWrong');
+  if (gw) gw.onclick = ev => {
     ev.preventDefault();
-    if (!wrongQ.length) { S.bankTab = 'papers'; save(); location.hash = '#/bank'; return; }
-    loadData(subj).then(() => startSession({ mode: 'redo', subj: subj, title: '错题速清', ids: wrongQ.slice(0, gN()) }));
+    loadData(subj).then(() => startSession({ mode: 'redo', subj: subj, title: '错题重做', ids: wrongQ.slice(0, gN()) }));
   };
 }
 
@@ -894,11 +866,11 @@ function finish() {
   location.replace('#/sum');
 }
 
-/* ───────────── 实战套卷 · 考点 · 全库搜题 ───────────── */
+/* ───────────── 实战套卷 · 考点 · 找题 ───────────── */
 function viewBank() {
   const subj = S.subj;
   const ts = topicsOf(subj);
-  const tab = S.bankTab || 'papers';
+  const tab = ['papers', 'topics', 'search'].indexOf(S.bankTab) >= 0 ? S.bankTab : 'papers';
   let body = '';
   if (tab === 'papers') {
     body = `<section class="papers">${META[subj].papers.map(p => { const r = S.papers[p.id];
@@ -910,19 +882,15 @@ function viewBank() {
       return `<a class="lr${st.k === 1 ? ' weak' : ''}" href="#/t/${subj}/${t.id}"><span class="nm">${t.name}${bf > 1 ? ' <i class="bias">↑</i>' : bf < 1 ? ' <i class="bias">↓</i>' : ''}</span>
         <span>${bar(mastery(subj, t.id), st.k)}</span><span class="mono lk">${t.n}</span></a>`; }).join('')}</section>`;
   } else {
-    body = `<div class="bk-sbox">
-      <input id="bkQ" class="dlg-in bk-sin" type="search" placeholder="搜${SUBJ[subj].name}题干、年份(如 2024)、考点、题号…" value="${esc(S.bankQ || '')}">
-      <div class="bk-flt" id="bkFlt"></div>
+    body = `<input id="bkQ" class="dlg-in bk-sin" type="search" placeholder="搜${SUBJ[subj].name}题干、年份、考点…" value="${esc(S.bankQ || '')}">
+      <div class="seg bk-seg" id="bkFlt"></div>
       <div class="bk-sbar" id="bkSbar"></div>
-    </div>
-    <section class="papers bk-slist" id="bkRes"><div class="row-i off"><span>题库加载中…</span></div></section>`;
+      <section class="papers"><ul class="qlist in-card" id="bkRes"><li class="row-i off"><span>题库加载中…</span></li></ul></section>`;
   }
-  html(`<a href="#/" class="back" id="bback">← 首页</a>
-  <section class="slim bank-h">${subjSwitch('bank')}
-    <div class="seg sm2">${[['papers', '套卷'], ['topics', '考点'], ['search', '搜题']].map(x => `<button class="${tab === x[0] ? 'on' : ''}" data-tab="${x[0]}">${x[1]}</button>`).join('')}</div></section>
+  html(`<section class="slim bank-h">${subjSwitch('bank')}
+    <div class="seg sm2">${[['papers', '套卷'], ['topics', '考点'], ['search', '找题']].map(x => `<button class="${tab === x[0] ? 'on' : ''}" data-tab="${x[0]}">${x[1]}</button>`).join('')}</div></section>
   ${body}`);
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.bankTab = b.dataset.tab; save(); viewBank(); });
-  $('#bback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
   app.querySelectorAll('[data-start]').forEach(b => b.onclick = ev => { ev.preventDefault(); startPaper(subj, b.dataset.start); });
   app.querySelectorAll('[data-print]').forEach(b => b.onclick = function (ev) {
     ev.preventDefault();
@@ -932,7 +900,7 @@ function viewBank() {
     loadData(subj).then(function (d) {
       const inp = $('#bkQ'), fltBox = $('#bkFlt'), barBox = $('#bkSbar'), resBox = $('#bkRes');
       if (!inp || !resBox) return;
-      let flt = S.bankFlt || 'all';
+      let flt = ['all', 'recent', 'real', 'undone', 'wrong'].indexOf(S.bankFlt) >= 0 ? S.bankFlt : 'all';
       const drawSearch = function () {
         const kw = (inp.value || '').trim().toLowerCase();
         S.bankQ = inp.value; S.bankFlt = flt;
@@ -947,32 +915,20 @@ function viewBank() {
           const txt = (q.src + ' ' + topicName(subj, q.t) + ' ' + (q.tag || '') + ' ' + q.stem + ' ' + (q.c1 || '') + ' ' + (q.c2 || '') + ' ' + (q.opts || []).join(' ')).replace(/<[^>]+>/g, ' ').toLowerCase();
           return kws.every(k => txt.indexOf(k) >= 0);
         });
-        const flts = [
-          ['all', '全部 (' + d.qs.length + ')'],
-          ['recent', '🔥 近5年真题'],
-          ['real', '历年真题'],
-          ['undone', '未做过'],
-          ['wrong', '待攻克错题']
-        ];
+        const flts = [['all', '全部'], ['recent', '近年'], ['real', '真题'], ['undone', '未做'], ['wrong', '错题']];
         fltBox.innerHTML = flts.map(x => `<button class="${flt === x[0] ? 'on' : ''}" data-bf="${x[0]}">${x[1]}</button>`).join('');
         fltBox.querySelectorAll('[data-bf]').forEach(b => b.onclick = () => { flt = b.dataset.bf; drawSearch(); });
-        barBox.innerHTML = `<span>找到 <b>${hits.length}</b> 道题${hits.length > 60 ? '（显示前 60 道）' : ''}</span>
-          ${hits.length ? `<span class="acts"><a href="#" id="bkGoHit" class="hot">▶ 练前 ${Math.min(15, hits.length)} 题</a><a href="#" id="bkPrHit">打印</a></span>` : ''}`;
+        barBox.innerHTML = `<span>${hits.length} 题${hits.length > 60 ? ' · 显示前 60' : ''}</span>
+          ${hits.length ? `<span class="acts"><a href="#" id="bkGoHit" class="hot">练前 ${Math.min(15, hits.length)} 题</a><a href="#" id="bkPrHit">打印</a></span>` : ''}`;
         const goBtn = $('#bkGoHit'), prBtn = $('#bkPrHit');
         if (goBtn) goBtn.onclick = ev => { ev.preventDefault(); startSession({ mode: 'list', subj: subj, ids: hits.slice(0, 15).map(q => q.id), title: (kw || '筛选') + ' · 专练' }); };
         if (prBtn) prBtn.onclick = ev => { ev.preventDefault(); printAsk(subj, hits.slice(0, 40).map(q => q.id), SUBJ[subj].name + ' · ' + (kw || '筛选题组'), false); };
         const slice = hits.slice(0, 60);
         resBox.innerHTML = slice.length ? slice.map(function (q) {
           const c = S.cards[q.id];
-          const stemTxt = q.stem.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 76);
-          return `<div class="paper bk-qrow">
-            <div class="bk-qmain" data-qgo="${q.id}">
-              <div class="bk-qtop"><i class="dot ${c ? (c.p === q.ans ? 'y' : 'n') : ''}"></i><b>${esc(q.src)}</b><span class="dim">${esc(topicName(subj, q.t).split(' ')[0])}</span></div>
-              <div class="bk-qstem">${esc(stemTxt)}</div>
-            </div>
-            <span class="acts"><a href="#" data-qgo="${q.id}">做</a></span>
-          </div>`;
-        }).join('') : '<div class="row-i off"><span>没有符合条件的题目，换个词或筛选试试</span></div>';
+          const stemTxt = q.stem.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 42);
+          return `<li><a href="#" data-qgo="${q.id}"><i class="dot ${c ? (c.p === q.ans ? 'y' : 'n') : ''}"></i><span>${esc(q.src)} · ${esc(stemTxt)}</span><em>${esc(topicName(subj, q.t).split(' ')[0])}</em></a></li>`;
+        }).join('') : '<li class="row-i off"><span>没有符合条件的题目</span></li>';
         resBox.querySelectorAll('[data-qgo]').forEach(el => el.onclick = function (ev) {
           ev.preventDefault();
           const allIds = slice.map(q => q.id), idx = allIds.indexOf(el.dataset.qgo);
@@ -2056,7 +2012,7 @@ function route() {
   document.title = 'beta111';
   const h = location.hash.replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
-  const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作在首页,「学习」就是运筹学
+  const tab = r === 't' || r === 'papers' || r === 'bank' ? 'bank' : r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' || r === 'or' ? 'home' : r;
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
   if (r !== 's' && S.cur && S.cur.qt && !S.cur.away) { S.cur.away = Date.now(); save(); }
   document.body.classList.toggle('playing', r === 's');
