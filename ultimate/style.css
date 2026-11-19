@@ -36,9 +36,9 @@ h2 { font-size: 16px; color: var(--soft); margin-bottom: 10px; }
 .top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 20px;
   padding-top: max(10px, env(safe-area-inset-top)); background: var(--bg); }
 .logo { font-family: "Great Vibes", "Snell Roundhand", cursive; font-size: 36px; line-height: 1.25; color: var(--ink); letter-spacing: .5px; }
-.nav { display: flex; gap: 6px; margin-left: auto; }
-.nav a { padding: 8px 14px; border-radius: 8px; color: var(--mute); font-size: 15px; }
-.nav a.on { color: var(--ink); font-weight: 600; }
+.nav { display: flex; gap: 2px; margin-left: auto; }
+.nav a { padding: 5px 12px; border-radius: 8px; color: var(--mute); font-size: 15px; }
+.nav a.on { color: var(--ink); }
 body.playing .top, body.reading .top { display: none; }
 
 main { max-width: 680px; margin: 0 auto; padding: 12px 18px 80px; }
@@ -202,6 +202,7 @@ section.links { justify-content: flex-start; }
 @media (max-width: 600px) {
   .top { padding: 8px 16px; }
   .logo { font-size: 22px; }
+  .nav a { padding: 5px 8px; }
   main { padding: 8px 16px 80px; }
   .num { font-size: 50px; }
   .lr { grid-template-columns: minmax(0, 1fr) 56px 44px; gap: 10px; }
@@ -284,10 +285,9 @@ body.previewing { overflow: hidden; }
 @media (max-width: 700px) {
   .top { justify-content: center; padding: 10px 16px 4px; padding-top: max(10px, env(safe-area-inset-top)); }
   .logo { font-size: 34px; }
-  .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; gap: 0; display: grid; grid-template-columns: repeat(3, 1fr);
+  .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; gap: 0; display: grid; grid-template-columns: repeat(4, 1fr);
     background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
-  .nav a { display: flex; align-items: center; justify-content: center; min-height: 49px; padding: 0; font-size: 14px; border-radius: 0; }
-  .nav a:active { opacity: .55; }
+  .nav a { text-align: center; padding: 13px 0 11px; font-size: 13px; border-radius: 0; }
   .nav a.on { color: var(--ink); font-weight: 600; }
   main { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
   .home { min-height: calc(100vh - 200px); min-height: calc(100dvh - 200px); }
@@ -754,10 +754,7 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
 .gk-tex { display: inline-block; height: 1.35em; width: auto; vertical-align: -.3em; background: #fff; border-radius: 2px; }
 .gk-t { border-collapse: collapse; margin: 10px 0; font-size: 13.5px; max-width: 100%; display: block; overflow-x: auto; }
 .gk-t td, .gk-t th { border: 1px solid var(--line, rgba(128,128,128,.3)); padding: 4px 8px; text-align: center; }
-.stem, .opt, .sol { overflow-wrap: anywhere; min-width: 0; }
-.stem .katex-display, .opt .katex-display, .sol .katex-display {
-  overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 2px 0; -webkit-overflow-scrolling: touch;
-}
+.stem, .opt, .sol { overflow-wrap: anywhere; }
 .meta .fav { margin-left: auto; color: var(--mute); text-decoration: none; padding: 2px 4px; }
 .meta .fav.on { color: var(--acc); }
 .meta .fav + .fav, .meta #rmw { margin-left: auto; }
@@ -837,217 +834,10 @@ table.tb.dtb th, table.tb.dtb td { border: 1px solid var(--line); padding: 4px 8
   body.playing .stem { font-size: 15px; line-height: 1.8; }
 }
 
-/* 解析分步折叠:题型判断 / 推理过程 / 选项排除,方便手机阅读长解析 */
-.sol-sec { margin: 0 0 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); overflow: hidden; }
-.sol-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
-  min-height: 44px; padding: 10px 14px; font-weight: 600; font-size: 14px; -webkit-user-select: none; user-select: none; }
-.sol-sec > summary::-webkit-details-marker { display: none; }
-.sol-sec > summary::after { content: "›"; font-size: 18px; line-height: 1; color: var(--mute); transform: rotate(90deg); transition: transform .15s; }
-.sol-sec:not([open]) > summary::after { transform: rotate(0deg); }
-.sol-sec-b { padding: 0 14px 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-
-/* ───── 三页视觉统一(练习 / 学习 / 我的):卡片与标题语言、科目切换、底栏图标与避让 ─────
-   不改配色、站名、做题选项铬、英语模块。后置覆盖,方便审阅与撤回。 */
-:root {
-  --ui-r: 14px;          /* 三个主页面共用的卡片圆角 */
-  --tabbar-h: 0px;       /* 桌面无底栏;手机上在 700px 媒体查询里写入 */
-}
-
-/* 分区标题:跟「我的」分组标题同一套字号与颜色 */
-.grp-h, .or-stage {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--mute);
-}
-.or-h1 { font-size: 24px; font-weight: 500; }   /* 与主站 h1 齐 */
-
-/* 卡片圆角 / 内边距:学习页向「我的」看齐,不改全局 --r(做题选项仍用 10px) */
-.grp, .stats div,
-.lcard, .or-tiles a, .or-demos a, .or-ch, .or-card, .or-vids, .or-timer,
-.or-tools .card, .or-search, .or-next { border-radius: var(--ui-r); }
-.lcard, .or-tiles a { padding: 16px 18px; }
-.lcard b, .or-tiles b { font-size: 16px; font-weight: 500; }
-
-/* 科目分段:标签永远横向书写,不允许被挤成竖排单字 */
-.seg button { white-space: nowrap; flex-shrink: 0; }
-
-/* 底栏图标:桌面仍是文字链,手机再显示 */
-.nav .nav-ico { display: none; }
-.nav .nav-lab { display: inline; }
-
-@media (max-width: 700px) {
-  :root { --tabbar-h: calc(49px + env(safe-area-inset-bottom, 0px)); }
-
-  /* 练习页六个科目:改成两行三段,等宽,选中不挤版面 */
-  .home .seg {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 3px;
-    width: 100%;
-    max-width: 360px;
-    margin-bottom: 28px;
-    padding: 3px;
-    border-radius: 12px;
-    background: var(--bg2);
-    box-sizing: border-box;
-  }
-  .home .seg button {
-    width: auto;
-    min-width: 0;
-    flex: none;
-    padding: 8px 4px;
-    border-radius: 9px;
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 1.3;
-    white-space: nowrap;
-    box-shadow: none;
-  }
-  .home .seg button.on {
-    background: var(--card);
-    color: var(--ink);
-    font-weight: 500;
-    box-shadow: 0 1px 3px #0000001f, 0 0 0 .5px #0000000d;
-  }
-
-  /* 主栏给底栏让位:49px + 安全区 + 余量;练习 / 学习 / 我的都走 main */
-  html, body { scroll-padding-bottom: var(--tabbar-h); }
-  main { padding-bottom: calc(var(--tabbar-h) + 40px); }
-  .or-page { padding-bottom: 32px; }
-
-  /* 底部标签栏:24px 图标 + 标签,总高仍不小于 49px,正文字号保持 16px */
-  .nav {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  .nav a {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    min-height: 49px;
-    padding: 5px 0 3px;
-    border-radius: 0;
-    color: var(--mute);
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1.15;
-    letter-spacing: 0;
-  }
-  .nav a.on {
-    color: var(--ink);
-    font-weight: 600;
-  }
-  .nav .nav-ico {
-    display: block;
-    width: 24px;
-    height: 24px;
-    flex: none;
-    stroke: currentColor;
-    fill: none;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .nav a.on .nav-ico {
-    stroke-width: 2.1;
-    fill: color-mix(in srgb, var(--ink) 16%, transparent);
-  }
-
-  /* 轻提示跟着底栏走 */
-  #toast { bottom: calc(var(--tabbar-h) + 16px); }
-}
-
-@media (min-width: 701px) {
-  /* 桌面分段控件保持一行横排标签 */
-  .seg, .home .seg {
-    display: inline-flex;
-    flex-wrap: nowrap;
-  }
-  .seg button, .home .seg button {
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-}
-
-
-/* ───── 导航切换防抖:顶栏高度固定,学习页不再把站名收成 0;练习科目切换不再垂直居中带动整页跳 ───── */
-.home {
-  justify-content: flex-start;
-  padding-top: 8px;
-}
-@media (max-width: 700px) {
-  :root {
-    --top-h: calc(max(10px, env(safe-area-inset-top, 0px)) + 46px);
-  }
-  .top {
-    box-sizing: border-box;
-    height: var(--top-h);
-    min-height: var(--top-h);
-    padding-top: max(10px, env(safe-area-inset-top, 0px));
-    padding-bottom: 4px;
-    overflow: hidden;
-  }
-  .logo { line-height: 1.25; }
-  /* 覆盖学习页收顶栏:练习 / 学习 / 我的切换时顶栏高度保持一致 */
-  body:has(.or-page) .top {
-    position: sticky;
-    top: 0;
-    height: var(--top-h);
-    min-height: var(--top-h);
-    padding: 10px 16px 4px;
-    padding-top: max(10px, env(safe-area-inset-top, 0px));
-  }
-  body:has(.or-page) .top .logo { display: block; }
-  .or-page > #orback {
-    top: var(--top-h);
-    padding-top: 10px;
-  }
-  .or-bar {
-    top: var(--top-h);
-    padding-top: 8px;
-  }
-  .or-timer { top: calc(var(--top-h) + 8px); }
-  .home { padding-top: 4px; }
-  .nav a, .nav a.on { font-weight: 500; }
-}
-
-
-/* 本机自动备份:行内恢复 + 删除 */
-.snap-row { padding: 0; gap: 0; }
-.snap-row .snap-open { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 50px; padding: 0 8px 0 16px; color: inherit; }
-.snap-row .snap-del { flex: none; align-self: stretch; padding: 0 16px; border: 0; background: none; color: var(--bad); font: inherit; font-size: 15px; cursor: pointer; }
-.snap-row .snap-del:active { opacity: .6; }
-@media (max-width: 700px) {
-  .snap-row .snap-open { min-height: 46px; }
-}
-
-/* 返回热区至少 44px 见方，字不必放大，热区要够瞄 */
-#app > .back,
-#back,
-#bback,
-.or-page > #orback,
-.or-bar .back {
-  box-sizing: border-box;
-  min-height: 44px;
-  min-width: 44px;
-  display: inline-flex;
-  align-items: center;
-}
-#app > .back {
-  display: flex;
-  align-items: center;
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-.qhead .x,
-#quit {
-  box-sizing: border-box;
-  min-width: 44px;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
+/* 结果页一句话错因诊断 + 打印共用题干合并 */
+.sum-diag { max-width: 440px; margin: -24px auto 28px; font-size: 13.5px; line-height: 1.6; color: var(--soft); }
+.links a.hot { color: var(--acc); }
+.pq-grp { padding: 6px 0 4px; }
+.pq-gh { font: 600 12px/1.5 -apple-system, "PingFang SC", sans-serif; color: #555; margin-bottom: 4px; }
+.pq-gstem { text-align: justify; margin-bottom: 4px; }
+.pq.pq-sub { padding-top: 4px; padding-left: 1em; }

@@ -1,4 +1,4 @@
-/* Ultimate · beta111
+/* Ultimate · 管综提分
    一组 10 题:系统按「考频 × 没掌握」挑漏分最多的考点,难度跟着你的表现上下浮动(保持在够得着的区间),
    组末一道压轴真题;错题按 1/3/7/16/35 天回来。题库由 scripts/build_ultimate.py 生成。 */
 'use strict';
@@ -10,6 +10,7 @@ const KEY = 'ult.v1';
 const SUBJ = { math: { name: '数学', pts: 3, per: 25, sec: 150, tgt: 60 }, logic: { name: '逻辑', pts: 2, per: 30, sec: 120, tgt: 46 },
   gk: { name: '公考', pts: 1, per: 135, sec: 55, tgt: 95 } };
 const IV = [1, 3, 7, 16, 35];
+const IV_SPRINT = [1, 2, 4, 7, 10];    // 10 天冲刺模式：压缩复习间隔，错题 1 天回炉，考前滚熟
 const LET = 'ABCDE';
 const LVN = ['', '基础', '中等', '较难', '挑战'];
 const COND_OPTS = ['条件(1)充分,但条件(2)不充分', '条件(2)充分,但条件(1)不充分', '条件(1)和(2)单独都不充分,但联合起来充分',
@@ -37,6 +38,9 @@ function loadData(subj) {
     s.src = window.UFILES[subj];
     s.onload = function () {
       const d = DATA[subj];
+      if (!d || !Array.isArray(d.qs)) {
+        delete loading[subj]; s.remove(); fail(new Error('题库数据异常：' + subj)); return;
+      }
       d.byId = {};
       d.qs.forEach(function (q) { d.byId[q.id] = q; });
       d.grp = {};
@@ -45,7 +49,7 @@ function loadData(subj) {
       d.topics.forEach(function (t) { d.topic[t.id] = t; });
       ok(d);
     };
-    s.onerror = fail;
+    s.onerror = function (e) { delete loading[subj]; s.remove(); fail(e || new Error('题库加载失败：' + subj)); };
     document.head.append(s);
   });
 }
@@ -179,8 +183,9 @@ function bestIn(d, subj, tid, target, used, opt) {
     if (fresh ? c : (!c || c.due <= now + DAY)) return;      // 旧题只用快到期以外的(到期的走复习通道)
     if (opt.minLv && q.lv < opt.minLv) return;
     if (opt.real && !q.real) return;
-    const sc = -Math.abs(pWin(subj, q) - target) * 5 + (q.real ? 0.5 : 0) + ((q.y || 2012) - 2010) / 40 + Math.random() * 0.25
-      - (fresh ? 0 : 1 + (now - c.last < 7 * DAY ? 1 : 0));
+    const sp = !!S.sprint;
+    const sc = -Math.abs(pWin(subj, q) - target) * 5 + (q.real ? (sp ? 1.6 : 0.5) : 0) + ((q.y || 2012) - 2010) / (sp ? 20 : 40) + Math.random() * 0.25
+      - (fresh ? 0 : 1 + (now - c.last < (sp ? 3 : 7) * DAY ? 1 : 0));
     if (sc > bs) { bs = sc; best = q; }
   });
   scan(true);
@@ -194,7 +199,8 @@ function biasOf(subj, tid) { const b = (S.bias || {})[subj + '|' + tid]; return 
 function priority(subj, t) {
   const n = tpList(subj, t.id).length, recent = ((S.recentFocus || {})[subj] || []);
   const tired = recent.filter(f => f.indexOf(t.id) >= 0).length;
-  return leak(subj, t) * (1 + 0.8 / Math.sqrt(n + 1)) * Math.pow(0.6, tired) * biasOf(subj, t.id);
+  const spBoost = S.sprint ? (0.75 + t.w / 3) : 1;     // 10 天冲刺：向高频大题倾斜，把时间花在最值钱的漏分点
+  return leak(subj, t) * spBoost * (1 + 0.8 / Math.sqrt(n + 1)) * Math.pow(0.6, tired) * biasOf(subj, t.id);
 }
 function focusTopics(subj) {
   const tested = topicsOf(subj).filter(t => tpList(subj, t.id).length);
@@ -228,11 +234,12 @@ function chooseNext(cur, d) {
       .sort((a, b) => mastery(subj, b.id) - mastery(subj, a.id)).slice(0, 3);
     if (warm.length) { const q = bestIn(d, subj, warm[Math.floor(Math.random() * warm.length)].id, 0.85, used); if (q) return pick(q, '保温'); }
   }
-  if (k === cur.n - 1) {          // 压轴:在已测过的考点里找一道难真题,做对把握最接近 45%(够得着的挑战,不是送死题)
+  if (k === cur.n - 1) {          // 压轴:平时 45% 挑战难真题;10 天冲刺收敛到 60% 高收益中难题
+    const bossTgt = S.sprint ? 0.60 : 0.45;
     let b = null, bd = 1e9;
     topicsOf(subj).filter(t => tpList(subj, t.id).length).forEach(function (t) {
-      const q = bestIn(d, subj, t.id, 0.45, used, { minLv: 3, real: true, noReuse: true });
-      if (q && Math.abs(pWin(subj, q) - 0.45) < bd) { bd = Math.abs(pWin(subj, q) - 0.45); b = q; }
+      const q = bestIn(d, subj, t.id, bossTgt, used, { minLv: S.sprint ? 2 : 3, real: true, noReuse: true });
+      if (q && Math.abs(pWin(subj, q) - bossTgt) < bd) { bd = Math.abs(pWin(subj, q) - bossTgt); b = q; }
     });
     if (b) { cur.boss = b.id; return pick(b, '压轴'); }
   }
@@ -257,7 +264,8 @@ function record(subj, q, pick, secs) {
   let st;
   if (!c) st = ok ? (slow ? 2 : 4) : 0;              // 新题一次做对:说明会,很久以后再抽查
   else st = ok ? Math.min(c.st + 1, 5) : 0;
-  const days = ok ? IV[Math.max(0, st - 1)] * (slow ? 0.5 : 1) : 2;   // 错题隔 2 天再见,免得靠记答案
+  const iv = S.sprint ? IV_SPRINT : IV;
+  const days = ok ? iv[Math.max(0, st - 1)] * (slow ? 0.5 : 1) : (S.sprint ? 1 : 2);   // 冲刺模式错题隔 1 天即回炉
   S.cards[q.id] = { s: subj, t: q.t, st: st, due: now + days * DAY, n: (c ? c.n : 0) + 1, ok: (c ? c.ok : 0) + (ok ? 1 : 0),
                     w: (c ? c.w : 0) + (ok ? 0 : 1), last: now, p: pick, kind: ok && c ? c.kind : undefined };
   (S.tp[subj] = S.tp[subj] || {});
@@ -280,65 +288,12 @@ function record(subj, q, pick, secs) {
 
 /* ───────────── 通用渲染 ───────────── */
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-function wrapSol(html) {
-  const s = String(html || '');
-  const re = /<b>(题型判断|推理过程|选项逐一排除|选项排除)<\/b>/g;
-  const hits = [];
-  let m;
-  while ((m = re.exec(s))) hits.push(m);
-  if (!hits.length) return s;
-  let out = s.slice(0, hits[0].index);
-  for (let i = 0; i < hits.length; i++) {
-    const title = hits[i][1];
-    const start = hits[i].index + hits[i][0].length;
-    const end = i + 1 < hits.length ? hits[i + 1].index : s.length;
-    const body = s.slice(start, end).replace(/^(?:<br\s*\/?>)+/i, '').replace(/(?:<br\s*\/?>)+$/i, '');
-    out += '<details class="sol-sec" open><summary>' + title + '</summary><div class="sol-sec-b">' + body + '</div></details>';
-  }
-  return out;
-}
 function typeset(node) {
   if (window.renderMathInElement) {
     window.renderMathInElement(node, { delimiters: [{ left: '$', right: '$', display: false }], throwOnError: false,
                                        macros: { '\\frac': '\\dfrac' } });
   }
   return node;
-}
-/* 公式库(KaTeX)按需加载:首页不拉,进做题、结算、打印或学习时再取,避免挡住练习首页 */
-function loadHref(href, kind) {
-  return new Promise(function (ok, fail) {
-    const attr = 'data-ult-href';
-    if (kind === 'css') {
-      const hit = document.querySelector('link[' + attr + '="' + href + '"]');
-      if (hit) { if (hit.dataset.ultReady) ok(); else hit.addEventListener('load', function () { ok(); }); return; }
-      const l = document.createElement('link');
-      l.rel = 'stylesheet';
-      l.href = href;
-      l.setAttribute(attr, href);
-      l.onload = function () { l.dataset.ultReady = '1'; ok(); };
-      l.onerror = fail;
-      document.head.append(l);
-    } else {
-      const hit = document.querySelector('script[' + attr + '="' + href + '"]');
-      if (hit) { if (hit.dataset.ultReady) ok(); else hit.addEventListener('load', function () { ok(); }); return; }
-      const s = document.createElement('script');
-      s.src = href;
-      s.setAttribute(attr, href);
-      s.onload = function () { s.dataset.ultReady = '1'; ok(); };
-      s.onerror = fail;
-      document.head.append(s);
-    }
-  });
-}
-let katexP = null;
-function loadKatex() {
-  if (window.renderMathInElement && window.katex) return Promise.resolve();
-  if (katexP) return katexP;
-  katexP = loadHref('vendor/katex/katex.min.css', 'css')
-    .then(function () { return loadHref('vendor/katex/katex.min.js', 'js'); })
-    .then(function () { return loadHref('vendor/katex/auto-render.min.js', 'js'); })
-    .catch(function (e) { katexP = null; throw e; });
-  return katexP;
 }
 /* 写作模块(writing.js,从旧站复制)要用的几个全局工具 */
 const $app = app;
@@ -354,8 +309,7 @@ function loadOR(cb) {
   const v = window.UFILES.v ? '?v=' + window.UFILES.v : '';
   const one = (f, done) => { const t = document.createElement('script'); t.src = f; t.onload = done; t.onerror = () => toast('运筹学内容加载失败'); document.head.append(t); };
   app.innerHTML = '<div class="or-page"><p class="dim">加载中…</p></div>';
-  const go = () => (window.marked ? f => f() : f => one('vendor/marked-12.0.2.min.js', f))(() => one('or/or-data.js' + v, () => one('or/or-solvers.js' + v, () => one('or.js' + v, cb))));
-  loadKatex().then(go, go);
+  (window.marked ? f => f() : f => one('vendor/marked-12.0.2.min.js', f))(() => one('or/or-data.js' + v, () => one('or/or-solvers.js' + v, () => one('or.js' + v, cb))));
 }
 /* 运筹学计入进度的章(按西安工业大学 IE 复试大纲;09 排队论一般不考,不计入) */
 const OR_CORE = ['01', '02', '03', '04', '05', '06', '07', '08', '10', '15', '16'];
@@ -363,32 +317,9 @@ const orDone = os => (os.done || []).filter(n => OR_CORE.indexOf(n) >= 0).length
 function loadWriting(cb) {
   if (window.renderWriting) { cb(); return; }
   const v = (window.UFILES.v ? '?v=' + window.UFILES.v : '');
-  if (!document.querySelector('link[data-wrcss]')) {
-    const css = document.createElement('link');
-    css.rel = 'stylesheet';
-    css.href = 'writing.css' + v;
-    css.setAttribute('data-wrcss', '1');
-    document.head.append(css);
-  }
   const one = (f, done) => { const t = document.createElement('script'); t.src = f + v; t.onload = done; t.onerror = () => toast('写作内容加载失败'); document.head.append(t); };
   one('writing-data.js', () => one('writing.js', cb));
 }
-function loadE2(cb) {
-  if (window.renderE2) { cb(); return; }
-  const v = window.UFILES && window.UFILES.v ? '?v=' + window.UFILES.v : '';
-  if (!document.querySelector('link[data-e2css]')) {
-    const css = document.createElement('link');
-    css.rel = 'stylesheet';
-    css.href = 'e2-embed.css' + v;
-    css.setAttribute('data-e2css', '1');
-    document.head.append(css);
-  }
-  const one = (f, done) => { const t = document.createElement('script'); t.src = f; t.onload = done; t.onerror = () => toast('英语内容加载失败'); document.head.append(t); };
-  app.innerHTML = '<p class="dim">加载中…</p>';
-  const ev = v || '?v=20';
-  one('../e2/data.js' + ev, () => one('../e2/vocab.js' + ev, () => one('e2-app.js' + ev, cb)));
-}
-
 
 const idle = f => (window.requestIdleCallback || (g => setTimeout(g, 300)))(f);
 function html(s) { app.innerHTML = s; typeset(app); window.scrollTo(0, 0); }
@@ -587,7 +518,7 @@ function subjSwitch(route, withOR) {
   const tab = withOR !== undefined && route === 'home' ? S.homeTab : '';     // 首页上「写作」「运筹学」是额外的视图
   return '<div class="seg">' + Object.keys(SUBJ).map(k =>
     `<button class="${!tab && S.subj === k ? 'on' : ''}" data-subj="${k}" data-route="${route}">${SUBJ[k].name}</button>`).join('')
-    + (route === 'home' ? `<button class="${tab === 'wr' ? 'on' : ''}" data-subj="wr" data-route="home">写作</button><button class="${tab === 'or' ? 'on' : ''}" data-subj="or" data-route="home">运筹学</button><button class="${tab === 'e2' ? 'on' : ''}" data-subj="e2" data-route="home">英语</button>` : '') + '</div>';
+    + (route === 'home' ? `<button class="${tab === 'wr' ? 'on' : ''}" data-subj="wr" data-route="home">写作</button><button class="${tab === 'or' ? 'on' : ''}" data-subj="or" data-route="home">运筹学</button>` : '') + '</div>';
 }
 function bar(m, k) { return `<span class="bar k${k}"><i style="width:${k ? Math.round(m * 100) : 0}%"></i></span>`; }   // 没侦察的不画(先验 50% 会误导)
 
@@ -612,26 +543,15 @@ function viewHomeWR() {
   html(`<section class="home">
     ${subjSwitch('home', true)}
     <div class="big"><span class="num">${n}</span><span class="of">/ 30 篇</span></div>
-    <div class="cap">写作 · 已读</div>
+    <div class="cap">管综写作 · 已读</div>
     <button class="go" id="go">${wr.last ? '继续读' : '开始'}</button>
     <a href="#/writing" class="dim sm">全部篇目 · 怎么写 · 考前一页纸</a>
   </section>`);
   $('#go').onclick = () => { location.hash = wr.last ? '#/writing/read/' + wr.last : '#/writing'; };
 }
-function viewHomeE2() {
-  html(`<section class="home">
-    ${subjSwitch('home', true)}
-    <div class="big"><span class="num">16</span><span class="of">/ 套</span></div>
-    <div class="cap">英语二 · 2010–2025 真题</div>
-    <button class="go" id="go">打开真题</button>
-    <a href="#/e2/vocab" class="dim sm">生词本 · 作文范文</a>
-  </section>`);
-  $('#go').onclick = () => { location.hash = '#/e2'; };
-}
 function viewHome() {
   if (S.homeTab === 'or') return viewHomeOR();
   if (S.homeTab === 'wr') return viewHomeWR();
-  if (S.homeTab === 'e2') return viewHomeE2();
   const subj = S.subj, cf = SUBJ[subj];
   const tested = topicsOf(subj).filter(t => stage(subj, t.id).k).length, all = topicsOf(subj).length;
   const resume = S.cur && S.cur.subj === subj, today = S.days[dayKey()] || 0;
@@ -645,7 +565,7 @@ function viewHome() {
     <button class="go" id="go">${resume ? '继续' : '开始'}</button>
     ${resume ? '<a href="#" id="newg" class="dim sm">换一组</a>' : ''}
   </section>`);
-  idle(() => { loadData(subj); loadKatex(); });  // 首页先出,再在后台拉本科题库和公式库,点「开始」少等
+  idle(() => loadData(subj));            // 首页渲染完就在后台把本科题库拉下来,点「开始」直接进
   $('#go').onclick = () => { if (resume) { S.cur.from = '#/'; S.cur.pushed = true; save(); location.hash = '#/s'; } else startTrain(subj); };
   const ng = $('#newg');
   if (ng) ng.onclick = ev => { ev.preventDefault(); S.cur = null; save(); startTrain(subj); };
@@ -711,7 +631,7 @@ function startSession(o, sure) {
                           from: fromSum ? ((S.last || {}).from || '#/') : here, pushed: !fromSum }, o);
   save();
   if (here === '#/s') route();
-  else if (fromSum) ultReplace('#/s');
+  else if (fromSum) location.replace('#/s');
   else location.hash = '#/s';
 }
 /* 离开做题页回到进来的那一页:能用浏览器后退就后退(历史不留做题页),否则直接换过去 */
@@ -719,7 +639,7 @@ function leaveSession(clear) {
   const cur = S.cur, to = (cur && cur.from) || '#/';
   if (clear) { S.cur = null; save(); }
   if (cur && cur.pushed && history.length > 1) history.back();
-  else ultReplace(to);
+  else location.replace(to);
 }
 function snapshot(subj) { const o = {}; topicsOf(subj).forEach(t => { o[t.id] = stage(subj, t.id).k; }); return o; }
 
@@ -741,8 +661,8 @@ function pushQ(cur, d, q) {
 let tick = null;
 function viewSession() {
   const cur = S.cur;
-  if (!cur) { ultReplace('#/'); return; }
-  Promise.all([loadData(cur.subj), loadKatex()]).then(function (res) { const d = res[0];
+  if (!cur) { location.replace('#/'); return; }
+  loadData(cur.subj).then(function (d) {
     if (cur.mode === 'paper' && !cur.done && Date.now() > cur.dl) { submitPaper(); return; }
     const rg = pageRange(cur, d, cur.i), ps = rg[0], pe = rg[1];
     cur.i = ps;
@@ -771,7 +691,7 @@ function viewSession() {
         return `<button class="opt ${c}" data-p="${L}" data-id="${x}" ${rv ? 'disabled' : ''}><b>${L}</b><span>${o}</span></button>`; }).join('')}</div>`; };
     const verdictOf = (x, qx, ax) => revealOf(x) ? `<div class="verdict ${ax.ok ? 'ok' : ax.skip ? 'skip' : 'bad'}">${ax.ok ? '✓' : ax.skip ? '未答 · 答案 ' + qx.ans : qx.ans}
         <span class="mono${ax.t > secOf(cur.subj, qx.t) * 1.25 ? ' hot' : ''}">${mmss(ax.t)}</span>${qx.skip ? '<em>可放弃</em>' : ''}</div>
-        <div class="sol">${wrapSol(qx.sol)}</div>` : '';
+        <div class="sol">${qx.sol || ''}</div>` : '';
     let bodyL, bodyR;
     if (!multi) {
       bodyL = `<div class="meta"><span>${q.src}</span><a href="#" class="cp" data-cpimg="1" title="把整道题截成图片复制,可直接粘贴到别的 AI(X)">复制图片</a>${tools(id)}</div>
@@ -906,7 +826,7 @@ function finish() {
   sum.from = cur.from;
   S.last = sum; S.cur = null; save();
   autoSnap();
-  ultReplace('#/sum');
+  location.replace('#/sum');
 }
 
 /* ───────────── 实战套卷 ───────────── */
@@ -973,25 +893,38 @@ function submitPaper() {
 /* ───────────── 一组结束 ───────────── */
 function viewSum() {
   const s = S.last;
-  if (!s) { ultReplace('#/'); return; }
-  Promise.all([loadData(s.subj), loadKatex()]).then(function (res) { const d = res[0];
+  if (!s) { location.replace('#/'); return; }
+  loadData(s.subj).then(function (d) {
     const n = s.ids.length, ok = s.ids.filter(id => (s.ans[id] || {}).ok).length, delta = s.est1 - s.est0;
     const pts = SUBJ[s.subj].pts;
-    const ups = topicsOf(s.subj).filter(t => (s.lv0 || {})[t.id] !== undefined && stage(s.subj, t.id).k > s.lv0[t.id] && s.lv0[t.id] > 0);
-    const found = topicsOf(s.subj).filter(t => s.lv0 && s.lv0[t.id] === 0 && stage(s.subj, t.id).k > 0);
-    const slow = s.ids.filter(id => (s.ans[id] || {}).ok && s.ans[id].t > secOf(s.subj, d.byId[id].t) * 1.25).length;
-    const bossA = s.boss && s.ans[s.boss];
+    const wrongs = s.ids.filter(id => { const a = s.ans[id]; return a && !a.ok && !a.skip; });
+    const slow = s.ids.filter(id => (s.ans[id] || {}).ok && d.byId[id] && s.ans[id].t > secOf(s.subj, d.byId[id].t) * 1.25).length;
     const scouting = topicsOf(s.subj).some(t => !stage(s.subj, t.id).k);
+    // 错因归类一句话诊断：按失分考点聚合并提示慢答数，零冗余
+    let diag = '';
+    if (wrongs.length || slow) {
+      const cnt = {};
+      wrongs.forEach(id => { const q = d.byId[id]; if (q) cnt[q.t] = (cnt[q.t] || 0) + 1; });
+      const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 3)
+        .map(tid => esc(topicName(s.subj, tid).split(' · ')[0]) + ' ' + cnt[tid] + ' 题');
+      const parts = [];
+      if (top.length) parts.push('失分：' + top.join(' · '));
+      if (slow) parts.push('超时 ' + slow + ' 题');
+      if (parts.length) diag = `<div class="sum-diag">${parts.join('　')}</div>`;
+    }
     html(`<section class="home">
       <div class="big">${s.mode === 'paper' ? `<span class="num">${ok * pts}</span><span class="of">/ ${n * pts}</span>`
         : scouting ? `<span class="num">${ok}</span><span class="of">/ ${n}</span>`
         : `<span class="num">${fmt(s.est1)}</span><span class="of">${Math.abs(delta) >= 0.05 ? (delta > 0 ? '+' : '') + fmt(delta) : ''}</span>`}</div>
       <div class="cap">${s.mode === 'paper' ? '对 ' + ok + ' / ' + n + (s.ids.some(id => (s.ans[id] || {}).skip) ? ' · 未答 ' + s.ids.filter(id => (s.ans[id] || {}).skip).length : '') : scouting ? '摸底' : ok + '/' + n + (s.ids.some(id => (s.ans[id] || {}).skip) ? ' · 未答 ' + s.ids.filter(id => (s.ans[id] || {}).skip).length : '')}</div>
+      ${diag}
       <button class="go" id="again">${s.mode === 'paper' ? '返回' : '继续'}</button>
-      <div class="links"><a href="#" id="rv">回看</a><a href="#" id="pr">打印</a></div>
+      <div class="links"><a href="#" id="rv">回看</a>${wrongs.length ? `<a href="#" id="redoW" class="hot">重做错题 (${wrongs.length})</a>` : ''}<a href="#" id="pr">打印</a></div>
     </section>`);
-    $('#again').onclick = () => { if (s.mode === 'paper') ultReplace('#/bank'); else startTrain(s.subj); };
+    $('#again').onclick = () => { if (s.mode === 'paper') location.replace('#/bank'); else startTrain(s.subj); };
     $('#pr').onclick = ev => { ev.preventDefault(); printAsk(s.subj, s.ids, s.title, false); };
+    const rw = $('#redoW');
+    if (rw) rw.onclick = ev => { ev.preventDefault(); startSession({ mode: 'redo', subj: s.subj, ids: wrongs.slice(), title: '重做本组错题' }); };
     const review = k => { startSession({ mode: 'review', subj: s.subj, ids: s.ids, title: '回看 · ' + s.title, done: true });
                           S.cur.ans = s.ans; S.cur.i = k; S.cur.boss = s.boss; save(); viewSession(); };
     $('#rv').onclick = ev => { ev.preventDefault(); review(Math.max(0, s.ids.findIndex(id => !(s.ans[id] || {}).ok))); };
@@ -1017,14 +950,20 @@ function viewMe() {
   <div class="grp-h">收藏</div>
   <div class="grp">${row('favgo', '做收藏的题', fav.length ? fav.length + ' 题' : '', fav.length ? 'chev' : 'off')}
     ${row('favpr', '打印收藏', '', fav.length ? 'chev' : 'off')}</div>
-  <div class="grp-h">目标分</div>
+  <div class="grp-h">AI 设置</div>
+  <div class="grp">${row('aiprov', '服务商', PROV()[AI.provider].name, 'chev')}${row('aikey', 'API Key', AI.keys[AI.provider] ? '已设置' : builtinKey(AI.provider) ? '内置' : '未设置', 'chev')}
+    ${row('airem', '记住 Key', AI.remember ? '记住' : '关闭网页即清除', 'chev')}
+    ${row('aimodel', '模型', MODELS()[AI.model][0], 'chev')}${row('aibud', '每日上限', kTok(AI.budget) + ' token', 'chev')}
+    <div class="row-i"><span>今日已用</span><span class="v">${kTok(aiToday().in + aiToday().out)} · 约 ${yuan(aiToday().usd)}</span></div></div>
+  <div class="grp-h">目标分与冲刺节奏</div>
   <div class="grp">
+    ${row('sprint', '10 天冲刺模式', S.sprint ? '已开启 · 真题优先/快复习' : '关闭', 'chev')}
     <label class="row-i"><span>数学</span><span class="v"><input type="number" inputmode="numeric" id="tm" min="20" max="75" value="${S.target.math}"> / 75</span></label>
     <label class="row-i"><span>逻辑</span><span class="v"><input type="number" inputmode="numeric" id="tl" min="20" max="60" value="${S.target.logic}"> / 60</span></label>
     <label class="row-i"><span>公考</span><span class="v"><input type="number" inputmode="numeric" id="tg" min="30" max="135" value="${S.target.gk}"> / 135</span></label></div>
   <div class="grp-h">数据</div>
   <div class="grp">${row('ex', '导出备份', S.lastBackup ? ago(S.lastBackup) : '从未', 'chev')}${row('im', '从备份恢复', '', 'chev')}</div>
-  <div class="grp-h">本机自动备份 · 每天一份，留 7 天</div>
+  <div class="grp-h">本机自动备份 · 每天一份,留 7 天</div>
   <div class="grp" id="snaps"><div class="row-i off"><span>读取中…</span></div></div>
   <div class="grp danger-g">${row('rs', '清空记录', '', 'danger')}</div>`);
   app.querySelectorAll('a.row-i').forEach(a => a.addEventListener('click', ev => ev.preventDefault()));
@@ -1032,6 +971,7 @@ function viewMe() {
   num($('#tm'), 'm', v => { S.target.math = Math.min(75, v); });
   num($('#tl'), 'l', v => { S.target.logic = Math.min(60, v); });
   num($('#tg'), 'g', v => { S.target.gk = Math.min(135, v); });
+  $('#sprint').onclick = () => { S.sprint = !S.sprint; save(); viewMe(); toast(S.sprint ? '已开启 10 天冲刺：真题优先、错题次日回炉' : '已切回常规复习节奏'); };
   $('#redo').onclick = () => wrong.length && loadData(S.subj).then(() => startSession({ mode: 'redo', subj: S.subj, title: '错题重做',
     ids: wrong.sort((a, b) => S.cards[a].due - S.cards[b].due).slice(0, gN()) }));
   $('#wlist').onclick = () => wrong.length && (location.hash = '#/wrongs');
@@ -1040,6 +980,11 @@ function viewMe() {
   $('#prw').onclick = () => wrong.length && printAsk(S.subj, wrong, SUBJ[S.subj].name + '错题', false);
   $('#bkp').onclick = () => { S.bankTab = 'papers'; save(); location.hash = '#/bank'; };
   $('#bkt').onclick = () => { S.bankTab = 'topics'; save(); location.hash = '#/bank'; };
+  $('#aikey').onclick = () => askKey().then(viewMe);
+  $('#airem').onclick = () => { AI.remember = !AI.remember; saveAI(); viewMe(); toast(AI.remember ? 'Key 会保存在本机浏览器' : 'Key 只在本次打开有效'); };
+  $('#aimodel').onclick = () => { const ks = Object.keys(MODELS()).filter(k => MODELS()[k][3] === AI.provider); AI.model = ks[(ks.indexOf(AI.model) + 1) % ks.length]; saveAI(); viewMe(); };
+  $('#aiprov').onclick = () => pickProvider().then(viewMe);
+  $('#aibud').onclick = () => ask('每天最多用多少万 token?', { input: String(AI.budget / 10000), type: 'number' }).then(v => { if (v && +v > 0) { AI.budget = Math.round(+v * 10000); saveAI(); viewMe(); } });
   $('#ex').onclick = exportBackup;
   $('#im').onclick = importBackup;
   fillSnaps();
@@ -1140,44 +1085,20 @@ async function autoSnap() {
     await kvSet('snaps', list);
   } catch (e) { /* 隐私模式等存不了就算了 */ }
 }
-async function delSnap(k) {
-  const list = ((await kvGet('snaps')) || []).filter(x => x !== k);
-  await kvDel('snap:' + k);
-  await kvSet('snaps', list);
-}
-async function delAllSnaps() {
-  for (const k of ((await kvGet('snaps')) || [])) await kvDel('snap:' + k);
-  await kvSet('snaps', []);
-}
 async function fillSnaps() {
   const box = $('#snaps');
   if (!box) return;
   const list = window.indexedDB ? ((await kvGet('snaps')) || []) : [];
   const snaps = (await Promise.all(list.map(k => kvGet('snap:' + k).then(v => v && Object.assign({ k: k }, v))))).filter(Boolean);
   if (!$('#snaps')) return;
-  if (!snaps.length) {
-    box.innerHTML = '<div class="row-i off"><span>还没有，做完一组后自动生成</span></div>';
-    return;
-  }
-  box.innerHTML = snaps.map(x => { const d = new Date(x.at);
-    const when = (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    return `<div class="row-i snap-row"><a href="#" class="snap-open" data-snap="${x.k}"><span>${when}</span><span class="v">${x.n} 题</span></a><button type="button" class="snap-del" data-del="${x.k}">删除</button></div>`;
-  }).join('') + '<a href="#" class="row-i danger" id="snap-clear">清空全部自动备份</a>';
+  box.innerHTML = snaps.length ? snaps.map(x => { const d = new Date(x.at);
+    return `<a href="#" class="row-i chev" data-snap="${x.k}"><span>${d.getMonth() + 1} 月 ${d.getDate()} 日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span><span class="v">${x.n} 题</span></a>`; }).join('')
+    : '<div class="row-i off"><span>还没有,做完一组后自动生成</span></div>';
   box.querySelectorAll('[data-snap]').forEach(a => a.onclick = async function (ev) {
     ev.preventDefault();
     const x = await kvGet('snap:' + a.dataset.snap);
     if (x && await ask('恢复到 ' + new Date(x.at).toLocaleString('zh-CN') + ' 的记录(做过 ' + x.n + ' 题)?当前记录会被覆盖。', { ok: '恢复' })) { restoreS(x.S); toast('已恢复'); }
   });
-  box.querySelectorAll('[data-del]').forEach(b => b.onclick = async function (ev) {
-    ev.preventDefault();
-    ev.stopPropagation();
-    if (await ask('删除这份备份?删除后不能恢复。', { ok: '删除', danger: true })) { await delSnap(b.dataset.del); toast('已删除'); fillSnaps(); }
-  });
-  const clear = $('#snap-clear');
-  if (clear) clear.onclick = async function (ev) {
-    ev.preventDefault();
-    if (await ask('清空全部自动备份?删除后不能恢复。', { ok: '全部清空', danger: true })) { await delAllSnaps(); toast('已清空自动备份'); fillSnaps(); }
-  };
 }
 
 /* ───────────── AI 教练(Claude API,浏览器直连,官方 SDK 打包在 vendor/anthropic-sdk-1.0.0.mjs) ─────────────
@@ -1331,7 +1252,7 @@ function aiSnapshot() {
   });
   const days = [];
   for (let k = 6; k >= 0; k--) days.push(S.days[dayKey(now - k * DAY)] || 0);
-  L.push('近7天题量:' + days.join(','));
+  L.push('近7天题量:' + days.join(',') + (S.sprint ? ' · 冲刺模式:已开(10天节奏)' : ''));
   const os = load('ult.or.v1', {});
   L.push(`[运筹学] 已学完 ${orDone(os)}/${OR_CORE.length} 章 · 闪卡待复习 ${Object.values(os.fc || {}).filter(x => x.due <= now).length} 张(学员也要考运筹学,安排时间要兼顾)`);
   if (S.lastQ && Date.now() - S.lastQ.at < 6 * 3600e3) L.push('刚才在看的题:' + S.lastQ.id + '(' + SUBJ[S.lastQ.subj].name + ')——学员说「这题」多半指它,可用 read_question 读');
@@ -1415,10 +1336,10 @@ CHAT_PROFILES.main = { title: 'AI 教练', sys: () => AI_SYS + (window.UKB ? '\n
   chips: function () {
     const subj = S.subj, ts = topicsOf(subj).filter(t => tpList(subj, t.id).length >= 2);
     const weak = ts.slice().sort((a, b) => mastery(subj, a.id) - mastery(subj, b.id))[0], nw = wrongIds(subj, []).length;
-    const L = ['分析一下我现在的学情'];
+    const L = ['剩 10 天了,按提分性价比给我排优先级', '分析一下我现在的学情'];
     if (weak) L.push('「' + weak.name + '」怎么快速提上去?');
     if (nw) L.push('看看我的错题,说说错在哪');
-    L.push('这个网站有哪些功能?', '帮我找一道' + (weak ? weak.name.split(' ')[0] : topicsOf(subj)[0].name.split(' ')[0]) + '的难题');
+    L.push('帮我找一道' + (weak ? weak.name.split(' ')[0] : topicsOf(subj)[0].name.split(' ')[0]) + '的真题');
     return L;
   } };
 /* 网站知识库(ai-kb.js,构建生成):概览放进系统提示,细节由 site_info 工具按需查 */
@@ -1619,7 +1540,11 @@ async function runTool(name, x) {
   return 'error:未知工具';
 }
 async function findById(id) {
-  const first = /^k/.test(id) ? 'gk' : /^[gj]\d|^cd-/.test(id) ? 'logic' : 'math';
+  if (!id) return null;
+  for (const sj of ['math', 'logic', 'gk']) {
+    if (DATA[sj] && DATA[sj].byId && DATA[sj].byId[id]) return { subj: sj, q: DATA[sj].byId[id] };
+  }
+  const first = /^k/.test(id) ? 'gk' : /^(?:cd-|[gj]\d)/.test(id) ? 'logic' : 'math';
   for (const sj of [first].concat(['math', 'logic', 'gk'].filter(x => x !== first))) { const d = await loadData(sj); if (d.byId[id]) return { subj: sj, q: d.byId[id] }; }
   return null;
 }
@@ -1861,7 +1786,7 @@ function plainQ(h) { return String(h || '').replace(/<br\s*\/?>/g, '\n').replace
    预览里看到的每一页就是打出来的那一页。纸面 794×1123px = 210×297mm(96dpi),上下边距 60px≈16mm,左右 57px≈15mm。 */
 const PAGE = { h: 1123, py: 60, px: 57, foot: 26 };
 function printAsk(subj, ids, title, pickCount) {
-  Promise.all([loadData(subj), loadKatex()]).then(function (res) { const d = res[0];
+  loadData(subj).then(function (d) {
     const o = { ans: 'key', space: subj === 'math' ? 'sm' : 'no', which: 'new', n: 20 };
     const opt = (k, v, t) => `<option value="${v}"${o[k] === v ? ' selected' : ''}>${t}</option>`;
     const pv = el('div', 'pv');
@@ -1910,16 +1835,34 @@ function paperBlocks(d, subj, ids, title, o) {
       <div class="doc-m"><span>${SUBJ[subj].name} · ${qs.length} 题 · 建议 ${mins} 分钟 · ${dt.getFullYear()}.${dt.getMonth() + 1}.${dt.getDate()}</span>
       <span class="doc-f"><span>用时</span><span>得分</span></span></div></header>
     ${qs.some(q => q.kind === 'cond') ? `<div class="doc-r">条件充分性判断　A. (1) 充分,(2) 不充分　B. (2) 充分,(1) 不充分　C. 单独都不充分,联合充分　D. 单独都充分　E. 单独、联合都不充分</div>` : ''}`;
-  const body = qs.map((q, k) => `<div class="pq sp-${o.space}" data-id="${q.id}">
-    <div class="pq-t"><b class="pq-n">${k + 1}.</b>${q.stem}</div>
-    ${q.fig ? `<img class="pq-f" src="${q.fig}" alt="">` : ''}
+  const oneQ = (q, k, isSub) => `<div class="pq${isSub ? ' pq-sub' : ''} sp-${o.space}" data-id="${q.id}">
+    <div class="pq-t"><b class="pq-n">${k + 1}.</b>${isSub && q.ask ? q.ask : q.stem}</div>
+    ${!isSub && q.fig ? `<img class="pq-f" src="${q.fig}" alt="">` : ''}
     ${q.kind === 'cond' ? `<div class="pq-c"><p>(1) ${q.c1}</p><p>(2) ${q.c2}</p></div>`
-      : `<ol class="pq-o ${optCols(q.opts)}">${q.opts.map((t, i) => `<li><b>${LET[i]}.</b> ${t}</li>`).join('')}</ol>`}</div>`);
+      : `<ol class="pq-o ${optCols(q.opts)}">${q.opts.map((t, i) => `<li><b>${LET[i]}.</b> ${t}</li>`).join('')}</ol>`}</div>`;
+  // 共用题干（逻辑组题 / 公考材料题）相邻合并：材料只印一次，省纸且贴合真卷版面
+  const body = [];
+  for (let i = 0; i < qs.length;) {
+    const q0 = qs[i];
+    let j = i + 1;
+    if (q0.grp && q0.ask) {
+      while (j < qs.length && qs[j].grp === q0.grp && qs[j].ask) j++;
+    }
+    if (j - i > 1) {
+      const shared = q0.stem.slice(0, q0.stem.length - q0.ask.length).replace(/(<br\s*\/?>)+$/i, '');
+      const subs = [];
+      for (let m = i; m < j; m++) subs.push(oneQ(qs[m], m, true));
+      body.push(`<div class="pq-grp"><div class="pq-gh">第 <span class="pq-rng">${i + 1}–${j}</span> 题共用题干</div><div class="pq-gstem">${shared}</div>${subs.join('')}</div>`);
+    } else {
+      body.push(oneQ(q0, i, false));
+    }
+    i = j;
+  }
   // 答案按排版后的最终题序生成(分页时为了填满页面可能调换了题序)
   const ans = order => { const qq = order.map(id => d.byId[id]);
     return o.ans === 'none' ? [] : [`<h2 class="doc-ah">答案${o.ans === 'sol' ? '与解析' : ''}</h2>
     <div class="keys">${qq.map((q, k) => `<span><i>${k + 1}</i>${q.ans}</span>`).join('')}</div>`]
-    .concat(o.ans !== 'sol' ? [] : qq.map((q, k) => `<div class="sol-i"><b>${k + 1}. ${q.ans}</b><span class="src">${q.src}</span><div>${wrapSol(q.sol)}</div></div>`)); };
+    .concat(o.ans !== 'sol' ? [] : qq.map((q, k) => `<div class="sol-i"><b>${k + 1}. ${q.ans}</b><span class="src">${q.src}</span><div>${q.sol || ''}</div></div>`)); };
   return { head: head, body: body, ans: ans };
 }
 function paginate(bl) {
@@ -1946,7 +1889,14 @@ function paginate(bl) {
       put(rest.splice(i, 1)[0]);
     }
     const order = [];
-    pages.forEach(pg => pg.forEach(n => { const q = n.querySelector('[data-id]'); if (q) { order.push(q.dataset.id); n.querySelector('.pq-n').textContent = order.length + '.'; } }));
+    pages.forEach(pg => pg.forEach(n => {
+      const qs = n.querySelectorAll('[data-id]');
+      if (!qs.length) return;
+      const startNo = order.length + 1;
+      qs.forEach(q => { order.push(q.dataset.id); const pn = q.querySelector('.pq-n'); if (pn) pn.textContent = order.length + '.'; });
+      const rng = n.querySelector('.pq-rng');
+      if (rng) rng.textContent = startNo + '–' + order.length;
+    }));
     const ans = bl.ans(order).map(mk);
     return ready().then(function () {
       if (ans.length) { newPage(); ans.forEach(put); }
@@ -1973,14 +1923,13 @@ document.addEventListener('visibilitychange', function () {
 function route() {
   clearInterval(tick);
   document.title = 'beta111';
-  const routeHash = location.hash;
-  const h = routeHash.split('?')[0].replace(/^#\/?/, '').split('/');
+  const h = location.hash.replace(/^#\/?/, '').split('/');
   const r = h[0] || 'home';
-  const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' || r === 'e2' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作和英语在首页,「学习」就是运筹学
+  const tab = r === 't' || r === 'papers' || r === 'bank' || r === 'wrongs' ? 'me' : r === 'sum' || r === 'writing' ? 'home' : r === 'or' ? 'learn' : r;     // 题库在「我的」里;写作在首页,「学习」就是运筹学
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.r === tab));
   if (r !== 's' && S.cur && S.cur.qt && !S.cur.away) { S.cur.away = Date.now(); save(); }
   document.body.classList.toggle('playing', r === 's');
-  document.body.classList.remove('chatmode');
+  document.body.classList.toggle('chatmode', r === 'ai' || (r === 'or' && h[1] === 'ai'));
   document.body.classList.toggle('reading', /^#\/writing\/./.test(location.hash));   // 写作阅读页全屏:它有自己的返回条和上一篇/下一篇
   if (r === 't') viewTopic(h[1], h[2]);
   else if (r === 'bank' || r === 'papers') viewBank();
@@ -1988,17 +1937,16 @@ function route() {
   else if (r === 'wrongs') viewWrongs();
   else if (r === 's') viewSession();
   else if (r === 'sum') viewSum();
-  else if (r === 'ai') { ultReplace('#/'); return; }
-  else if (r === 'learn') ultReplace('#/or');     // 「学习」现在只有运筹学,直接进运筹学首页
+  else if (r === 'ai') viewAI('main');
+  else if (r === 'learn') location.replace('#/or');     // 「学习」现在只有运筹学,直接进运筹学首页
   else if (r === 'or') loadOR(() => { if (location.hash.indexOf('#/or') === 0) window.renderOR(h); });
-  else if (r === 'e2') loadE2(() => { if (location.hash === routeHash) window.renderE2(h); });
   else if (r === 'writing') loadWriting(() => { if (location.hash.indexOf('#/writing') === 0) window.renderWriting(); });
   else viewHome();
 }
 document.addEventListener('click', function (ev) {
   const b = ev.target.closest('[data-subj]');
   if (!b) return;
-  if (b.dataset.subj === 'or' || b.dataset.subj === 'wr' || b.dataset.subj === 'e2') S.homeTab = b.dataset.subj;          // 首页的运筹学、写作、英语是额外视图,其他页的科目仍是数学/逻辑
+  if (b.dataset.subj === 'or' || b.dataset.subj === 'wr') S.homeTab = b.dataset.subj;          // 首页的运筹学只是首页的一个视图,其他页的科目仍是数学/逻辑
   else { S.subj = b.dataset.subj; S.homeTab = ''; }
   save(); route();
 });
@@ -2027,52 +1975,7 @@ app.addEventListener('touchend', function (e) {
   if (b && !b.disabled) b.click();
 }, { passive: true });
 let navCount = 0;          // 本次打开后在站内跳过几次;>1 说明后退还停在站内
-/* 站内 hash 栈:用来判断「上一页是不是上级」。顶栏返回在是的时候 history.back(),
-   避免再压一条相同地址,系统返回又回到刚离开的页。 */
-function normHash(h) {
-  h = String(h == null ? '' : h);
-  if (!h || h === '#') return '#/';
-  if (h.charAt(0) !== '#') h = '#' + h;
-  const i = h.indexOf('?');
-  const path = (i < 0 ? h : h.slice(0, i)).replace(/\/+$/, '') || '#/';
-  if (path === '#') return '#/' + (i < 0 ? '' : h.slice(i));
-  return path + (i < 0 ? '' : h.slice(i));
-}
-let hashAct = '';
-const savedRoutes = history.state && history.state.ultRoutes;
-const hashStack = Array.isArray(savedRoutes) && savedRoutes.length &&
-  savedRoutes[savedRoutes.length - 1] === normHash(location.hash)
-  ? savedRoutes.slice() : [normHash(location.hash)];
-function saveRouteHistory() {
-  history.replaceState(Object.assign({}, history.state, { ultRoutes: hashStack.slice() }), '');
-}
-saveRouteHistory();
-window.__ultHashStack = hashStack;
-window.__ultNormHash = normHash;
-function ultReplace(h) {
-  hashAct = 'replace';
-  if (normHash(location.hash) === normHash(h)) { hashAct = ''; return; }
-  location.replace(h);
-}
-window.addEventListener('hashchange', () => {
-  const h = normHash(location.hash);
-  const restored = history.state && history.state.ultRoutes;
-  if (Array.isArray(restored) && restored[restored.length - 1] === h && hashAct !== 'replace') {
-    hashStack.splice(0, hashStack.length, ...restored);
-  } else if (hashAct === 'replace') {
-    hashStack[Math.max(0, hashStack.length - 1)] = h;
-  } else if (hashStack.length >= 2 && normHash(hashStack[hashStack.length - 2]) === h) {
-    hashStack.pop();
-  } else if (normHash(hashStack[hashStack.length - 1]) !== h) {
-    hashStack.push(h);
-  }
-  hashAct = '';
-  saveRouteHistory();
-  navCount++;
-  layerMark = false;
-  while (LAYERS.length) LAYERS[0].close(true);
-  route();
-});   // 换页时收起所有浮层
+window.addEventListener('hashchange', () => { navCount++; layerMark = false; while (LAYERS.length) LAYERS[0].close(true); route(); });   // 换页时收起所有浮层
 // 申请持久存储(iOS 上减少被系统清掉的可能),打开时顺手存今天的快照
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 setTimeout(autoSnap, 1500);

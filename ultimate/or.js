@@ -1,6 +1,6 @@
 /* 运筹学模块(从「运筹学学习站」并入,按 Ultimate 的样式与交互重做)。
    由 app.js 的 loadOR 首次进入 #/or… 时加载:vendor/marked → or/or-data.js(window.ORC,构建生成,勿读)→ or/or-solvers.js → 本文件。
-   路由:#/or 首页 · #/or/c/<章号> 讲义 · #/or/cards 闪卡 · #/or/tools/<计算器>
+   路由:#/or 首页 · #/or/c/<章号> 讲义 · #/or/cards 闪卡 · #/or/tools/<计算器> · #/or/ai/<场景> AI 助教(每章一个对话,共用 Key 和额度)
    记录存 localStorage ult.or.v1(已学完、阅读位置、闪卡、计算器输入、模拟卷计时),并入导出/导入备份。 */
 (function () {
   'use strict';
@@ -112,6 +112,7 @@
         <a href="#/or/q"><b>练题</b><span>${dd(qs.due, ' 道待复习') || '选择 · 大题'}</span></a>
         <a href="#/or/cards"><b>闪卡</b><span>${due ? dd(due, ' 张待复习') : fresh ? fresh + ' 张新卡' : '都记住了'}</span></a>
         <a href="#/or/tools"><b>计算器</b><span>逐步出表</span></a>
+        <a href="#/or/ai/all"><b>问 AI</b><span>随时答疑</span></a>
       </div>
       <div class="grp-h">学习路线</div>
       <div class="or-path">${groups.map(g => `<div class="or-stage">${esc(g.name)}</div><div class="or-row">${g.list.map(c => {
@@ -144,7 +145,7 @@
     const i = CH.indexOf(c), prev = CH[i - 1], next = CH[i + 1], exam = c.no === '12' || c.no === '13';
     const dn = st.done.indexOf(c.no) >= 0, core = c.core || c.no === '09';
     $app.innerHTML = `<div class="or-page or-read">
-      <div class="or-bar"><a href="#/or" class="back" id="orback">‹ 运筹学</a></div>
+      <div class="or-bar"><a href="#/or" class="back" id="orback">‹ 运筹学</a><a href="#" id="orai" class="or-ask">问 AI</a></div>
       ${exam ? timerHTML(c.no) : ''}
       <div class="or-eyebrow">${c.n === 0 ? '导读' : c.d ? '第 ' + c.d + ' 章' + (c.tag ? ' · ' + c.tag : '') : '考试冲刺'}</div>
       <h1 class="or-h1">${esc(c.title)}</h1>
@@ -154,6 +155,7 @@
       <div class="or-foot">${prev ? `<a href="#/or/c/${prev.no}">‹ ${esc(lab(prev))}</a>` : '<span></span>'}${next ? `<a href="#/or/c/${next.no}" class="nx">${esc(lab(next))} ›</a>` : ''}</div>
     </div>`;
     $$('.md a').forEach(a => { if (/^https?:/.test(a.getAttribute('href') || '')) { a.target = '_blank'; a.rel = 'noopener'; } });
+    $('#orai').onclick = ev => { ev.preventDefault(); askAI('', c.no); };
     const mk = $('#mark'); if (mk) mk.onclick = ev => { ev.preventDefault(); const k = st.done.indexOf(c.no); if (k >= 0) st.done.splice(k, 1); else st.done.push(c.no); saveOR(); mk.classList.toggle('on', k < 0); mk.textContent = k < 0 ? '✓ 已学完' : '标记学完'; };
     const tc = $('#tocards'); if (tc) tc.onclick = ev => { ev.preventDefault(); st.cardFilter = c.no; saveOR(); location.hash = '#/or/cards'; };
     $$('[data-demo]').forEach(a => a.onclick = ev => { ev.preventDefault(); openDemo(a.dataset.demo); });
@@ -194,6 +196,23 @@
     const sp = $('#tstop'); if (sp) sp.onclick = ev => { ev.preventDefault(); delete st.timer[no]; saveOR(); viewChapter(no); };
     if (st.timer[no]) { tick(); tickH = setInterval(tick, 1000); }
   }
+  /* 讲义里选中一段文字 → 浮出「问 AI」 */
+  const selBtn = el('button', 'or-selask', '问 AI'); selBtn.hidden = true; document.body.append(selBtn);
+  let selText = '';
+  document.addEventListener('selectionchange', function () {
+    clearTimeout(selBtn._t);
+    selBtn._t = setTimeout(function () {
+      const sel = window.getSelection(), t = sel ? sel.toString().trim() : '';
+      if (!t || t.length > 600 || !sel.rangeCount || !sel.anchorNode || !sel.anchorNode.parentElement || !sel.anchorNode.parentElement.closest('.or-read .md')) { selBtn.hidden = true; return; }
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      selText = t; selBtn.hidden = false;
+      selBtn.style.left = Math.min(innerWidth - 84, Math.max(8, r.left + r.width / 2 - 34)) + 'px';
+      selBtn.style.top = Math.max(8, r.bottom + 10) + 'px';            // 放在选区下方,避开 iOS 自带的拷贝菜单
+    }, 250);
+  });
+  selBtn.addEventListener('mousedown', e => e.preventDefault());
+  selBtn.onclick = function () { selBtn.hidden = true; askAI(`我在读「${(chOf(st.last) || {}).title || ''}」,对这段内容不太理解:\n\n「${selText}」\n\n请用简单的话解释它是什么意思、为什么成立,最好举一个小例子。`, st.last); };
+
   /* ── 记忆闪卡:1/3/7/14/30/60 天间隔;忘了 10 分钟后本轮再来 ── */
   let queue = [], showA = false;
   function cardsDue(filter) {
@@ -216,13 +235,14 @@
       ${card ? `<div class="or-card" id="ocard"><div class="meta"><span>${DISP[card.ch] ? '第 ' + DISP[card.ch] + ' 章 · ' : ''}${esc((chOf(card.ch) || {}).title || '')}</span><span>${st.fc[card.id] ? '复习' : '新卡'}</span></div>
           <div class="q">${mdInline(card.q)}</div>${showA ? `<div class="a">${mdInline(card.a)}</div>` : '<div class="tap dim">先在心里答,再点卡片看答案</div>'}</div>
         ${showA ? `<div class="or-rate"><button data-r="0">忘了</button><button data-r="1">模糊</button><button data-r="2" class="ok">记得</button></div>` : ''}
-        `
+        <div class="links"><a href="#" id="askcard">这张没懂,问 AI</a></div>`
       : `<div class="or-card done"><b>本轮完成</b><p class="dim">到期的卡明天会自动出现;也可以换个章节范围继续。</p></div>`}
     </div>`;
     $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
     $('#cf').onchange = e => { st.cardFilter = e.target.value; saveOR(); queue = []; viewCards(); };
     const oc = $('#ocard'); if (oc && !showA) oc.onclick = () => { showA = true; viewCards(); };
     $$('.or-rate button').forEach(b => b.onclick = () => rate(card, +b.dataset.r));
+    const ac = $('#askcard'); if (ac) ac.onclick = ev => { ev.preventDefault(); askAI(`这是一张复习卡:\n问:${card.q}\n答:${card.a}\n\n请帮我理解为什么是这样,并给一个具体例子。`, 'cards'); };
   }
   function rate(card, r) {
     const s = st.fc[card.id] || { box: 0, first: Date.now() };
@@ -387,7 +407,7 @@
     el.innerHTML = `<div class="grid2"><div class="card form">
       <div class="cons-row"><select id="gs"><option>max</option><option>min</option></select>z =<input id="gc1">x₁+<input id="gc2">x₂</div>
       <div id="gcons" class="form"></div>
-      <div class="row"><button class="btn small" id="gadd">+ 添加约束</button></div>
+      <div class="row"><button class="btn small" id="gadd">+ 添加约束</button><button class="btn small" id="gai">让 AI 讲解这个图</button></div>
       <div class="result" id="gres" style="white-space:pre-wrap;font-family:var(--f-mono);font-size:13px"></div></div>
       <canvas class="lp" id="gcv" width="620" height="620"></canvas></div>`;
     $('#gs').value = LP.sense; $('#gc1').value = LP.c[0]; $('#gc2').value = LP.c[1];
@@ -399,6 +419,7 @@
     const upd = () => { LP.sense = $('#gs').value; LP.c = [parseFloat($('#gc1').value) || 0, parseFloat($('#gc2').value) || 0]; S.set('t_g', LP); solve(); };
     ['gs', 'gc1', 'gc2'].forEach((id) => ($('#' + id).oninput = $('#' + id).onchange = upd));
     $('#gadd').onclick = () => { LP.cons.push([1, 1, '<=', 10]); list(); upd(); };
+    $('#gai').onclick = () => askAI(`请用图解法讲解这个线性规划：\n${LP.sense} z = ${LP.c[0]}x1 + ${LP.c[1]}x2\n${LP.cons.map((r) => `${r[0]}x1 + ${r[1]}x2 ${r[2]} ${r[3]}`).join('\n')}\nx1, x2 >= 0\n说明可行域的形状、每个顶点、最优解，以及解是否唯一。`);
     list(); upd();
     function solve() {
       const eps = 1e-7, all = [...LP.cons, [1, 0, '>=', 0], [0, 1, '>=', 0]];
@@ -1228,7 +1249,7 @@
       <div class="qc-q">${mdInline(q.q)}</div>
       <div class="qc-opts">${it.ord.map((oi, k) => `<button class="qc-o${answered ? (oi === q.a ? ' ok' : k === it.pick ? ' bad' : ' dim') : ''}" data-k="${k}"><b>${'ABCD'[k]}</b><span>${mdInline(q.o[oi])}</span></button>`).join('')}</div>
       ${answered ? `<div class="qc-e">${it.ord[it.pick] === q.a ? '<b class="demo-ok">对了。</b>' : `<b class="demo-bad">选错了,答案是 ${'ABCD'[it.ord.indexOf(q.a)]}。</b>`}${mdInline(q.e)}</div>
-        <div class="qc-bar"><button class="go sm" id="qcnext">${cq.i + 1 < cq.list.length ? '下一题' : '看结果'}</button></div>` : ''}
+        <div class="qc-bar"><a href="#" id="qcai">没懂,问 AI</a><button class="go sm" id="qcnext">${cq.i + 1 < cq.list.length ? '下一题' : '看结果'}</button></div>` : ''}
     </div>`;
     $('#orback').onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } };
     if (!answered) $$('.qc-o').forEach(b => b.onclick = () => {
@@ -1238,6 +1259,7 @@
     });
     else {
       $('#qcnext').onclick = () => { cq.i++; viewQC(ch); window.scrollTo(0, 0); };
+      $('#qcai').onclick = ev => { ev.preventDefault(); askAI(`这道选择题我没懂:\n${q.q}\n选项:${q.o.map((o, i) => 'ABCD'[i] + '. ' + o).join(';')}\n答案:${q.o[q.a]}\n\n请讲清楚为什么,以及其他选项错在哪里。`, q.ch); };
     }
   }
   function viewQK(kind, seed) {
@@ -1245,7 +1267,7 @@
     if (!seed) { location.replace('#/or/q/k/' + kind + '/' + Math.floor(Math.random() * 1e9)); return; }
     const g = genQ(kind, +seed), cc = chOf(GEN[kind].ch), key = kind + ':' + seed, graded = (st.qg || {})[key];
     $app.innerHTML = `<div class="or-page or-qk">
-      <div class="or-bar"><a href="#/or/q" class="back" id="orback">‹ 练题</a></div>
+      <div class="or-bar"><a href="#/or/q" class="back" id="orback">‹ 练题</a><a href="#" id="qkai" class="or-ask">问 AI</a></div>
       <div class="or-eyebrow">${esc(GEN[kind].name)}${cc && cc.d ? ' · 第 ' + cc.d + ' 章' : ''}</div>
       ${g ? `<div class="qk-q md">${g.q}</div><p class="dim sm">先在纸上做完,再看解答。</p>
         <div id="qksol" hidden><div class="qk-sol md">${g.sol}</div>
@@ -1262,19 +1284,20 @@
       st.qw = st.qw.filter(w => w.k + ':' + w.s !== key); if (!ok) st.qw.push({ k: kind, s: +seed, t: Date.now() }); st.qw = st.qw.slice(-40);
       saveOR(); $('.qk-grade').innerHTML = `<span class="dim">已记录:${ok ? '做对了' : '做错了,放进「做错的计算题」'}</span>`;
     });
+    $('#qkai').onclick = ev => { ev.preventDefault(); const t = g ? $('.qk-q').innerText : ''; askAI(`这是一道「${GEN[kind].name}」练习题:\n${t}\n\n请先给我解题思路的提示,不要直接给答案。`, GEN[kind].ch); };
   }
   function qcStats() { const now = Date.now(); return { due: QB.filter(q => st.qc[q.id] && st.qc[q.id].due <= now).length, total: QB.length + GORDER.length }; }
 
   /* ── 路由入口(app.js 调用):parts = ['or', 子页, 参数] ── */
   window.renderOR = function (parts) {
-    clearInterval(tickH);
+    clearInterval(tickH); selBtn.hidden = true;
     document.title = '运筹学 · beta111';
     const sub = parts[1] || '';
     if (sub === 'c') return viewChapter(parts[2]);
     if (sub === 'cards') return viewCards();
     if (sub === 'q') return parts[2] === 'c' ? viewQC(parts[3] || 'all') : parts[2] === 'k' ? viewQK(parts[3], parts[4]) : viewQ(parts[2] === 'ch' ? parts[3] : '');
     if (sub === 'tools') { renderTools(parts[2] || S.get('tool', 'simplex')); window.scrollTo(0, 0); const b = $('#orback'); if (b) b.onclick = ev => { if (navCount > 1) { ev.preventDefault(); history.back(); } }; return; }
-    if (sub === 'ai') { location.replace('#/or'); return; }
+    if (sub === 'ai') return viewORAI(parts[2]);
     return viewHome();
   };
   window.orSummary = function () {
