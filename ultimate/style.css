@@ -294,7 +294,8 @@ body.previewing { overflow: hidden; }
   .home .go { min-width: 220px; padding: 16px 44px; }
   #toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
   body.playing #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
-  .seg button { padding: 8px 14px 8px 0; font-size: 16px; }
+  .seg button { padding: 6px 11px; font-size: 14px; }
+  .bank-h .seg button { padding: 5px 10px; font-size: 13.5px; }
   .lr { padding: 13px 2px; }
   .paper { padding: 12px 2px; }
   .paper .acts a { padding: 6px 4px; }
